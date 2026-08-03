@@ -1,6 +1,7 @@
 mod analyzer;
 mod cache;
 mod config;
+mod import;
 mod logging;
 mod lyrics;
 mod microphones;
@@ -17,7 +18,11 @@ use app_core::{AppConfig, SongsStore};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use cache::{calculate_cache_stats, clear_all, clear_models_command, clear_videos_command};
 use config::{load_config, save_config};
-use lyrics::{apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics};
+use import::{import_available, probe_import, run_import};
+use lyrics::{
+    apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
+    search_lrclib_terms,
+};
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
 use playback::{
     ensure_mp3_stems, ensure_playable_source_video, fetch_pixabay_videos, get_audio_paths,
@@ -118,6 +123,10 @@ pub fn run() {
             load_songs_meta,
             load_analysis_queue,
             load_library_menu_items,
+            // Import
+            import_available,
+            probe_import,
+            run_import,
             // Analyzer
             enqueue_one,
             enqueue_all,
@@ -131,6 +140,7 @@ pub fn run() {
             // Lyrics
             load_lyrics,
             search_lrclib_lyrics,
+            search_lrclib_terms,
             save_lyrics,
             provide_lrc,
             apply_timed_lyrics,

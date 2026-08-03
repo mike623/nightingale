@@ -1,5 +1,5 @@
 import { useMemo, type ComponentType, type SVGProps } from "react";
-import { Disc3Icon, FolderIcon, RefreshCwIcon } from "lucide-react";
+import { Disc3Icon, FolderIcon, RefreshCwIcon, YoutubeIcon } from "lucide-react";
 
 import { JellyfinIcon } from "@/components/icons/jellyfin";
 import { PlexIcon } from "@/components/icons/plex";
@@ -65,6 +65,7 @@ export const useSourceButtons = (): SourceButton[] => {
     rescanDisabled,
     isPending,
     hasSource,
+    isFolderSource,
     libraryPinned,
     jellyfinSource,
     navidromeSource,
@@ -147,6 +148,19 @@ export const useSourceButtons = (): SourceButton[] => {
           },
         ];
 
+    // Import from URL lives with the Folder library only — imported files land
+    // in the watched folder and are reaped by any remote source's scan (ADR-0001).
+    if (isFolderSource) {
+      buttons.push({
+        key: "import-url",
+        icon: YoutubeIcon,
+        label: "Import from URL",
+        tooltip: "Import a YouTube video or playlist",
+        handler: () => setMode("import-url"),
+        disabled: isPending,
+      });
+    }
+
     if (hasSource) {
       buttons.push({
         key: "rescan",
@@ -161,6 +175,7 @@ export const useSourceButtons = (): SourceButton[] => {
     return buttons;
   }, [
     hasSource,
+    isFolderSource,
     libraryPinned,
     isPending,
     jellyfin,

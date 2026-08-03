@@ -10,6 +10,14 @@ export const searchLrclibLyrics = async (fileHash: string): Promise<LrclibCandid
   return await invoke<LrclibCandidate[]>("search_lrclib_lyrics", { fileHash });
 };
 
+/** Manual LRCLIB search with user-supplied track/artist terms. */
+export const searchLrclibTerms = async (
+  track: string,
+  artist: string,
+): Promise<LrclibCandidate[]> => {
+  return await invoke<LrclibCandidate[]>("search_lrclib_terms", { track, artist });
+};
+
 export const saveLyrics = async (fileHash: string, lines: string[]): Promise<void> => {
   return await invoke<void>("save_lyrics", { fileHash, lines });
 };

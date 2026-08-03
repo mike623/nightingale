@@ -359,6 +359,32 @@ export const SettingsPage = () => {
                 </ButtonGroup>
               </Field>
 
+              {/* ponytail: not wired into the settings controller-nav ring (index
+                  math is Parakeet-shifted); mouse/touch works. Add a nav slot in
+                  constants.ts getAnalysisNav/getSettingsStops if it needs the ring. */}
+              <Field>
+                <Label>Word-level lyric timing</Label>
+                <Hint>
+                  Off uses LRCLIB's line-level synced lyrics and skips the slow WhisperX step
+                  entirely — songs with no LRCLIB match stay lyric-less until you search LRCLIB by
+                  hand (in Edit Lyrics). On always runs WhisperX for per-word karaoke highlighting.
+                </Hint>
+                <ButtonGroup>
+                  <Button
+                    variant={config?.word_level_lyrics === true ? "outline" : "default"}
+                    onClick={() => mutate({ word_level_lyrics: false })}
+                  >
+                    Off
+                  </Button>
+                  <Button
+                    variant={config?.word_level_lyrics === true ? "default" : "outline"}
+                    onClick={() => mutate({ word_level_lyrics: true })}
+                  >
+                    On
+                  </Button>
+                </ButtonGroup>
+              </Field>
+
               <Field>
                 <Label>Vocal detection sensitivity</Label>
                 <Hint>

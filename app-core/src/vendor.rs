@@ -66,6 +66,54 @@ pub fn ffmpeg_path() -> PathBuf {
     vendor_dir().join(name)
 }
 
+pub fn ytdlp_path() -> PathBuf {
+    let name = if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" };
+    vendor_dir().join(name)
+}
+
+fn ytdlp_download_url() -> Result<String, String> {
+    let base = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
+    let file = match (std::env::consts::OS, std::env::consts::ARCH) {
+        // macOS ships a universal2 standalone binary.
+        ("macos", _) => "yt-dlp_macos",
+        ("linux", "x86_64") => "yt-dlp_linux",
+        ("linux", "aarch64") => "yt-dlp_linux_aarch64",
+        ("windows", _) => "yt-dlp.exe",
+        (os, arch) => return Err(format!("Unsupported platform for yt-dlp: {os}-{arch}")),
+    };
+    Ok(format!("{base}/{file}"))
+}
+
+/// Lazily ensure yt-dlp is present (downloaded on the first Import, not at
+/// launch — see docs/adr/0002) and attempt a self-update, since yt-dlp breaks
+/// whenever YouTube changes its internals. A failed update on an
+/// already-present binary is non-fatal; a failed initial download is fatal.
+pub fn ensure_ytdlp() -> Result<PathBuf, String> {
+    let dest = ytdlp_path();
+    let existed = dest.is_file();
+
+    if !existed {
+        let _ = std::fs::create_dir_all(vendor_dir());
+        download_to_file(&ytdlp_download_url()?, &dest)
+            .map_err(|e| format!("Failed to download yt-dlp: {e}"))?;
+        mark_executable(&dest)?;
+    }
+
+    // Self-update in place. yt-dlp goes stale fast; a stale binary fails
+    // downloads silently, so we always try. Non-fatal — the (possibly older)
+    // binary still runs.
+    match silent_command(&dest).arg("-U").output() {
+        Ok(o) if o.status.success() => {}
+        Ok(o) => tracing::warn!(
+            "[ytdlp] self-update failed: {}",
+            String::from_utf8_lossy(&o.stderr)
+        ),
+        Err(e) => tracing::warn!("[ytdlp] could not run self-update: {e}"),
+    }
+
+    Ok(dest)
+}
+
 pub fn python_path() -> PathBuf {
     if cfg!(windows) {
         vendor_dir().join("venv").join("Scripts").join("python.exe")

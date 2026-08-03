@@ -43,19 +43,32 @@ pub struct LyricsFile {
 }
 
 pub fn lrclib_candidates(song: &Song) -> Vec<LrclibCandidate> {
-    let title = &song.title;
-    let artist = &song.artist;
-
-    if title.is_empty() || artist == "Unknown Artist" {
+    if song.title.is_empty() || song.artist == "Unknown Artist" {
         return Vec::new();
     }
+    lrclib_search(&song.title, &song.artist, &song.album, song.duration_secs)
+}
 
+/// Manual LRCLIB search with user-supplied terms — used by the "search LRCLIB"
+/// box when the auto-derived title/artist (e.g. a messy YouTube MV name) don't
+/// match. Artist may be empty; sorting has no album/duration reference.
+pub fn search_lrclib_terms(track: &str, artist: &str) -> Vec<LrclibCandidate> {
+    let track = track.trim();
+    if track.is_empty() {
+        return Vec::new();
+    }
+    lrclib_search(track, artist.trim(), "", 0.0)
+}
+
+fn lrclib_search(
+    title: &str,
+    artist: &str,
+    album: &str,
+    duration_secs: f64,
+) -> Vec<LrclibCandidate> {
     let agent = ureq::Agent::new_with_defaults();
 
-    info!(
-        "[lrclib] Searching: \"{title}\" by \"{artist}\" ({:.0}s, album=\"{}\")",
-        song.duration_secs, song.album
-    );
+    info!("[lrclib] Searching: \"{title}\" by \"{artist}\" ({duration_secs:.0}s, album=\"{album}\")");
 
     let url = format!(
         "https://lrclib.net/api/search?track_name={}&artist_name={}",
@@ -94,14 +107,14 @@ pub fn lrclib_candidates(song: &Song) -> Vec<LrclibCandidate> {
         with_lyrics.len()
     );
 
-    let album_lower = song.album.to_lowercase();
+    let album_lower = album.to_lowercase();
     with_lyrics.sort_by_key(|r| {
         let album_bonus: i64 = if r.album_name.to_lowercase() == album_lower {
             0
         } else {
             5_000
         };
-        let duration_penalty = ((r.duration_secs - song.duration_secs).abs() * 10.0) as i64;
+        let duration_penalty = ((r.duration_secs - duration_secs).abs() * 10.0) as i64;
         album_bonus + duration_penalty
     });
 
@@ -299,6 +312,14 @@ pub(crate) fn write_lyrics_file(
     let lyrics_json = serde_json::json!({ "lines": lines });
     std::fs::write(&out, serde_json::to_string_pretty(&lyrics_json).unwrap())?;
     Ok(out)
+}
+
+/// Best LRCLIB candidate's raw synced LRC (line-level timing), if any. Used by
+/// the analyzer to serve line-level lyrics without running WhisperX alignment.
+pub(crate) fn best_synced_lrc(song: &Song) -> Option<String> {
+    lrclib_candidates(song)
+        .into_iter()
+        .find_map(|c| c.synced_lyrics.filter(|s| !s.trim().is_empty()))
 }
 
 pub(crate) fn fetch_lrclib_lyrics(song: &Song, cache: &CacheDir) -> Option<PathBuf> {

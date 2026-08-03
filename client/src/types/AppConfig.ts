@@ -36,6 +36,13 @@ export type AppConfig = {
   align_backend: string | null;
   vocal_detection_threshold_pct: number | null;
   auto_analyze: boolean | null;
+  /**
+   * When set, analysis always runs WhisperX to produce word-level lyric
+   * timing. Default (`None`/false) prefers LRCLIB's line-level synced lyrics
+   * and skips WhisperX when they exist — only transcribing when LRCLIB has
+   * no match. See docs/adr/0003.
+   */
+  word_level_lyrics: boolean | null;
   song_list_view: string | null;
   language_overrides: { [key in string]: string } | null;
 };

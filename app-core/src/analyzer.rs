@@ -631,6 +631,40 @@ fn process_song(initial_hash: &str, cache: &CacheDir) {
         return;
     };
 
+    // Default lyrics path (word-level opt-in, see docs/adr/0003): prefer LRCLIB's
+    // line-level synced lyrics and skip WhisperX entirely. When word-level is off
+    // and this isn't a forced / already-stems-only pass:
+    //   - LRCLIB has a synced match  -> line-level LRC + stem separation, no WhisperX.
+    //   - LRCLIB has no synced match -> separate stems, NO transcription (lyric-less).
+    // WhisperX runs only when word-level is enabled globally or forced per-song.
+    if !AppConfig::load().word_level_lyrics()
+        && !STEMS_ONLY.lock().unwrap().contains(initial_hash)
+        && !FORCE_TRANSCRIBE.lock().unwrap().contains(initial_hash)
+    {
+        if let Some(lrc) = crate::lyrics::best_synced_lrc(&song) {
+            match crate::lyrics::provide_lrc(&song.file_hash, &lrc, true) {
+                Ok(()) => {
+                    info!(
+                        "[analyzer] Using LRCLIB line-level lyrics for {} (skipping WhisperX)",
+                        song.file_hash
+                    );
+                    return;
+                }
+                Err(e) => {
+                    warn!("[analyzer] LRC path failed ({e}); separating stems without lyrics")
+                }
+            }
+        } else {
+            info!(
+                "[analyzer] No LRCLIB synced lyrics for {}; separating stems without lyrics \
+                 (enable word-level timing or search LRCLIB manually to get lyrics)",
+                song.file_hash
+            );
+        }
+        // Lyric-less: run the stems-only pass (separation + key), no WhisperX.
+        mark_stems_only(&song.file_hash);
+    }
+
     let (song, local_path, file_hash_owned) = match prepare_audio_for_analysis(&song, cache) {
         Ok(out) => out,
         Err(e) => {
