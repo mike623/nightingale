@@ -1,4 +1,5 @@
 import { usePlaybackMicState } from "@/contexts/playback";
+import { useConfig } from "@/queries/use-config";
 import { PITCH_BUFFER_SIZE } from "@/lib/pitch/constants";
 import type { PitchSeries } from "@/lib/pitch/state";
 import { freqToSemitone, snapToRefOctave } from "@/lib/pitch/state";
@@ -50,8 +51,8 @@ function displayScale(windowHeight: number): number {
   return Math.max(MIN_DISPLAY_SCALE, windowHeight / REFERENCE_HEIGHT);
 }
 
-function computeLayout(windowHeight: number, windowWidth: number): CanvasLayout {
-  const scale = displayScale(windowHeight);
+function computeLayout(windowHeight: number, windowWidth: number, userScale = 1): CanvasLayout {
+  const scale = displayScale(windowHeight) * userScale;
   const width = Math.min(BASE_DISPLAY_WIDTH * scale, Math.max(240, windowWidth - 32));
   const height = BASE_DISPLAY_HEIGHT * scale;
   const paddingX = 8 * scale;
@@ -297,6 +298,8 @@ export function PitchGraph({ series, position = "top" }: PitchGraphProps) {
   const { micReady: visible } = usePlaybackMicState();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { height: windowHeight, width: windowWidth } = useWindowSize();
+  const { data: config } = useConfig();
+  const userScale = config?.pitch_graph_scale ?? 1;
 
   useEffect(() => {
     if (!visible) return;
@@ -305,11 +308,11 @@ export function PitchGraph({ series, position = "top" }: PitchGraphProps) {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
 
-    const layout = computeLayout(windowHeight, windowWidth);
+    const layout = computeLayout(windowHeight, windowWidth, userScale);
 
     setupCanvas(canvas, ctx, layout);
     drawPitchSeries(ctx, layout, series);
-  }, [series, visible, windowHeight, windowWidth]);
+  }, [series, visible, windowHeight, windowWidth, userScale]);
 
   if (!visible) return null;
 

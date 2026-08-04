@@ -49,6 +49,10 @@ export type AppConfig = {
    * stricter, higher is more forgiving. Default 6.
    */
   pitch_tolerance_semitones: number | null;
+  /**
+   * Size multiplier for the on-screen pitch graph. Default 1.0.
+   */
+  pitch_graph_scale: number | null;
   song_list_view: string | null;
   language_overrides: { [key in string]: string } | null;
 };

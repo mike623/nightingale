@@ -211,6 +211,8 @@ pub struct AppConfig {
     /// scores zero (`similarity = max(0, 1 - diff/tolerance)`). Lower is
     /// stricter, higher is more forgiving. Default 6.
     pub pitch_tolerance_semitones: Option<f64>,
+    /// Size multiplier for the on-screen pitch graph. Default 1.0.
+    pub pitch_graph_scale: Option<f64>,
     pub song_list_view: Option<String>,
     pub language_overrides: Option<HashMap<String, String>>,
 }
@@ -248,6 +250,7 @@ impl Default for AppConfig {
             auto_analyze: None,
             word_level_lyrics: None,
             pitch_tolerance_semitones: None,
+            pitch_graph_scale: None,
             song_list_view: None,
             language_overrides: None,
         }
@@ -415,6 +418,11 @@ impl AppConfig {
     /// Pitch-scoring tolerance in semitones (default 6, clamped 1–12).
     pub fn pitch_tolerance_semitones(&self) -> f64 {
         self.pitch_tolerance_semitones.unwrap_or(6.0).clamp(1.0, 12.0)
+    }
+
+    /// Pitch-graph size multiplier (default 1.0, clamped 0.5–2.5).
+    pub fn pitch_graph_scale(&self) -> f64 {
+        self.pitch_graph_scale.unwrap_or(1.0).clamp(0.5, 2.5)
     }
 
     pub fn mic_monitor_gain(&self) -> f32 {

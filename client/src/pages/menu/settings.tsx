@@ -19,6 +19,9 @@ import {
   LYRICS_VERTICAL_POSITIONS,
   MODELS,
   NAV,
+  PITCH_GRAPH_SCALE_MAX,
+  PITCH_GRAPH_SCALE_MIN,
+  PITCH_GRAPH_SCALE_STEP,
   PITCH_TOLERANCE_MAX,
   PITCH_TOLERANCE_MIN,
   PITCH_TOLERANCE_STEP,
@@ -60,6 +63,9 @@ export const SettingsPage = () => {
   const [pitchTolerance, setPitchTolerance] = useState(
     config?.pitch_tolerance_semitones ?? DEFAULTS.pitch_tolerance_semitones,
   );
+  const [pitchGraphScale, setPitchGraphScale] = useState(
+    config?.pitch_graph_scale ?? DEFAULTS.pitch_graph_scale,
+  );
 
   const close = () => navigate("/");
   const asrEngine = config?.asr_engine ?? DEFAULTS.asr_engine;
@@ -98,6 +104,10 @@ export const SettingsPage = () => {
   }, [config?.pitch_tolerance_semitones]);
 
   useEffect(() => {
+    setPitchGraphScale(config?.pitch_graph_scale ?? DEFAULTS.pitch_graph_scale);
+  }, [config?.pitch_graph_scale]);
+
+  useEffect(() => {
     const updateIsFullScreen = async () => {
       setIsFullScreen(await tauriIsFullScreen());
     };
@@ -125,6 +135,11 @@ export const SettingsPage = () => {
     mutate({ pitch_tolerance_semitones: semitones });
   };
 
+  const updatePitchGraphScale = (scale: number) => {
+    setPitchGraphScale(scale);
+    mutate({ pitch_graph_scale: scale });
+  };
+
   const toggleWindowMode = (fullscreen: boolean) => {
     setIsFullScreen(fullscreen);
     setFullScreen(fullscreen);
@@ -137,6 +152,7 @@ export const SettingsPage = () => {
     setMicLatencySec(DEFAULTS.mic_latency_compensation_sec);
     setVocalThresholdPct(DEFAULTS.vocal_detection_threshold_pct);
     setPitchTolerance(DEFAULTS.pitch_tolerance_semitones);
+    setPitchGraphScale(DEFAULTS.pitch_graph_scale);
   };
 
   const { footerSegment, getFocusClassName, syncFocusFromElement } = useSettingsNavigation({
@@ -414,6 +430,22 @@ export const SettingsPage = () => {
                   step={PITCH_TOLERANCE_STEP}
                   value={[pitchTolerance]}
                   onValueChange={([semitones]) => updatePitchTolerance(semitones)}
+                />
+              </Field>
+
+              {/* ponytail: plain slider, not wired into the settings controller-nav ring. */}
+              <Field>
+                <Label>Pitch graph size</Label>
+                <Hint>
+                  Scale the on-screen pitch graph shown while singing (
+                  {Math.round(pitchGraphScale * 100)}%).
+                </Hint>
+                <Slider
+                  min={PITCH_GRAPH_SCALE_MIN}
+                  max={PITCH_GRAPH_SCALE_MAX}
+                  step={PITCH_GRAPH_SCALE_STEP}
+                  value={[pitchGraphScale]}
+                  onValueChange={([scale]) => updatePitchGraphScale(scale)}
                 />
               </Field>
 

@@ -23,7 +23,11 @@ persist as a config flag. No backend change.
 
 ---
 
-## T-002 — Resizable pitch-match diagram
+## T-002 — Resizable pitch-match diagram ✅ done
+
+**Done:** `config.pitch_graph_scale` (default 1.0, clamp 0.5–2.5) multiplies the graph
+size in `pitch-graph.tsx` `computeLayout`; Settings → Analysis "Pitch graph size"
+slider, live. (Time-window / `PITCH_BUFFER_SIZE` left adjustable-later.)
 
 **Want:** let the user resize the pitch/matching-line graph.
 

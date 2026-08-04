@@ -89,6 +89,7 @@ export const DEFAULTS = {
   mic_latency_compensation_sec: DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   auto_analyze: false,
   pitch_tolerance_semitones: SEMITONE_TOLERANCE,
+  pitch_graph_scale: 1,
   lyrics_vertical_position: "bottom",
   lyrics_horizontal_position: "center",
 } satisfies Pick<
@@ -104,6 +105,7 @@ export const DEFAULTS = {
   | "mic_latency_compensation_sec"
   | "auto_analyze"
   | "pitch_tolerance_semitones"
+  | "pitch_graph_scale"
   | "lyrics_vertical_position"
   | "lyrics_horizontal_position"
 >;
@@ -120,6 +122,9 @@ export const VOCAL_THRESHOLD_MAX = 0.6;
 export const PITCH_TOLERANCE_STEP = 0.5;
 export const PITCH_TOLERANCE_MIN = MIN_SEMITONE_TOLERANCE;
 export const PITCH_TOLERANCE_MAX = MAX_SEMITONE_TOLERANCE;
+export const PITCH_GRAPH_SCALE_STEP = 0.1;
+export const PITCH_GRAPH_SCALE_MIN = 0.5;
+export const PITCH_GRAPH_SCALE_MAX = 2.5;
 export const NUMBER_PICKER_SIZE = 16;
 
 export const NAV = {
