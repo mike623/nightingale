@@ -415,16 +415,6 @@ impl AppConfig {
         self.word_level_lyrics.unwrap_or(false)
     }
 
-    /// Pitch-scoring tolerance in semitones (default 6, clamped 1–12).
-    pub fn pitch_tolerance_semitones(&self) -> f64 {
-        self.pitch_tolerance_semitones.unwrap_or(6.0).clamp(1.0, 12.0)
-    }
-
-    /// Pitch-graph size multiplier (default 1.0, clamped 0.5–2.5).
-    pub fn pitch_graph_scale(&self) -> f64 {
-        self.pitch_graph_scale.unwrap_or(1.0).clamp(0.5, 2.5)
-    }
-
     pub fn mic_monitor_gain(&self) -> f32 {
         self.mic_monitor_gain
             .map(|v| v as f32)
