@@ -20,7 +20,12 @@ import {
 import { useSaveLyricsMutation } from "@/mutations/use-save-lyrics-mutation";
 import { useLrclibCandidates } from "@/queries/use-lyrics";
 import type { LrclibCandidate } from "@/types/LrclibCandidate";
-import { detectLrcLevel, isEditLyricsDialogMode, stripLrcToPlainLines } from "@/utils/edit-lyrics";
+import {
+  detectLrcLevel,
+  formatSeconds,
+  isEditLyricsDialogMode,
+  stripLrcToPlainLines,
+} from "@/utils/edit-lyrics";
 import { Loader2Icon, SearchIcon } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -479,6 +484,12 @@ export const EditLyricsDialog = () => {
               </TabsContent>
 
               <TabsContent value="lrclib" className="mt-3 flex min-h-0 flex-1 flex-col gap-2">
+                {/* Song length so the user can pick the LRCLIB match whose
+                    duration lines up. */}
+                <p className="text-xs text-muted-foreground">
+                  Song length:{" "}
+                  <span className="tabular-nums">{formatSeconds(song.duration_secs)}</span>
+                </p>
                 {/* Manual search — auto title/artist (esp. from a YouTube MV name)
                     is often wrong. ponytail: inputs outside the controller-nav ring. */}
                 <div className="flex items-end gap-2">
