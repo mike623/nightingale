@@ -6,7 +6,9 @@
 //! exactly like any other local file.
 
 use std::collections::BTreeMap;
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -68,6 +70,8 @@ pub struct ImportProgress {
     pub total: usize,
     /// Title of the entry currently being downloaded, if any.
     pub current: Option<String>,
+    /// Download fraction (0.0–1.0) of the current entry.
+    pub current_pct: f64,
     pub imported: usize,
     pub skipped: usize,
     pub failed: usize,
@@ -172,6 +176,7 @@ pub fn run_import(
             done,
             total,
             current: Some(entry.title.clone()),
+            current_pct: 0.0,
             imported,
             skipped,
             failed: failed.len(),
@@ -183,7 +188,18 @@ pub fn run_import(
                 continue;
             }
         }
-        match download_entry(&yt, &root, entry) {
+        let on_pct = |pct: f64| {
+            on_progress(ImportProgress {
+                done,
+                total,
+                current: Some(entry.title.clone()),
+                current_pct: pct,
+                imported,
+                skipped,
+                failed: failed.len(),
+            });
+        };
+        match download_entry(&yt, &root, entry, on_pct) {
             Ok(path) => {
                 if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
                     manifest.videos.insert(entry.id.clone(), name.to_string());
@@ -204,6 +220,7 @@ pub fn run_import(
         done: total,
         total,
         current: None,
+        current_pct: 1.0,
         imported,
         skipped,
         failed: failed.len(),
@@ -340,7 +357,12 @@ fn split_title_artist(raw_title: &str, track: Option<String>, artist: String) ->
     (raw_title.trim().to_string(), artist)
 }
 
-fn download_entry(yt: &Path, root: &Path, entry: &ImportEntry) -> Result<PathBuf, String> {
+fn download_entry(
+    yt: &Path,
+    root: &Path,
+    entry: &ImportEntry,
+    mut on_pct: impl FnMut(f64),
+) -> Result<PathBuf, String> {
     let tmp = root.join(format!(".import_tmp_{}", sanitize(&entry.id)));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).map_err(|e| format!("Cannot create temp dir: {e}"))?;
@@ -348,7 +370,9 @@ fn download_entry(yt: &Path, root: &Path, entry: &ImportEntry) -> Result<PathBuf
     let result = (|| {
         let url = format!("https://www.youtube.com/watch?v={}", entry.id);
         let out_tmpl = tmp.join("%(id)s.%(ext)s");
-        let dl = silent_command(yt)
+        // `--newline` + a machine-readable progress template stream download
+        // percentage to stdout, one line per update, tagged so we can parse it.
+        let mut child = silent_command(yt)
             .args([
                 "-f",
                 "bv*+ba/b",
@@ -356,15 +380,50 @@ fn download_entry(yt: &Path, root: &Path, entry: &ImportEntry) -> Result<PathBuf
                 "mp4",
                 "--no-playlist",
                 "--no-warnings",
+                "--newline",
+                "--progress-template",
+                "download:NGPCT %(progress._percent_str)s",
                 "-o",
             ])
             .arg(&out_tmpl)
             .arg(&url)
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| format!("Failed to run yt-dlp: {e}"))?;
-        if !dl.status.success() {
-            return Err(short_err("Download failed", &dl.stderr));
+
+        // Drain stderr on a thread so a full pipe can't deadlock the download.
+        let stderr = child.stderr.take();
+        let err_handle = std::thread::spawn(move || {
+            let mut buf = String::new();
+            if let Some(stderr) = stderr {
+                let _ = BufReader::new(stderr).read_to_string(&mut buf);
+            }
+            buf
+        });
+
+        // Read progress lines, emitting only when the integer percent changes.
+        if let Some(stdout) = child.stdout.take() {
+            let mut last_bucket: i32 = -1;
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                if let Some(pct) = parse_pct(&line) {
+                    let bucket = (pct * 100.0) as i32;
+                    if bucket != last_bucket {
+                        last_bucket = bucket;
+                        on_pct(pct);
+                    }
+                }
+            }
         }
+
+        let status = child
+            .wait()
+            .map_err(|e| format!("yt-dlp wait failed: {e}"))?;
+        let stderr_str = err_handle.join().unwrap_or_default();
+        if !status.success() {
+            return Err(short_err("Download failed", stderr_str.as_bytes()));
+        }
+
         let downloaded = first_file_in(&tmp).ok_or("yt-dlp produced no file")?;
         let dest = unique_path(root, &format!("{} - {}", entry.artist, entry.title), "mp4");
         embed_and_move(&downloaded, &dest, &entry.title, &entry.artist)?;
@@ -373,6 +432,15 @@ fn download_entry(yt: &Path, root: &Path, entry: &ImportEntry) -> Result<PathBuf
 
     let _ = std::fs::remove_dir_all(&tmp);
     result
+}
+
+/// Parse a percentage from a tagged yt-dlp progress line
+/// (`download:NGPCT  45.2%`) into a 0.0–1.0 fraction.
+fn parse_pct(line: &str) -> Option<f64> {
+    const MARKER: &str = "NGPCT";
+    let idx = line.find(MARKER)? + MARKER.len();
+    let rest = line[idx..].trim().trim_end_matches('%').trim();
+    rest.parse::<f64>().ok().map(|p| (p / 100.0).clamp(0.0, 1.0))
 }
 
 /// Stream-copy `src` into `dest` while stamping title/artist tags (fast, no
@@ -498,6 +566,13 @@ mod tests {
     #[test]
     fn sanitize_removes_path_separators() {
         assert_eq!(sanitize("a/b:c?"), "a_b_c_");
+    }
+
+    #[test]
+    fn parse_pct_reads_tagged_line() {
+        assert_eq!(parse_pct("download:NGPCT  45.2%"), Some(0.452));
+        assert_eq!(parse_pct("download:NGPCT 100.0%"), Some(1.0));
+        assert_eq!(parse_pct("[download] fragment 1"), None);
     }
 
     #[test]

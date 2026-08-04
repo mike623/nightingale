@@ -10,6 +10,10 @@ export type ImportProgress = {
    * Title of the entry currently being downloaded, if any.
    */
   current: string | null;
+  /**
+   * Download fraction (0.0–1.0) of the current entry.
+   */
+  currentPct: number;
   imported: number;
   skipped: number;
   failed: number;

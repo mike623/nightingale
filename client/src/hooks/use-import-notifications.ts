@@ -20,8 +20,10 @@ export function useImportNotifications() {
     (async () => {
       unlisteners.push(
         await onImportProgress((p) => {
+          const pct =
+            p.currentPct > 0 && p.currentPct < 1 ? ` (${Math.round(p.currentPct * 100)}%)` : "";
           const label = p.current
-            ? `Importing ${Math.min(p.done + 1, p.total)}/${p.total}: ${p.current}`
+            ? `Importing ${Math.min(p.done + 1, p.total)}/${p.total}: ${p.current}${pct}`
             : `Importing ${p.done}/${p.total}…`;
           toast.loading(label, { id: IMPORT_TOAST });
         }),
