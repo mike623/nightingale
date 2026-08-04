@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Stars } from "@/components/shared/stars";
-import { useLastScoresBySongForActiveProfile } from "@/hooks/use-last-scores-by-song";
+import { useBestScoresBySongForActiveProfile } from "@/hooks/use-best-scores-by-song";
 import type { QueuedStatus } from "@/types/QueuedStatus";
 import type { Song } from "@/types/Song";
 import { XIcon } from "lucide-react";
@@ -16,7 +16,7 @@ interface SongDetailsHeaderProps {
 }
 
 export const SongDetailsHeader = ({ song, queueStatus, onClose }: SongDetailsHeaderProps) => {
-  const lastScore = useLastScoresBySongForActiveProfile().get(song.file_hash);
+  const bestScore = useBestScoresBySongForActiveProfile().get(song.file_hash);
 
   return (
     <header className="relative border-b px-4 pb-4 pt-3">
@@ -63,11 +63,11 @@ export const SongDetailsHeader = ({ song, queueStatus, onClose }: SongDetailsHea
         <span className="tabular-nums">{formatSeconds(song.duration_secs)}</span>
       </div>
 
-      {lastScore != null && (
+      {bestScore != null && (
         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Last score</span>
-          <Stars score={lastScore} size="sm" />
-          <span className="tabular-nums text-foreground">{lastScore}</span>
+          <span>Best score</span>
+          <Stars score={bestScore} size="sm" />
+          <span className="tabular-nums text-foreground">{bestScore}</span>
         </div>
       )}
     </header>
