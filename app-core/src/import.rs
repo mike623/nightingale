@@ -106,7 +106,7 @@ pub fn import_available() -> bool {
 /// Resolve a YouTube URL to a preview without downloading media. `--flat-playlist`
 /// lists playlist entries cheaply; a bare video resolves to a single entry.
 pub fn probe(url: &str) -> Result<ImportPreview, String> {
-    let yt = ensure_ytdlp()?;
+    let (yt, _) = ensure_ytdlp()?;
     let out = silent_command(&yt)
         .args(["--flat-playlist", "--no-warnings", "-J", url])
         .output()
@@ -162,7 +162,7 @@ pub fn run_import(
 ) -> Result<ImportReport, String> {
     let root = import_folder_root()
         .ok_or_else(|| "Import is only available with a Folder library".to_string())?;
-    let yt = ensure_ytdlp()?;
+    let (yt, ytdlp_updated) = ensure_ytdlp()?;
     std::fs::create_dir_all(&root).map_err(|e| format!("Cannot create library folder: {e}"))?;
 
     let mut manifest = load_manifest(&root);
@@ -199,7 +199,7 @@ pub fn run_import(
                 failed: failed.len(),
             });
         };
-        match download_entry(&yt, &root, entry, on_pct) {
+        match download_entry(&yt, &root, entry, ytdlp_updated, on_pct) {
             Ok(path) => {
                 if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
                     manifest.videos.insert(entry.id.clone(), name.to_string());
@@ -361,6 +361,7 @@ fn download_entry(
     yt: &Path,
     root: &Path,
     entry: &ImportEntry,
+    ytdlp_updated: bool,
     mut on_pct: impl FnMut(f64),
 ) -> Result<PathBuf, String> {
     let tmp = root.join(format!(".import_tmp_{}", sanitize(&entry.id)));
@@ -421,7 +422,14 @@ fn download_entry(
             .map_err(|e| format!("yt-dlp wait failed: {e}"))?;
         let stderr_str = err_handle.join().unwrap_or_default();
         if !status.success() {
-            return Err(short_err("Download failed", stderr_str.as_bytes()));
+            // A stale yt-dlp is the usual cause when the self-update also failed;
+            // say so instead of a generic failure (docs/adr/0002).
+            let prefix = if ytdlp_updated {
+                "Download failed"
+            } else {
+                "Download failed — yt-dlp may be outdated (its self-update failed)"
+            };
+            return Err(short_err(prefix, stderr_str.as_bytes()));
         }
 
         let downloaded = first_file_in(&tmp).ok_or("yt-dlp produced no file")?;

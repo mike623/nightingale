@@ -88,7 +88,11 @@ fn ytdlp_download_url() -> Result<String, String> {
 /// launch — see docs/adr/0002) and attempt a self-update, since yt-dlp breaks
 /// whenever YouTube changes its internals. A failed update on an
 /// already-present binary is non-fatal; a failed initial download is fatal.
-pub fn ensure_ytdlp() -> Result<PathBuf, String> {
+///
+/// Returns the binary path and whether the self-update succeeded. The caller
+/// uses the flag to surface a clear "yt-dlp outdated" error when a subsequent
+/// download fails after a failed update (rather than a generic failure).
+pub fn ensure_ytdlp() -> Result<(PathBuf, bool), String> {
     let dest = ytdlp_path();
     let existed = dest.is_file();
 
@@ -102,16 +106,22 @@ pub fn ensure_ytdlp() -> Result<PathBuf, String> {
     // Self-update in place. yt-dlp goes stale fast; a stale binary fails
     // downloads silently, so we always try. Non-fatal — the (possibly older)
     // binary still runs.
-    match silent_command(&dest).arg("-U").output() {
-        Ok(o) if o.status.success() => {}
-        Ok(o) => tracing::warn!(
-            "[ytdlp] self-update failed: {}",
-            String::from_utf8_lossy(&o.stderr)
-        ),
-        Err(e) => tracing::warn!("[ytdlp] could not run self-update: {e}"),
-    }
+    let updated = match silent_command(&dest).arg("-U").output() {
+        Ok(o) if o.status.success() => true,
+        Ok(o) => {
+            tracing::warn!(
+                "[ytdlp] self-update failed: {}",
+                String::from_utf8_lossy(&o.stderr)
+            );
+            false
+        }
+        Err(e) => {
+            tracing::warn!("[ytdlp] could not run self-update: {e}");
+            false
+        }
+    };
 
-    Ok(dest)
+    Ok((dest, updated))
 }
 
 pub fn python_path() -> PathBuf {
