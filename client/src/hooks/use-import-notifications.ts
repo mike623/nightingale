@@ -1,10 +1,8 @@
-import { onImportDone, onImportError, onImportProgress } from "@/bridge/import";
+import { IMPORT_TOAST_ID, onImportDone, onImportError, onImportProgress } from "@/bridge/import";
 import { MENU, SONGS, SONGS_META } from "@/queries/keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { toast } from "sonner";
-
-const IMPORT_TOAST = "youtube-import";
 
 /**
  * App-level listener for background YouTube imports. Streams progress into a
@@ -25,7 +23,7 @@ export function useImportNotifications() {
           const label = p.current
             ? `Importing ${Math.min(p.done + 1, p.total)}/${p.total}: ${p.current}${pct}`
             : `Importing ${p.done}/${p.total}…`;
-          toast.loading(label, { id: IMPORT_TOAST });
+          toast.loading(label, { id: IMPORT_TOAST_ID });
         }),
       );
 
@@ -36,9 +34,9 @@ export function useImportNotifications() {
           if (r.failed.length > 0) parts.push(`${r.failed.length} failed`);
           const msg = parts.join(" · ") + (r.playlistName ? ` → “${r.playlistName}”` : "");
           if (r.failed.length > 0) {
-            toast.warning(msg, { id: IMPORT_TOAST });
+            toast.warning(msg, { id: IMPORT_TOAST_ID });
           } else {
-            toast.success(msg, { id: IMPORT_TOAST });
+            toast.success(msg, { id: IMPORT_TOAST_ID });
           }
           queryClient.invalidateQueries({ queryKey: SONGS });
           queryClient.invalidateQueries({ queryKey: SONGS_META });
@@ -48,7 +46,7 @@ export function useImportNotifications() {
 
       unlisteners.push(
         await onImportError((e) => {
-          toast.error(`Import failed: ${e}`, { id: IMPORT_TOAST });
+          toast.error(`Import failed: ${e}`, { id: IMPORT_TOAST_ID });
         }),
       );
     })();

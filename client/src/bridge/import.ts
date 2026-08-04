@@ -4,6 +4,9 @@ import type { ImportReport } from "@/types/ImportReport";
 
 import { invoke, listen } from "./runtime";
 
+/** Shared sonner toast id for the single in-flight import notification. */
+export const IMPORT_TOAST_ID = "youtube-import";
+
 /** True only when the active library is a Folder — Import is hidden otherwise. */
 export const importAvailable = async (): Promise<boolean> =>
   await invoke<boolean>("import_available");

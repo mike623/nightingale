@@ -490,8 +490,8 @@ export const EditLyricsDialog = () => {
                   Song length:{" "}
                   <span className="tabular-nums">{formatSeconds(song.duration_secs)}</span>
                 </p>
-                {/* Manual search — auto title/artist (esp. from a YouTube MV name)
-                    is often wrong. ponytail: inputs outside the controller-nav ring. */}
+                {/* Manual search — auto title/artist (esp. from a YouTube MV name) is
+                    often wrong. TODO: these inputs aren't in the dialog controller-nav ring. */}
                 <div className="flex items-end gap-2">
                   <div className="flex-1 space-y-1">
                     <Input

@@ -391,9 +391,9 @@ export const SettingsPage = () => {
                 </ButtonGroup>
               </Field>
 
-              {/* ponytail: not wired into the settings controller-nav ring (index
-                  math is Parakeet-shifted); mouse/touch works. Add a nav slot in
-                  constants.ts getAnalysisNav/getSettingsStops if it needs the ring. */}
+              {/* TODO: not reachable via the settings controller-nav ring — mouse/touch
+                  only. Add a nav slot in constants.ts getAnalysisNav/getSettingsStops
+                  (the index math is Parakeet-shifted) to make it controller-navigable. */}
               <Field>
                 <Label>Word-level lyric timing</Label>
                 <Hint>
@@ -417,7 +417,7 @@ export const SettingsPage = () => {
                 </ButtonGroup>
               </Field>
 
-              {/* ponytail: plain slider, not wired into the settings controller-nav ring. */}
+              {/* TODO: plain slider, not reachable via the settings controller-nav ring. */}
               <Field>
                 <Label>Scoring tolerance</Label>
                 <Hint>
@@ -433,7 +433,7 @@ export const SettingsPage = () => {
                 />
               </Field>
 
-              {/* ponytail: plain slider, not wired into the settings controller-nav ring. */}
+              {/* TODO: plain slider, not reachable via the settings controller-nav ring. */}
               <Field>
                 <Label>Pitch graph size</Label>
                 <Hint>

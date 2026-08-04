@@ -2,7 +2,7 @@ import { Loader2Icon, YoutubeIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { probeImport, startImport } from "@/bridge/import";
+import { IMPORT_TOAST_ID, probeImport, startImport } from "@/bridge/import";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -95,7 +95,7 @@ export const ImportUrlDialog = () => {
       }
       await startImport({ ...preview, entries });
       toast.loading(`Importing ${entries.length} track${entries.length === 1 ? "" : "s"}…`, {
-        id: "youtube-import",
+        id: IMPORT_TOAST_ID,
       });
       onClose();
     } catch (e) {
