@@ -78,7 +78,12 @@ channel.
 
 ---
 
-## T-005 — Keep / show last score per song
+## T-005 — Keep / show last score per song ✅ done
+
+**Done:** `useLastScoresBySongForActiveProfile` (most-recent `played_at` per song for
+the active profile); song details header shows "Last score" with stars + number.
+Data already persisted; `PROFILES` query invalidates after each play so it updates
+live. Chose **last** (most recent) per the ask.
 
 **Want:** remember and display the last score for a song (see your previous result
 before/without replaying).
