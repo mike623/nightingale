@@ -1,7 +1,8 @@
 import type { ImportPreview } from "@/types/ImportPreview";
+import type { ImportProgress } from "@/types/ImportProgress";
 import type { ImportReport } from "@/types/ImportReport";
 
-import { invoke } from "./runtime";
+import { invoke, listen } from "./runtime";
 
 /** True only when the active library is a Folder — Import is hidden otherwise. */
 export const importAvailable = async (): Promise<boolean> =>
@@ -11,6 +12,16 @@ export const importAvailable = async (): Promise<boolean> =>
 export const probeImport = async (url: string): Promise<ImportPreview> =>
   await invoke<ImportPreview>("probe_import", { url });
 
-/** Download the previewed entries into the watched folder and trigger a rescan. */
-export const runImport = async (preview: ImportPreview): Promise<ImportReport> =>
-  await invoke<ImportReport>("run_import", { preview });
+/** Kick off a background download of the previewed entries. Returns immediately;
+ * progress/completion arrive via the events below. */
+export const startImport = async (preview: ImportPreview): Promise<void> =>
+  await invoke<void>("start_import", { preview });
+
+export const onImportProgress = async (cb: (p: ImportProgress) => void): Promise<() => void> =>
+  await listen<ImportProgress>("import-progress", ({ payload }) => cb(payload));
+
+export const onImportDone = async (cb: (r: ImportReport) => void): Promise<() => void> =>
+  await listen<ImportReport>("import-done", ({ payload }) => cb(payload));
+
+export const onImportError = async (cb: (e: string) => void): Promise<() => void> =>
+  await listen<string>("import-error", ({ payload }) => cb(payload));

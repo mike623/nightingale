@@ -61,7 +61,13 @@ new Scoring section). Mirrors the existing `word_level_lyrics` toggle wiring
 
 ---
 
-## T-004 — Background YouTube import
+## T-004 — Background YouTube import ✅ done
+
+**Done:** `start_import` command spawns a background thread; `run_import` takes a
+progress callback that emits `import-progress`, with `import-done` / `import-error`
+at the end. The dialog fires-and-forgets + closes; `useImportNotifications` (mounted
+in MenuLayout) streams progress into one sonner toast and invalidates the library on
+completion.
 
 **Want:** imports run in the background — close the dialog, keep using the app,
 get notified on completion. Today `run_import` blocks the dialog (single spinner)

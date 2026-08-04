@@ -1,4 +1,5 @@
-use app_core::{ImportPreview, ImportReport};
+use app_core::ImportPreview;
+use tauri::{AppHandle, Emitter};
 
 /// True only when the active library is a Folder — Import is hidden otherwise.
 #[tauri::command]
@@ -15,11 +16,23 @@ pub async fn probe_import(url: String) -> Result<ImportPreview, String> {
         .map_err(|e| e.to_string())?
 }
 
-/// Download the previewed entries into the watched folder and trigger a rescan.
-/// Long-running (a playlist downloads many videos); runs off-thread.
+/// Kick off a download of the previewed entries in the background and return
+/// immediately. Progress streams over the `import-progress` event; the final
+/// `ImportReport` arrives on `import-done`, or an error on `import-error`.
 #[tauri::command]
-pub async fn run_import(preview: ImportPreview) -> Result<ImportReport, String> {
-    tauri::async_runtime::spawn_blocking(move || app_core::run_import(&preview))
-        .await
-        .map_err(|e| e.to_string())?
+pub fn start_import(app: AppHandle, preview: ImportPreview) {
+    std::thread::spawn(move || {
+        let app_for_progress = app.clone();
+        let result = app_core::run_import(&preview, move |progress| {
+            let _ = app_for_progress.emit("import-progress", progress);
+        });
+        match result {
+            Ok(report) => {
+                let _ = app.emit("import-done", report);
+            }
+            Err(e) => {
+                let _ = app.emit("import-error", e);
+            }
+        }
+    });
 }

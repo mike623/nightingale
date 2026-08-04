@@ -59,6 +59,20 @@ pub struct ImportReport {
     pub playlist_name: Option<String>,
 }
 
+/// Progress tick emitted while a (possibly background) import runs.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProgress {
+    pub done: usize,
+    pub total: usize,
+    /// Title of the entry currently being downloaded, if any.
+    pub current: Option<String>,
+    pub imported: usize,
+    pub skipped: usize,
+    pub failed: usize,
+}
+
 /// Persisted in the watched folder as `.nightingale-imports.json`. Lets a
 /// re-import of the same playlist skip videos already downloaded (delta) and
 /// reuse the playlist's `.m3u` instead of spawning a new one.
@@ -138,7 +152,10 @@ pub fn probe(url: &str) -> Result<ImportPreview, String> {
 /// For a playlist it (re)writes the playlist's `.m3u` — reusing the same file
 /// across re-imports — with the full current membership in playlist order, then
 /// triggers a rescan.
-pub fn run_import(preview: &ImportPreview) -> Result<ImportReport, String> {
+pub fn run_import(
+    preview: &ImportPreview,
+    mut on_progress: impl FnMut(ImportProgress),
+) -> Result<ImportReport, String> {
     let root = import_folder_root()
         .ok_or_else(|| "Import is only available with a Folder library".to_string())?;
     let yt = ensure_ytdlp()?;
@@ -149,7 +166,16 @@ pub fn run_import(preview: &ImportPreview) -> Result<ImportReport, String> {
     let mut skipped = 0usize;
     let mut failed: Vec<ImportFailure> = Vec::new();
 
-    for entry in &preview.entries {
+    let total = preview.entries.len();
+    for (done, entry) in preview.entries.iter().enumerate() {
+        on_progress(ImportProgress {
+            done,
+            total,
+            current: Some(entry.title.clone()),
+            imported,
+            skipped,
+            failed: failed.len(),
+        });
         // Delta skip: already imported and the file is still there.
         if let Some(name) = manifest.videos.get(&entry.id) {
             if root.join(name).exists() {
@@ -173,6 +199,15 @@ pub fn run_import(preview: &ImportPreview) -> Result<ImportReport, String> {
             }
         }
     }
+
+    on_progress(ImportProgress {
+        done: total,
+        total,
+        current: None,
+        imported,
+        skipped,
+        failed: failed.len(),
+    });
 
     let mut wrote_playlist = false;
     let playlist_name = if preview.is_playlist {

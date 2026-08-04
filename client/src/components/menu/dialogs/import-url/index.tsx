@@ -2,7 +2,7 @@ import { Loader2Icon, YoutubeIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { probeImport, runImport } from "@/bridge/import";
+import { probeImport, startImport } from "@/bridge/import";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -17,12 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDialog } from "@/hooks/use-dialog";
 import type { ImportPreview } from "@/types/ImportPreview";
-import type { ImportReport } from "@/types/ImportReport";
 
-type Step = "input" | "preview" | "done";
+type Step = "input" | "preview";
 
-// ponytail: single spinner while a playlist downloads — no per-track progress
-// bar for v1. Add a channel-based progress event if long playlists feel opaque.
 export const ImportUrlDialog = () => {
   const { mode, close } = useDialog();
   const open = mode === "import-url";
@@ -30,10 +27,9 @@ export const ImportUrlDialog = () => {
   const [url, setUrl] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [report, setReport] = useState<ImportReport | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const step: Step = report ? "done" : preview ? "preview" : "input";
+  const step: Step = preview ? "preview" : "input";
   const single = preview && !preview.isPlaylist ? preview.entries[0] : null;
   const selectedCount = selected.size;
   const allSelected = preview ? selectedCount === preview.entries.length : false;
@@ -42,7 +38,6 @@ export const ImportUrlDialog = () => {
     setUrl("");
     setPreview(null);
     setSelected(new Set());
-    setReport(null);
     setBusy(false);
     close();
   };
@@ -82,15 +77,20 @@ export const ImportUrlDialog = () => {
         : new Set(),
     );
 
+  // Fire-and-forget: kick off the background download and close. Progress and
+  // the final result surface as a toast (see useImportNotifications).
   const doImport = async () => {
     if (!preview || busy || selectedCount === 0) return;
     setBusy(true);
     try {
       const entries = preview.entries.filter((e) => selected.has(e.id));
-      setReport(await runImport({ ...preview, entries }));
+      await startImport({ ...preview, entries });
+      toast.loading(`Importing ${entries.length} track${entries.length === 1 ? "" : "s"}…`, {
+        id: "youtube-import",
+      });
+      onClose();
     } catch (e) {
       toast.error(String(e));
-    } finally {
       setBusy(false);
     }
   };
@@ -113,8 +113,9 @@ export const ImportUrlDialog = () => {
             <YoutubeIcon className="size-5" /> Import from URL
           </DialogTitle>
           <DialogDescription>
-            Download a YouTube video or playlist into your folder library. It runs through the
-            normal karaoke pipeline — vocal separation and synced lyrics — like any local file.
+            Download a YouTube video or playlist into your folder library. It runs in the background
+            through the normal karaoke pipeline — vocal separation and synced lyrics — like any
+            local file.
           </DialogDescription>
         </DialogHeader>
 
@@ -186,28 +187,6 @@ export const ImportUrlDialog = () => {
             </div>
           ))}
 
-        {step === "done" && report && (
-          <div className="space-y-2 text-sm">
-            <p>
-              Imported {report.imported} track{report.imported === 1 ? "" : "s"}
-              {report.skipped > 0 ? ` (${report.skipped} already imported)` : ""}
-              {report.playlistName ? ` into playlist “${report.playlistName}”` : ""}.
-            </p>
-            {report.failed.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-destructive">{report.failed.length} failed:</p>
-                <ul className="max-h-40 overflow-y-auto rounded-md border p-2">
-                  {report.failed.map((f, i) => (
-                    <li key={i} className="py-0.5">
-                      <span className="font-medium">{f.title}</span> — {f.reason}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
         <DialogFooter>
           {step === "input" && (
             <Button onClick={fetchPreview} disabled={busy || !url.trim()}>
@@ -228,7 +207,6 @@ export const ImportUrlDialog = () => {
               </Button>
             </>
           )}
-          {step === "done" && <Button onClick={onClose}>Done</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

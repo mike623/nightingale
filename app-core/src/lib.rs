@@ -29,8 +29,8 @@ pub use cache::{
 };
 pub use config::{AppConfig, LibrarySource};
 pub use import::{
-    ImportEntry, ImportFailure, ImportPreview, ImportReport, import_available, probe as probe_import,
-    run_import,
+    ImportEntry, ImportFailure, ImportPreview, ImportProgress, ImportReport, import_available,
+    probe as probe_import, run_import,
 };
 pub use library_db::{init_library, library_db_path};
 pub use library_menu::{LibraryMenuItem, LibraryMenuItems, load_library_menu_items};

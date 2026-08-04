@@ -19,6 +19,7 @@ import { SidebarInset } from "@/components/ui/sidebar";
 import { EXIT_SUPPORTED } from "@/bridge/exit";
 import { useMenuNav } from "@/hooks/navigation/use-menu-nav";
 import { useDialog } from "@/hooks/use-dialog";
+import { useImportNotifications } from "@/hooks/use-import-notifications";
 import { useShouldRunSetup } from "@/hooks/use-should-run-setup";
 import { useSongsMeta } from "@/queries/use-songs";
 import { useCallback } from "react";
@@ -42,6 +43,8 @@ export const MenuLayout = () => {
   const { mode, setMode } = useDialog();
   const { shouldRunSetup } = useShouldRunSetup();
   const location = useLocation();
+
+  useImportNotifications();
 
   const isContentPage = location.pathname !== "/";
   const overlayOpen = isContentPage || mode !== null || shouldRunSetup;
