@@ -12,6 +12,7 @@ import { usePlaybackConfigPersist } from "@/hooks/playback/use-playback-config-p
 import type { VideoFlavor } from "@/lib/playback/video-flavor";
 import type { AppConfig } from "@/types/AppConfig";
 import { forwardRef, memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useLyricsHidden } from "@/hooks/use-lyrics-hidden";
 import { isPixabayTheme, themeName } from "./background";
 
 function formatTime(seconds: number): string {
@@ -112,6 +113,7 @@ function SettingsInfo({
   videoFlavor: VideoFlavor;
   showShortcuts: boolean;
 }) {
+  const [lyricsHidden] = useLyricsHidden();
   return (
     <div className="flex flex-col items-end">
       {guideAvailable && (
@@ -128,6 +130,10 @@ function SettingsInfo({
       <HintText>
         Monitor: {micMonitorUserEnabled ? "ON" : "OFF"}
         {showShortcuts ? " [R]" : ""}
+      </HintText>
+      <HintText>
+        Lyrics: {lyricsHidden ? "OFF" : "ON"}
+        {showShortcuts ? " [L]" : ""}
       </HintText>
       <HintText>
         {showShortcuts

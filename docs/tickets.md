@@ -5,7 +5,11 @@ this repo isn't ours). Promote to GitHub issues via `gh issue create` if/when wa
 
 ---
 
-## T-001 — Toggle lyrics display with hotkey `L`
+## T-001 — Toggle lyrics display with hotkey `L` ✅ done
+
+**Done:** `L` toggles the lyrics overlay during playback (session-scoped
+`useLyricsHidden` jotai atom); `lyrics-display` returns null when hidden; HUD shows
+`Lyrics: ON/OFF [L]`.
 
 **Want:** hide/show the on-screen lyrics during playback, bound to `L`.
 
