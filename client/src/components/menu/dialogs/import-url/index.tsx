@@ -16,7 +16,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDialog } from "@/hooks/use-dialog";
+import { readLastPlaylist, saveLastPlaylist } from "@/lib/last-playlist";
 import type { ImportPreview } from "@/types/ImportPreview";
+import { RotateCcwIcon } from "lucide-react";
 
 type Step = "input" | "preview";
 
@@ -42,9 +44,12 @@ export const ImportUrlDialog = () => {
     close();
   };
 
-  const fetchPreview = async () => {
-    const trimmed = url.trim();
+  const lastPlaylist = open ? readLastPlaylist() : null;
+
+  const fetchPreview = async (urlArg?: string) => {
+    const trimmed = (urlArg ?? url).trim();
     if (!trimmed || busy) return;
+    setUrl(trimmed);
     setBusy(true);
     try {
       const p = await probeImport(trimmed);
@@ -84,6 +89,10 @@ export const ImportUrlDialog = () => {
     setBusy(true);
     try {
       const entries = preview.entries.filter((e) => selected.has(e.id));
+      // Remember playlists so they can be re-imported (delta) for new tracks.
+      if (preview.isPlaylist) {
+        saveLastPlaylist({ url: url.trim(), title: preview.playlistTitle ?? "" });
+      }
       await startImport({ ...preview, entries });
       toast.loading(`Importing ${entries.length} track${entries.length === 1 ? "" : "s"}…`, {
         id: "youtube-import",
@@ -132,6 +141,18 @@ export const ImportUrlDialog = () => {
               }}
               autoFocus
             />
+            {lastPlaylist && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                disabled={busy}
+                onClick={() => fetchPreview(lastPlaylist.url)}
+              >
+                <RotateCcwIcon className="size-4" />
+                Re-import last playlist{lastPlaylist.title ? `: ${lastPlaylist.title}` : ""}
+              </Button>
+            )}
           </div>
         )}
 
@@ -189,7 +210,7 @@ export const ImportUrlDialog = () => {
 
         <DialogFooter>
           {step === "input" && (
-            <Button onClick={fetchPreview} disabled={busy || !url.trim()}>
+            <Button onClick={() => fetchPreview()} disabled={busy || !url.trim()}>
               {busy && <Loader2Icon className="size-4 animate-spin" />} Fetch
             </Button>
           )}
