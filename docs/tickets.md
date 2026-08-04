@@ -32,7 +32,11 @@ drag handle or a settings slider. Persist the size. Frontend-only.
 
 ---
 
-## T-003 — User-controllable scoring tolerance
+## T-003 — User-controllable scoring tolerance ✅ done
+
+**Done:** `config.pitch_tolerance_semitones` (default 6, clamp 1–12) threaded through
+`pitchSimilarity` / `usePitchScoring` / `playback-mic-context`; Settings → Analysis
+"Scoring tolerance" slider.
 
 **Want:** control how strict pitch matching is.
 
@@ -67,3 +71,27 @@ kicking it off. Surface progress in the sidebar or a toast; report the final
 `ImportReport` when done. Per-item atomicity already fits a streaming/queued model.
 Ties in with T-002-style HUD only loosely — mostly backend job plumbing + an events
 channel.
+
+---
+
+## T-005 — Keep / show last score per song
+
+**Want:** remember and display the last score for a song (see your previous result
+before/without replaying).
+
+**State today:** scores already persist — `ProfileStore.scores: Vec<ScoreRecord>`
+(`{profile, song_hash, score, played_at}`) in `app-core/src/profile.rs`, written by
+`add_score`. But the UI only surfaces **best** per profile, and only in the result
+dialog after a song ends (`client/src/utils/playback/result.ts` `bestPerProfile`,
+`client/src/components/playback/dialogs/result.tsx`).
+
+**Gap:** no "last score" shown outside the post-play dialog.
+
+**Sketch:**
+- Backend already has the data; add a `last_score_for_song(song_hash)` (most recent
+  `played_at`) alongside the existing `top_scores_for_song` in `profile.rs`.
+- Surface it in the song list / song details (`client/src/components/menu/song-list/…`)
+  and/or the result dialog ("last: X · best: Y").
+
+**Decide:** show **last** (most recent play) or **best** (already computed)? Pick one
+or show both. "Keep last score" reads as most-recent; confirm before building.

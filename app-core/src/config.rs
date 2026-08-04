@@ -207,6 +207,10 @@ pub struct AppConfig {
     /// skips WhisperX entirely — songs with no synced match are left lyric-less
     /// (stems only) rather than transcribed. See docs/adr/0003.
     pub word_level_lyrics: Option<bool>,
+    /// Pitch-scoring tolerance in semitones — the distance at which a sung note
+    /// scores zero (`similarity = max(0, 1 - diff/tolerance)`). Lower is
+    /// stricter, higher is more forgiving. Default 6.
+    pub pitch_tolerance_semitones: Option<f64>,
     pub song_list_view: Option<String>,
     pub language_overrides: Option<HashMap<String, String>>,
 }
@@ -243,6 +247,7 @@ impl Default for AppConfig {
             vocal_detection_threshold_pct: None,
             auto_analyze: None,
             word_level_lyrics: None,
+            pitch_tolerance_semitones: None,
             song_list_view: None,
             language_overrides: None,
         }
@@ -405,6 +410,11 @@ impl AppConfig {
     /// Opt-in word-level lyric timing. Off by default — see `word_level_lyrics`.
     pub fn word_level_lyrics(&self) -> bool {
         self.word_level_lyrics.unwrap_or(false)
+    }
+
+    /// Pitch-scoring tolerance in semitones (default 6, clamped 1–12).
+    pub fn pitch_tolerance_semitones(&self) -> f64 {
+        self.pitch_tolerance_semitones.unwrap_or(6.0).clamp(1.0, 12.0)
     }
 
     pub fn mic_monitor_gain(&self) -> f32 {

@@ -19,6 +19,9 @@ import {
   LYRICS_VERTICAL_POSITIONS,
   MODELS,
   NAV,
+  PITCH_TOLERANCE_MAX,
+  PITCH_TOLERANCE_MIN,
+  PITCH_TOLERANCE_STEP,
   SEPARATORS,
   SETTINGS_TABS,
   VOCAL_THRESHOLD_MAX,
@@ -54,6 +57,9 @@ export const SettingsPage = () => {
   const [vocalThresholdPct, setVocalThresholdPct] = useState(
     config?.vocal_detection_threshold_pct ?? DEFAULTS.vocal_detection_threshold_pct,
   );
+  const [pitchTolerance, setPitchTolerance] = useState(
+    config?.pitch_tolerance_semitones ?? DEFAULTS.pitch_tolerance_semitones,
+  );
 
   const close = () => navigate("/");
   const asrEngine = config?.asr_engine ?? DEFAULTS.asr_engine;
@@ -88,6 +94,10 @@ export const SettingsPage = () => {
   }, [config?.vocal_detection_threshold_pct]);
 
   useEffect(() => {
+    setPitchTolerance(config?.pitch_tolerance_semitones ?? DEFAULTS.pitch_tolerance_semitones);
+  }, [config?.pitch_tolerance_semitones]);
+
+  useEffect(() => {
     const updateIsFullScreen = async () => {
       setIsFullScreen(await tauriIsFullScreen());
     };
@@ -110,6 +120,11 @@ export const SettingsPage = () => {
     mutate({ vocal_detection_threshold_pct: pct });
   };
 
+  const updatePitchTolerance = (semitones: number) => {
+    setPitchTolerance(semitones);
+    mutate({ pitch_tolerance_semitones: semitones });
+  };
+
   const toggleWindowMode = (fullscreen: boolean) => {
     setIsFullScreen(fullscreen);
     setFullScreen(fullscreen);
@@ -121,6 +136,7 @@ export const SettingsPage = () => {
     setMicMonitorGain(DEFAULTS.mic_monitor_gain);
     setMicLatencySec(DEFAULTS.mic_latency_compensation_sec);
     setVocalThresholdPct(DEFAULTS.vocal_detection_threshold_pct);
+    setPitchTolerance(DEFAULTS.pitch_tolerance_semitones);
   };
 
   const { footerSegment, getFocusClassName, syncFocusFromElement } = useSettingsNavigation({
@@ -383,6 +399,22 @@ export const SettingsPage = () => {
                     On
                   </Button>
                 </ButtonGroup>
+              </Field>
+
+              {/* ponytail: plain slider, not wired into the settings controller-nav ring. */}
+              <Field>
+                <Label>Scoring tolerance</Label>
+                <Hint>
+                  How far off-pitch a note can be before it scores zero. Lower is stricter, higher
+                  is more forgiving ({pitchTolerance} semitone{pitchTolerance === 1 ? "" : "s"}).
+                </Hint>
+                <Slider
+                  min={PITCH_TOLERANCE_MIN}
+                  max={PITCH_TOLERANCE_MAX}
+                  step={PITCH_TOLERANCE_STEP}
+                  value={[pitchTolerance]}
+                  onValueChange={([semitones]) => updatePitchTolerance(semitones)}
+                />
               </Field>
 
               <Field>

@@ -38,11 +38,17 @@ export type AppConfig = {
   auto_analyze: boolean | null;
   /**
    * When set, analysis always runs WhisperX to produce word-level lyric
-   * timing. Default (`None`/false) prefers LRCLIB's line-level synced lyrics
-   * and skips WhisperX when they exist — only transcribing when LRCLIB has
-   * no match. See docs/adr/0003.
+   * timing. Default (`None`/false) uses LRCLIB's line-level synced lyrics and
+   * skips WhisperX entirely — songs with no synced match are left lyric-less
+   * (stems only) rather than transcribed. See docs/adr/0003.
    */
   word_level_lyrics: boolean | null;
+  /**
+   * Pitch-scoring tolerance in semitones — the distance at which a sung note
+   * scores zero (`similarity = max(0, 1 - diff/tolerance)`). Lower is
+   * stricter, higher is more forgiving. Default 6.
+   */
+  pitch_tolerance_semitones: number | null;
   song_list_view: string | null;
   language_overrides: { [key in string]: string } | null;
 };

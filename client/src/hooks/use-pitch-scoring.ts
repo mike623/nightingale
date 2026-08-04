@@ -4,6 +4,7 @@ import {
   MAX_MIC_LATENCY_COMPENSATION_SEC,
   MIN_MIC_LATENCY_COMPENSATION_SEC,
   PITCH_WINDOW_SAMPLES,
+  SEMITONE_TOLERANCE,
 } from "@/lib/pitch/constants";
 import { createPitchDetector, detectPitchFromSamplesRef } from "@/lib/pitch/detect";
 import {
@@ -27,6 +28,7 @@ export function usePitchScoring(
   { isReady, duration, getReferenceBuffer, subscribe }: PitchScoringSource,
   micPitch: number | null,
   latencyCompensationSec = DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
+  toleranceSemitones = SEMITONE_TOLERANCE,
 ) {
   const refDetector = useRef(createPitchDetector());
   const scratchRef = useRef(new Float32Array(PITCH_WINDOW_SAMPLES));
@@ -34,6 +36,7 @@ export function usePitchScoring(
   const scoringRef = useRef(new PitchScoring(1));
   const micPitchRef = useRef(micPitch);
   const latencyRef = useRef(latencyCompensationSec);
+  const toleranceRef = useRef(toleranceSemitones);
   const singableRef = useRef<number | null>(null);
   const [series, setSeries] = useState<PitchSeries>({
     refPitches: [],
@@ -43,6 +46,7 @@ export function usePitchScoring(
   const [score, setScore] = useState(0);
 
   micPitchRef.current = micPitch;
+  toleranceRef.current = toleranceSemitones;
   latencyRef.current = Math.min(
     MAX_MIC_LATENCY_COMPENSATION_SEC,
     Math.max(MIN_MIC_LATENCY_COMPENSATION_SEC, latencyCompensationSec),
@@ -84,7 +88,8 @@ export function usePitchScoring(
           scratchRef.current,
           reference.sampleRate,
         );
-        const sim = refHz != null && mp != null ? pitchSimilarity(refHz, mp) : 0;
+        const sim =
+          refHz != null && mp != null ? pitchSimilarity(refHz, mp, toleranceRef.current) : 0;
         bufferRef.current.tryPush(refHz, mp, sim, t);
         scoringRef.current.accumulate(t, refHz, mp, sim);
       }
