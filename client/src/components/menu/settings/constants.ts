@@ -1,6 +1,9 @@
 import {
   DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   MAX_MIC_LATENCY_COMPENSATION_SEC,
+  MAX_SEMITONE_TOLERANCE,
+  MIN_SEMITONE_TOLERANCE,
+  SEMITONE_TOLERANCE,
 } from "@/lib/pitch/constants";
 import type { AppConfig } from "@/types/AppConfig";
 
@@ -85,6 +88,8 @@ export const DEFAULTS = {
   mic_monitor_gain: 0.65,
   mic_latency_compensation_sec: DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   auto_analyze: false,
+  pitch_tolerance_semitones: SEMITONE_TOLERANCE,
+  pitch_graph_scale: 1,
   lyrics_vertical_position: "bottom",
   lyrics_horizontal_position: "center",
 } satisfies Pick<
@@ -99,6 +104,8 @@ export const DEFAULTS = {
   | "mic_monitor_gain"
   | "mic_latency_compensation_sec"
   | "auto_analyze"
+  | "pitch_tolerance_semitones"
+  | "pitch_graph_scale"
   | "lyrics_vertical_position"
   | "lyrics_horizontal_position"
 >;
@@ -112,6 +119,12 @@ export const MIC_LATENCY_MAX = MAX_MIC_LATENCY_COMPENSATION_SEC;
 export const VOCAL_THRESHOLD_STEP = 0.01;
 export const VOCAL_THRESHOLD_MIN = 0;
 export const VOCAL_THRESHOLD_MAX = 0.6;
+export const PITCH_TOLERANCE_STEP = 0.5;
+export const PITCH_TOLERANCE_MIN = MIN_SEMITONE_TOLERANCE;
+export const PITCH_TOLERANCE_MAX = MAX_SEMITONE_TOLERANCE;
+export const PITCH_GRAPH_SCALE_STEP = 0.1;
+export const PITCH_GRAPH_SCALE_MIN = 0.5;
+export const PITCH_GRAPH_SCALE_MAX = 2.5;
 export const NUMBER_PICKER_SIZE = 16;
 
 export const NAV = {

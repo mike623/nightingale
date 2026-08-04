@@ -19,6 +19,12 @@ import {
   LYRICS_VERTICAL_POSITIONS,
   MODELS,
   NAV,
+  PITCH_GRAPH_SCALE_MAX,
+  PITCH_GRAPH_SCALE_MIN,
+  PITCH_GRAPH_SCALE_STEP,
+  PITCH_TOLERANCE_MAX,
+  PITCH_TOLERANCE_MIN,
+  PITCH_TOLERANCE_STEP,
   SEPARATORS,
   SETTINGS_TABS,
   VOCAL_THRESHOLD_MAX,
@@ -54,6 +60,12 @@ export const SettingsPage = () => {
   const [vocalThresholdPct, setVocalThresholdPct] = useState(
     config?.vocal_detection_threshold_pct ?? DEFAULTS.vocal_detection_threshold_pct,
   );
+  const [pitchTolerance, setPitchTolerance] = useState(
+    config?.pitch_tolerance_semitones ?? DEFAULTS.pitch_tolerance_semitones,
+  );
+  const [pitchGraphScale, setPitchGraphScale] = useState(
+    config?.pitch_graph_scale ?? DEFAULTS.pitch_graph_scale,
+  );
 
   const close = () => navigate("/");
   const asrEngine = config?.asr_engine ?? DEFAULTS.asr_engine;
@@ -88,6 +100,14 @@ export const SettingsPage = () => {
   }, [config?.vocal_detection_threshold_pct]);
 
   useEffect(() => {
+    setPitchTolerance(config?.pitch_tolerance_semitones ?? DEFAULTS.pitch_tolerance_semitones);
+  }, [config?.pitch_tolerance_semitones]);
+
+  useEffect(() => {
+    setPitchGraphScale(config?.pitch_graph_scale ?? DEFAULTS.pitch_graph_scale);
+  }, [config?.pitch_graph_scale]);
+
+  useEffect(() => {
     const updateIsFullScreen = async () => {
       setIsFullScreen(await tauriIsFullScreen());
     };
@@ -110,6 +130,16 @@ export const SettingsPage = () => {
     mutate({ vocal_detection_threshold_pct: pct });
   };
 
+  const updatePitchTolerance = (semitones: number) => {
+    setPitchTolerance(semitones);
+    mutate({ pitch_tolerance_semitones: semitones });
+  };
+
+  const updatePitchGraphScale = (scale: number) => {
+    setPitchGraphScale(scale);
+    mutate({ pitch_graph_scale: scale });
+  };
+
   const toggleWindowMode = (fullscreen: boolean) => {
     setIsFullScreen(fullscreen);
     setFullScreen(fullscreen);
@@ -121,6 +151,8 @@ export const SettingsPage = () => {
     setMicMonitorGain(DEFAULTS.mic_monitor_gain);
     setMicLatencySec(DEFAULTS.mic_latency_compensation_sec);
     setVocalThresholdPct(DEFAULTS.vocal_detection_threshold_pct);
+    setPitchTolerance(DEFAULTS.pitch_tolerance_semitones);
+    setPitchGraphScale(DEFAULTS.pitch_graph_scale);
   };
 
   const { footerSegment, getFocusClassName, syncFocusFromElement } = useSettingsNavigation({
@@ -357,6 +389,64 @@ export const SettingsPage = () => {
                     On
                   </Button>
                 </ButtonGroup>
+              </Field>
+
+              {/* TODO: not reachable via the settings controller-nav ring — mouse/touch
+                  only. Add a nav slot in constants.ts getAnalysisNav/getSettingsStops
+                  (the index math is Parakeet-shifted) to make it controller-navigable. */}
+              <Field>
+                <Label>Word-level lyric timing</Label>
+                <Hint>
+                  Off uses LRCLIB's line-level synced lyrics and skips the slow WhisperX step
+                  entirely — songs with no LRCLIB match stay lyric-less until you search LRCLIB by
+                  hand (in Edit Lyrics). On always runs WhisperX for per-word karaoke highlighting.
+                </Hint>
+                <ButtonGroup>
+                  <Button
+                    variant={config?.word_level_lyrics === true ? "outline" : "default"}
+                    onClick={() => mutate({ word_level_lyrics: false })}
+                  >
+                    Off
+                  </Button>
+                  <Button
+                    variant={config?.word_level_lyrics === true ? "default" : "outline"}
+                    onClick={() => mutate({ word_level_lyrics: true })}
+                  >
+                    On
+                  </Button>
+                </ButtonGroup>
+              </Field>
+
+              {/* TODO: plain slider, not reachable via the settings controller-nav ring. */}
+              <Field>
+                <Label>Scoring tolerance</Label>
+                <Hint>
+                  How far off-pitch a note can be before it scores zero. Lower is stricter, higher
+                  is more forgiving ({pitchTolerance} semitone{pitchTolerance === 1 ? "" : "s"}).
+                </Hint>
+                <Slider
+                  min={PITCH_TOLERANCE_MIN}
+                  max={PITCH_TOLERANCE_MAX}
+                  step={PITCH_TOLERANCE_STEP}
+                  value={[pitchTolerance]}
+                  onValueChange={([semitones]) => updatePitchTolerance(semitones)}
+                />
+              </Field>
+
+              {/* TODO: plain slider, not reachable via the settings controller-nav ring. */}
+              <Field>
+                <Label>Pitch graph size</Label>
+                <Hint>
+                  Scale the on-screen pitch graph shown while singing (
+                  {Math.round(pitchGraphScale * 100)}%).
+                </Hint>
+                <Slider
+                  min={PITCH_GRAPH_SCALE_MIN}
+                  max={PITCH_GRAPH_SCALE_MAX}
+                  step={PITCH_GRAPH_SCALE_STEP}
+                  value={[pitchGraphScale]}
+                  onValueChange={([scale]) => updatePitchGraphScale(scale)}
+                />
               </Field>
 
               <Field>

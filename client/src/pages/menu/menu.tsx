@@ -2,6 +2,7 @@ import { ClearCacheDialog } from "@/components/menu/dialogs/clear-cache";
 import { DonateDialog } from "@/components/menu/dialogs/donate";
 import { EditLyricsDialog } from "@/components/menu/dialogs/edit-lyrics";
 import { ExitDialog } from "@/components/menu/dialogs/exit";
+import { ImportUrlDialog } from "@/components/menu/dialogs/import-url";
 import { InfoDialog } from "@/components/menu/dialogs/info";
 import { JellyfinConnectDialog } from "@/components/menu/dialogs/remote-source/jellyfin-connect";
 import { NavidromeConnectDialog } from "@/components/menu/dialogs/remote-source/navidrome-connect";
@@ -18,6 +19,7 @@ import { SidebarInset } from "@/components/ui/sidebar";
 import { EXIT_SUPPORTED } from "@/bridge/exit";
 import { useMenuNav } from "@/hooks/navigation/use-menu-nav";
 import { useDialog } from "@/hooks/use-dialog";
+import { useImportNotifications } from "@/hooks/use-import-notifications";
 import { useShouldRunSetup } from "@/hooks/use-should-run-setup";
 import { useSongsMeta } from "@/queries/use-songs";
 import { useCallback } from "react";
@@ -41,6 +43,8 @@ export const MenuLayout = () => {
   const { mode, setMode } = useDialog();
   const { shouldRunSetup } = useShouldRunSetup();
   const location = useLocation();
+
+  useImportNotifications();
 
   const isContentPage = location.pathname !== "/";
   const overlayOpen = isContentPage || mode !== null || shouldRunSetup;
@@ -73,6 +77,7 @@ export const MenuLayout = () => {
       <DonateDialog />
       <SelectLanguageDialog />
       <EditLyricsDialog />
+      <ImportUrlDialog />
       <ClearCacheDialog />
       <JellyfinConnectDialog />
       <NavidromeConnectDialog />

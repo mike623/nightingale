@@ -202,6 +202,17 @@ pub struct AppConfig {
     pub align_backend: Option<String>,
     pub vocal_detection_threshold_pct: Option<f64>,
     pub auto_analyze: Option<bool>,
+    /// When set, analysis always runs WhisperX to produce word-level lyric
+    /// timing. Default (`None`/false) uses LRCLIB's line-level synced lyrics and
+    /// skips WhisperX entirely — songs with no synced match are left lyric-less
+    /// (stems only) rather than transcribed. See docs/adr/0003.
+    pub word_level_lyrics: Option<bool>,
+    /// Pitch-scoring tolerance in semitones — the distance at which a sung note
+    /// scores zero (`similarity = max(0, 1 - diff/tolerance)`). Lower is
+    /// stricter, higher is more forgiving. Default 6.
+    pub pitch_tolerance_semitones: Option<f64>,
+    /// Size multiplier for the on-screen pitch graph. Default 1.0.
+    pub pitch_graph_scale: Option<f64>,
     pub song_list_view: Option<String>,
     pub language_overrides: Option<HashMap<String, String>>,
 }
@@ -237,6 +248,9 @@ impl Default for AppConfig {
             align_backend: None,
             vocal_detection_threshold_pct: None,
             auto_analyze: None,
+            word_level_lyrics: None,
+            pitch_tolerance_semitones: None,
+            pitch_graph_scale: None,
             song_list_view: None,
             language_overrides: None,
         }
@@ -394,6 +408,11 @@ impl AppConfig {
 
     pub fn auto_analyze(&self) -> bool {
         self.auto_analyze.unwrap_or(false)
+    }
+
+    /// Opt-in word-level lyric timing. Off by default — see `word_level_lyrics`.
+    pub fn word_level_lyrics(&self) -> bool {
+        self.word_level_lyrics.unwrap_or(false)
     }
 
     pub fn mic_monitor_gain(&self) -> f32 {

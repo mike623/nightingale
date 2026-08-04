@@ -6,7 +6,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { openUrl } from "@/bridge/opener";
+import { searchLrclibTerms } from "@/bridge/lyrics";
 import { useDialogNav } from "@/hooks/navigation/use-dialog-nav";
 import { useDialog } from "@/hooks/use-dialog";
 import { useLyricsEditor } from "@/hooks/use-lyrics-editor";
@@ -17,9 +20,15 @@ import {
 import { useSaveLyricsMutation } from "@/mutations/use-save-lyrics-mutation";
 import { useLrclibCandidates } from "@/queries/use-lyrics";
 import type { LrclibCandidate } from "@/types/LrclibCandidate";
-import { detectLrcLevel, isEditLyricsDialogMode, stripLrcToPlainLines } from "@/utils/edit-lyrics";
-import { Loader2Icon } from "lucide-react";
+import {
+  detectLrcLevel,
+  formatSeconds,
+  isEditLyricsDialogMode,
+  stripLrcToPlainLines,
+} from "@/utils/edit-lyrics";
+import { Loader2Icon, SearchIcon } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { CarouselNav } from "./carousel-nav";
 import { EditLyricsFooter } from "./edit-lyrics-footer";
 import { LrcOptions, type TimingChoice } from "./lrc-options";
@@ -124,13 +133,18 @@ export const EditLyricsDialog = () => {
 
   const editor = useLyricsEditor({ song, onSaved: close });
   const candidatesQuery = useLrclibCandidates(fileHash);
-  const candidates = candidatesQuery.data ?? [];
+  // A manual LRCLIB search (custom track/artist) overrides the auto results.
+  const [manualResults, setManualResults] = useState<LrclibCandidate[] | null>(null);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [searchTrack, setSearchTrack] = useState("");
+  const [searchArtist, setSearchArtist] = useState("");
+  const candidates = manualResults ?? candidatesQuery.data ?? [];
   const candidateCount = candidates.length;
-  const matchesLoading = candidatesQuery.isLoading;
-  const hasMatches = isAnalyzed ? candidateCount > 1 : candidateCount > 0;
-  // Show the tab while searching too, so the loading state is visible instead
-  // of the tab silently popping in once results arrive.
-  const showMatchesTab = hasMatches || matchesLoading;
+  const matchesLoading = candidatesQuery.isLoading || manualLoading;
+  // Always offer the LRCLIB tab: even with zero auto-matches the user needs the
+  // search box to look lyrics up by hand (auto title/artist from a YouTube MV
+  // name is often wrong).
+  const showMatchesTab = true;
 
   const provideLrcMutation = useProvideLrcMutation();
   const applyTimedMutation = useApplyTimedLyricsMutation();
@@ -147,7 +161,26 @@ export const EditLyricsDialog = () => {
     setCarouselIndex(0);
     setTimingChoice("provided");
     setSeparateStems(false);
+    setManualResults(null);
+    setManualLoading(false);
+    setSearchTrack(song?.title ?? "");
+    setSearchArtist(song && song.artist !== "Unknown Artist" ? song.artist : "");
   }
+
+  const runManualSearch = async () => {
+    if (manualLoading || !searchTrack.trim()) return;
+    setManualLoading(true);
+    try {
+      const results = await searchLrclibTerms(searchTrack.trim(), searchArtist.trim());
+      setManualResults(results);
+      setCarouselIndex(0);
+      if (results.length === 0) toast.info("No LRCLIB matches for those terms.");
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setManualLoading(false);
+    }
+  };
 
   const lrcLevel = useMemo(() => detectLrcLevel(editor.text), [editor.text]);
   const hasLrc = lrcLevel !== "none";
@@ -450,11 +483,54 @@ export const EditLyricsDialog = () => {
                 {editorPane}
               </TabsContent>
 
-              <TabsContent value="lrclib" className="mt-3 flex min-h-0 flex-1 flex-col">
+              <TabsContent value="lrclib" className="mt-3 flex min-h-0 flex-1 flex-col gap-2">
+                {/* Song length so the user can pick the LRCLIB match whose
+                    duration lines up. */}
+                <p className="text-xs text-muted-foreground">
+                  Song length:{" "}
+                  <span className="tabular-nums">{formatSeconds(song.duration_secs)}</span>
+                </p>
+                {/* Manual search — auto title/artist (esp. from a YouTube MV name) is
+                    often wrong. TODO: these inputs aren't in the dialog controller-nav ring. */}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 space-y-1">
+                    <Input
+                      value={searchTrack}
+                      placeholder="Track"
+                      onChange={(e) => setSearchTrack(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") runManualSearch();
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Input
+                      value={searchArtist}
+                      placeholder="Artist"
+                      onChange={(e) => setSearchArtist(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") runManualSearch();
+                      }}
+                    />
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={runManualSearch}
+                    disabled={manualLoading || !searchTrack.trim()}
+                    aria-label="Search LRCLIB"
+                  >
+                    {manualLoading ? (
+                      <Loader2Icon className="size-4 animate-spin" />
+                    ) : (
+                      <SearchIcon className="size-4" />
+                    )}
+                  </Button>
+                </div>
                 <LrclibMatches
                   candidates={candidates}
-                  isLoading={candidatesQuery.isLoading}
-                  isError={candidatesQuery.isError}
+                  isLoading={matchesLoading}
+                  isError={candidatesQuery.isError && manualResults === null}
                   errorMessage={
                     candidatesQuery.error instanceof Error ? candidatesQuery.error.message : null
                   }

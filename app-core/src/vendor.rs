@@ -66,6 +66,64 @@ pub fn ffmpeg_path() -> PathBuf {
     vendor_dir().join(name)
 }
 
+pub fn ytdlp_path() -> PathBuf {
+    let name = if cfg!(windows) { "yt-dlp.exe" } else { "yt-dlp" };
+    vendor_dir().join(name)
+}
+
+fn ytdlp_download_url() -> Result<String, String> {
+    let base = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
+    let file = match (std::env::consts::OS, std::env::consts::ARCH) {
+        // macOS ships a universal2 standalone binary.
+        ("macos", _) => "yt-dlp_macos",
+        ("linux", "x86_64") => "yt-dlp_linux",
+        ("linux", "aarch64") => "yt-dlp_linux_aarch64",
+        ("windows", _) => "yt-dlp.exe",
+        (os, arch) => return Err(format!("Unsupported platform for yt-dlp: {os}-{arch}")),
+    };
+    Ok(format!("{base}/{file}"))
+}
+
+/// Lazily ensure yt-dlp is present (downloaded on the first Import, not at
+/// launch — see docs/adr/0002) and attempt a self-update, since yt-dlp breaks
+/// whenever YouTube changes its internals. A failed update on an
+/// already-present binary is non-fatal; a failed initial download is fatal.
+///
+/// Returns the binary path and whether the self-update succeeded. The caller
+/// uses the flag to surface a clear "yt-dlp outdated" error when a subsequent
+/// download fails after a failed update (rather than a generic failure).
+pub fn ensure_ytdlp() -> Result<(PathBuf, bool), String> {
+    let dest = ytdlp_path();
+    let existed = dest.is_file();
+
+    if !existed {
+        let _ = std::fs::create_dir_all(vendor_dir());
+        download_to_file(&ytdlp_download_url()?, &dest)
+            .map_err(|e| format!("Failed to download yt-dlp: {e}"))?;
+        mark_executable(&dest)?;
+    }
+
+    // Self-update in place. yt-dlp goes stale fast; a stale binary fails
+    // downloads silently, so we always try. Non-fatal — the (possibly older)
+    // binary still runs.
+    let updated = match silent_command(&dest).arg("-U").output() {
+        Ok(o) if o.status.success() => true,
+        Ok(o) => {
+            tracing::warn!(
+                "[ytdlp] self-update failed: {}",
+                String::from_utf8_lossy(&o.stderr)
+            );
+            false
+        }
+        Err(e) => {
+            tracing::warn!("[ytdlp] could not run self-update: {e}");
+            false
+        }
+    };
+
+    Ok((dest, updated))
+}
+
 pub fn python_path() -> PathBuf {
     if cfg!(windows) {
         vendor_dir().join("venv").join("Scripts").join("python.exe")

@@ -2,6 +2,7 @@ mod analyzer;
 mod cache;
 mod config;
 mod error;
+mod import;
 mod library_db;
 mod library_menu;
 mod library_model;
@@ -27,12 +28,16 @@ pub use cache::{
     clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path, same_path,
 };
 pub use config::{AppConfig, LibrarySource};
+pub use import::{
+    ImportEntry, ImportFailure, ImportPreview, ImportProgress, ImportReport, import_available,
+    probe as probe_import, run_import,
+};
 pub use library_db::{init_library, library_db_path};
 pub use library_menu::{LibraryMenuItem, LibraryMenuItems, load_library_menu_items};
 pub use library_model::{LibraryMenuFilters, LoadSongsParams, SongsMeta, SongsStore};
 pub use lyrics::{
     LrclibCandidate, LyricsFile, apply_timed_lyrics, load_lyrics_file, provide_lrc,
-    save_lyrics_and_realign, search_lrclib_for_hash,
+    save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,
 };
 pub use media_server::MediaEndpoint;
 pub use playback::{

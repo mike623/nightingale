@@ -1,4 +1,5 @@
 import { usePlaybackTransportActions, usePlaybackTransportState } from "@/contexts/playback";
+import { useLyricsHidden } from "@/hooks/use-lyrics-hidden";
 import { cn } from "@/lib/utils";
 import type { AppConfig } from "@/types/AppConfig";
 import type { Segment, Word } from "@/types/Transcript";
@@ -217,6 +218,7 @@ function LyricsDisplayImpl({
 }: LyricsDisplayProps) {
   const { isPlaying, paused } = usePlaybackTransportState();
   const { subscribe, getCurrentTime } = usePlaybackTransportActions();
+  const [lyricsHidden] = useLyricsHidden();
   const animate = isPlaying && !paused;
 
   const [segIdx, setSegIdx] = useState(() =>
@@ -286,7 +288,7 @@ function LyricsDisplayImpl({
     return subscribe((time) => apply(time));
   }, [segments, subscribe, getCurrentTime, animate]);
 
-  if (segments.length === 0) {
+  if (segments.length === 0 || lyricsHidden) {
     return null;
   }
 

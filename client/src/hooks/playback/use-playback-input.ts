@@ -7,6 +7,7 @@ import {
   usePlaybackTransportState,
 } from "@/contexts/playback";
 import { useNavInput } from "@/hooks/navigation/use-nav-input";
+import { useLyricsHidden } from "@/hooks/use-lyrics-hidden";
 import { usePlaybackConfigPersist } from "@/hooks/playback/use-playback-config-persist";
 import type { AppConfig } from "@/types/AppConfig";
 import { useCallback, useEffect, useRef } from "react";
@@ -69,7 +70,9 @@ export function usePlaybackInput(config: AppConfig | null) {
     ),
   );
 
-  // Keyboard-only shortcuts (G, T, F, M, N, R, +/-, Space)
+  const [, setLyricsHidden] = useLyricsHidden();
+
+  // Keyboard-only shortcuts (G, T, F, L, M, N, R, +/-, Space)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === " ") {
@@ -93,6 +96,11 @@ export function usePlaybackInput(config: AppConfig | null) {
         case "f":
         case "F":
           cycleFlavor();
+          break;
+
+        case "l":
+        case "L":
+          setLyricsHidden((hidden) => !hidden);
           break;
 
         case "g":
@@ -153,5 +161,6 @@ export function usePlaybackInput(config: AppConfig | null) {
     handleToggleMic,
     handleCycleMic,
     handleToggleMicMonitor,
+    setLyricsHidden,
   ]);
 }

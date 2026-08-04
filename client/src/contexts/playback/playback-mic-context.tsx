@@ -11,7 +11,7 @@ import { useMicDevices } from "@/queries/use-mic-devices";
 import { useMicReactive, type MicReactiveRef } from "@/hooks/use-mic-reactive";
 import { usePitchScoring } from "@/hooks/use-pitch-scoring";
 import { usePlaybackConfigPersist } from "@/hooks/playback/use-playback-config-persist";
-import { DEFAULT_MIC_LATENCY_COMPENSATION_SEC } from "@/lib/pitch/constants";
+import { DEFAULT_MIC_LATENCY_COMPENSATION_SEC, SEMITONE_TOLERANCE } from "@/lib/pitch/constants";
 import type { PitchSeries } from "@/lib/pitch/state";
 import type { AppConfig } from "@/types/AppConfig";
 import {
@@ -94,6 +94,7 @@ export function PlaybackMicProvider({ config, children }: PlaybackMicProviderPro
     { isReady, duration, getReferenceBuffer: getScoringBuffer, subscribe },
     latestPitch,
     config?.mic_latency_compensation_sec ?? DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
+    config?.pitch_tolerance_semitones ?? SEMITONE_TOLERANCE,
   );
 
   const micErrorShown = useRef(false);
