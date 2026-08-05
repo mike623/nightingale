@@ -33,3 +33,8 @@ export const provideLrc = async (
 export const applyTimedLyrics = async (fileHash: string, lrcText: string): Promise<void> => {
   return await invoke<void>("apply_timed_lyrics", { fileHash, lrcText });
 };
+
+/** Remove a song's lyrics entirely, leaving it lyricless but still playable. */
+export const clearLyrics = async (fileHash: string): Promise<void> => {
+  return await invoke<void>("clear_lyrics", { fileHash });
+};

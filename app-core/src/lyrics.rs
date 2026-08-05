@@ -303,6 +303,56 @@ pub fn apply_timed_lyrics(file_hash: &str, lrc_text: &str) -> Result<(), String>
     Ok(())
 }
 
+/// Drop a song's lyrics entirely, leaving it lyricless but still playable.
+/// Keeps existing stems/key/tempo for an analyzed song (karaoke instrumental,
+/// no scrolling lyrics); for a not-yet-analyzed song it prepares playback over
+/// the original mix. Mirrors [`apply_timed_lyrics`]/[`provide_lrc`] with an
+/// empty transcript.
+pub fn clear_lyrics(file_hash: &str) -> Result<(), String> {
+    if is_usdx_song(file_hash) {
+        return Err("Cannot edit lyrics for USDX songs".to_string());
+    }
+
+    let Some(song) = library_db::load_song_by_hash(file_hash).ok().flatten() else {
+        return Err("Song not found".to_string());
+    };
+
+    let cache = CacheDir::new();
+    let empty = ParsedLrc { segments: Vec::new() };
+
+    cache.delete_transcript_variants(file_hash);
+    let _ = std::fs::remove_file(cache.lyrics_path(file_hash));
+
+    if song.is_analyzed {
+        // Keep the existing stems and key/tempo; just blank the lyric lines.
+        let meta = read_transcript_meta(&cache, file_hash);
+        let key = song.key.clone().or(meta.key);
+        let no_stems = song.no_stems;
+
+        let value = build_lrc_transcript(&empty, song.language.as_deref(), key.as_deref(), 1.0, no_stems);
+        write_transcript_json(&cache, file_hash, &value)
+            .map_err(|e| format!("Failed to write transcript: {e}"))?;
+
+        let mut updated = song;
+        updated.is_analyzed = true;
+        updated.transcript_source = Some(TranscriptSource::Lrc);
+        updated.key = key;
+        updated.override_key = None;
+        updated.tempo = 1.0;
+        updated.key_offset = 0;
+        updated.no_stems = no_stems;
+        library_db::update_song_fields(file_hash, &updated).map_err(|e| e.to_string())?;
+    } else {
+        // Nothing analyzed yet: make it a lyricless song over the original mix.
+        let value = build_lrc_transcript(&empty, song.language.as_deref(), None, 1.0, true);
+        write_transcript_json(&cache, file_hash, &value)
+            .map_err(|e| format!("Failed to write transcript: {e}"))?;
+        prepare_lrc_no_stems(file_hash).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
 pub(crate) fn write_lyrics_file(
     cache: &CacheDir,
     file_hash: &str,

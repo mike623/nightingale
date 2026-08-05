@@ -15,6 +15,7 @@ import { useDialog } from "@/hooks/use-dialog";
 import { useLyricsEditor } from "@/hooks/use-lyrics-editor";
 import {
   useApplyTimedLyricsMutation,
+  useClearLyricsMutation,
   useProvideLrcMutation,
 } from "@/mutations/use-timed-lyrics-mutation";
 import { useSaveLyricsMutation } from "@/mutations/use-save-lyrics-mutation";
@@ -149,6 +150,7 @@ export const EditLyricsDialog = () => {
   const provideLrcMutation = useProvideLrcMutation();
   const applyTimedMutation = useApplyTimedLyricsMutation();
   const saveLyricsMutation = useSaveLyricsMutation();
+  const clearLyricsMutation = useClearLyricsMutation();
 
   const [activeTab, setActiveTab] = useState<EditLyricsTab>("edit");
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -193,7 +195,10 @@ export const EditLyricsDialog = () => {
   const willSeparate = useProvidedTiming && separateStems && !stemsSeparated;
 
   const saving =
-    provideLrcMutation.isLoading || applyTimedMutation.isLoading || saveLyricsMutation.isLoading;
+    provideLrcMutation.isLoading ||
+    applyTimedMutation.isLoading ||
+    saveLyricsMutation.isLoading ||
+    clearLyricsMutation.isLoading;
   const canSave =
     !saving && !editor.loadingInitial && editor.isDirty && editor.text.trim().length > 0;
 
@@ -245,6 +250,11 @@ export const EditLyricsDialog = () => {
     const lines = hasLrc ? stripLrcToPlainLines(editor.text) : editor.normalized;
     if (lines.length === 0) return;
     saveLyricsMutation.mutate({ hash, lines, title }, { onSuccess: close });
+  };
+
+  const handleDelete = () => {
+    if (saving || !song) return;
+    clearLyricsMutation.mutate({ hash: song.file_hash, title: song.title }, { onSuccess: close });
   };
 
   const applyCandidate = (candidate: LrclibCandidate) => {
@@ -555,6 +565,7 @@ export const EditLyricsDialog = () => {
             saveLabel={saveLabel}
             hint={footerHint}
             isFocused={(slot) => isFocused(layout.footerSegment, slot)}
+            onDelete={isAnalyzed ? handleDelete : undefined}
           />
         </div>
       </DialogContent>

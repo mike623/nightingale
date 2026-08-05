@@ -1,7 +1,8 @@
 use app_core::{
-    apply_timed_lyrics as core_apply_timed_lyrics, load_lyrics_file, provide_lrc as core_provide_lrc,
-    save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms as core_search_lrclib_terms,
-    LrclibCandidate, LyricsFile,
+    apply_timed_lyrics as core_apply_timed_lyrics, clear_lyrics as core_clear_lyrics,
+    load_lyrics_file, provide_lrc as core_provide_lrc, save_lyrics_and_realign,
+    search_lrclib_for_hash, search_lrclib_terms as core_search_lrclib_terms, LrclibCandidate,
+    LyricsFile,
 };
 
 #[tauri::command]
@@ -36,4 +37,9 @@ pub fn provide_lrc(file_hash: String, lrc_text: String, separate_stems: bool) ->
 #[tauri::command]
 pub fn apply_timed_lyrics(file_hash: String, lrc_text: String) -> Result<(), String> {
     core_apply_timed_lyrics(&file_hash, &lrc_text)
+}
+
+#[tauri::command]
+pub fn clear_lyrics(file_hash: String) -> Result<(), String> {
+    core_clear_lyrics(&file_hash)
 }
