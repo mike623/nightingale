@@ -7,6 +7,13 @@ pub fn import_available() -> bool {
     app_core::import_available()
 }
 
+/// YouTube video ids already imported into the active folder library. The
+/// preview uses this to flag/uncheck entries that would just be re-downloads.
+#[tauri::command]
+pub fn imported_video_ids() -> Vec<String> {
+    app_core::imported_video_ids()
+}
+
 /// Resolve a YouTube URL to a preview (single video or playlist) without
 /// downloading. Runs off-thread so the UI stays responsive.
 #[tauri::command]

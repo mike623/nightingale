@@ -103,6 +103,23 @@ pub fn import_available() -> bool {
     import_folder_root().is_some()
 }
 
+/// YouTube video ids already imported into the active folder (manifest entry
+/// whose file is still on disk). Lets the preview flag/skip re-imports up front,
+/// mirroring the delta-skip `run_import` does at download time. Empty when there
+/// is no folder library or no manifest yet.
+pub fn imported_video_ids() -> Vec<String> {
+    let Some(root) = import_folder_root() else {
+        return Vec::new();
+    };
+    let manifest = load_manifest(&root);
+    manifest
+        .videos
+        .into_iter()
+        .filter(|(_, name)| root.join(name).exists())
+        .map(|(id, _)| id)
+        .collect()
+}
+
 /// Resolve a YouTube URL to a preview without downloading media. `--flat-playlist`
 /// lists playlist entries cheaply; a bare video resolves to a single entry.
 pub fn probe(url: &str) -> Result<ImportPreview, String> {

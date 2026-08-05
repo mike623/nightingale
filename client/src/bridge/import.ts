@@ -15,6 +15,10 @@ export const importAvailable = async (): Promise<boolean> =>
 export const probeImport = async (url: string): Promise<ImportPreview> =>
   await invoke<ImportPreview>("probe_import", { url });
 
+/** YouTube video ids already imported into the active folder (file still on disk). */
+export const importedVideoIds = async (): Promise<string[]> =>
+  await invoke<string[]>("imported_video_ids");
+
 /** Kick off a background download of the previewed entries. Returns immediately;
  * progress/completion arrive via the events below. */
 export const startImport = async (preview: ImportPreview): Promise<void> =>

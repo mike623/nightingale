@@ -2,7 +2,7 @@ import { Loader2Icon, YoutubeIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { IMPORT_TOAST_ID, probeImport, startImport } from "@/bridge/import";
+import { IMPORT_TOAST_ID, importedVideoIds, probeImport, startImport } from "@/bridge/import";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -29,6 +29,8 @@ export const ImportUrlDialog = () => {
   const [url, setUrl] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Video ids already on disk — shown as "Imported" and unchecked by default.
+  const [imported, setImported] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
   const step: Step = preview ? "preview" : "input";
@@ -40,6 +42,7 @@ export const ImportUrlDialog = () => {
     setUrl("");
     setPreview(null);
     setSelected(new Set());
+    setImported(new Set());
     setBusy(false);
     close();
   };
@@ -52,14 +55,17 @@ export const ImportUrlDialog = () => {
     setUrl(trimmed);
     setBusy(true);
     try {
-      const p = await probeImport(trimmed);
+      const [p, alreadyImported] = await Promise.all([probeImport(trimmed), importedVideoIds()]);
       if (p.entries.length === 0) {
         toast.error("No videos found at that URL.");
         return;
       }
+      const done = new Set(alreadyImported);
       setPreview(p);
-      // Everything checked by default — the user unticks what they don't want.
-      setSelected(new Set(p.entries.map((e) => e.id)));
+      setImported(done);
+      // Check only the new tracks — already-imported entries stay unticked so a
+      // re-import is a clean delta by default. (Re-download still works if ticked.)
+      setSelected(new Set(p.entries.filter((e) => !done.has(e.id)).map((e) => e.id)));
     } catch (e) {
       toast.error(String(e));
     } finally {
@@ -197,10 +203,17 @@ export const ImportUrlDialog = () => {
                   <li key={e.id}>
                     <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-accent">
                       <Checkbox checked={selected.has(e.id)} onCheckedChange={() => toggle(e.id)} />
-                      <span className="truncate">
+                      <span
+                        className={`truncate ${imported.has(e.id) ? "text-muted-foreground" : ""}`}
+                      >
                         {e.artist ? `${e.artist} — ` : ""}
                         {e.title}
                       </span>
+                      {imported.has(e.id) && (
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                          Imported
+                        </span>
+                      )}
                     </label>
                   </li>
                 ))}

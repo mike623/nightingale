@@ -18,7 +18,7 @@ use app_core::{AppConfig, SongsStore};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use cache::{calculate_cache_stats, clear_all, clear_models_command, clear_videos_command};
 use config::{load_config, save_config};
-use import::{import_available, probe_import, start_import};
+use import::{import_available, imported_video_ids, probe_import, start_import};
 use lyrics::{
     apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
     search_lrclib_terms,
@@ -125,6 +125,7 @@ pub fn run() {
             load_library_menu_items,
             // Import
             import_available,
+            imported_video_ids,
             probe_import,
             start_import,
             // Analyzer
