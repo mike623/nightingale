@@ -15,12 +15,26 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useDialog } from "@/hooks/use-dialog";
 import { readLastPlaylist, saveLastPlaylist } from "@/lib/last-playlist";
+import type { ImportEntry } from "@/types/ImportEntry";
 import type { ImportPreview } from "@/types/ImportPreview";
 import { RotateCcwIcon } from "lucide-react";
 
 type Step = "input" | "preview";
+
+/** Links the user pasted, one per line, trimmed and de-duplicated. */
+function parseUrls(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
 
 export const ImportUrlDialog = () => {
   const { mode, close } = useDialog();
@@ -32,9 +46,13 @@ export const ImportUrlDialog = () => {
   // Video ids already on disk — shown as "Imported" and unchecked by default.
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // Multi-link probing is sequential (one yt-dlp process each), so it reports progress.
+  const [probed, setProbed] = useState<{ done: number; total: number } | null>(null);
 
   const step: Step = preview ? "preview" : "input";
-  const single = preview && !preview.isPlaylist ? preview.entries[0] : null;
+  // A lone video is editable; anything longer is a pick-list.
+  const single =
+    preview && !preview.isPlaylist && preview.entries.length === 1 ? preview.entries[0] : null;
   const selectedCount = selected.size;
   const allSelected = preview ? selectedCount === preview.entries.length : false;
 
@@ -43,21 +61,64 @@ export const ImportUrlDialog = () => {
     setPreview(null);
     setSelected(new Set());
     setImported(new Set());
+    setProbed(null);
     setBusy(false);
     close();
   };
 
   const lastPlaylist = open ? readLastPlaylist() : null;
 
+  /**
+   * Probes every pasted link in turn and folds the results into one preview.
+   * Several links always resolve to a flat list of videos: only a lone
+   * playlist link keeps its playlist identity (and so its `.m3u`), because
+   * there is no single playlist a merged list could belong to.
+   */
+  const probeAll = async (urls: string[]): Promise<ImportPreview> => {
+    const merged = new Map<string, ImportEntry>();
+    const failures: string[] = [];
+
+    for (const [index, link] of urls.entries()) {
+      setProbed({ done: index, total: urls.length });
+      try {
+        const p = await probeImport(link);
+        // A later duplicate keeps the first entry: same video id, same file.
+        p.entries.forEach((entry) => {
+          if (!merged.has(entry.id)) merged.set(entry.id, entry);
+        });
+      } catch (e) {
+        failures.push(`${link}: ${String(e)}`);
+      }
+    }
+
+    if (failures.length > 0) {
+      toast.error(
+        `Could not read ${failures.length} of ${urls.length} links`,
+        // The list can be long; the first failure is the useful one.
+        { description: failures[0] },
+      );
+    }
+
+    return {
+      isPlaylist: false,
+      playlistId: null,
+      playlistTitle: null,
+      entries: [...merged.values()],
+    };
+  };
+
   const fetchPreview = async (urlArg?: string) => {
-    const trimmed = (urlArg ?? url).trim();
-    if (!trimmed || busy) return;
-    setUrl(trimmed);
+    const urls = urlArg ? parseUrls(urlArg) : parseUrls(url);
+    if (urls.length === 0 || busy) return;
+    setUrl(urls.join("\n"));
     setBusy(true);
     try {
-      const [p, alreadyImported] = await Promise.all([probeImport(trimmed), importedVideoIds()]);
+      const [p, alreadyImported] = await Promise.all([
+        urls.length === 1 ? probeImport(urls[0]) : probeAll(urls),
+        importedVideoIds(),
+      ]);
       if (p.entries.length === 0) {
-        toast.error("No videos found at that URL.");
+        toast.error(urls.length === 1 ? "No videos found at that URL." : "No videos found.");
         return;
       }
       const done = new Set(alreadyImported);
@@ -69,6 +130,7 @@ export const ImportUrlDialog = () => {
     } catch (e) {
       toast.error(String(e));
     } finally {
+      setProbed(null);
       setBusy(false);
     }
   };
@@ -91,10 +153,12 @@ export const ImportUrlDialog = () => {
   // Fire-and-forget: kick off the background download and close. Progress and
   // the final result surface as a toast (see useImportNotifications).
   const doImport = async () => {
-    if (!preview || busy || selectedCount === 0) return;
+    if (!preview || busy || (!single && selectedCount === 0)) return;
     setBusy(true);
     try {
-      const entries = preview.entries.filter((e) => selected.has(e.id));
+      // A single video imports itself even when it is already on disk (an
+      // explicit re-download); a pick-list imports exactly what is ticked.
+      const entries = single ? preview.entries : preview.entries.filter((e) => selected.has(e.id));
       // Remember playlists so they can be re-imported (delta) for new tracks.
       if (preview.isPlaylist) {
         saveLastPlaylist({ url: url.trim(), title: preview.playlistTitle ?? "" });
@@ -136,17 +200,24 @@ export const ImportUrlDialog = () => {
 
         {step === "input" && (
           <div className="space-y-2">
-            <Label htmlFor="import-url">YouTube URL</Label>
-            <Input
+            <Label htmlFor="import-url">YouTube URLs</Label>
+            <Textarea
               id="import-url"
               value={url}
-              placeholder="https://www.youtube.com/watch?v=…"
+              rows={4}
+              className="max-h-40 overflow-y-auto"
+              placeholder={"https://www.youtube.com/watch?v=…\nhttps://youtu.be/…"}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") fetchPreview();
+                // Enter types a newline here, so submitting takes the modifier.
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) fetchPreview();
               }}
               autoFocus
             />
+            <p className="text-xs text-muted-foreground">
+              One link per line. A single playlist link keeps its playlist; several links import as
+              individual videos.
+            </p>
             {lastPlaylist && (
               <Button
                 variant="outline"
@@ -187,8 +258,9 @@ export const ImportUrlDialog = () => {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>
-                  Playlist{preview.playlistTitle ? ` “${preview.playlistTitle}”` : ""} — pick tracks
-                  to import.
+                  {preview.isPlaylist
+                    ? `Playlist${preview.playlistTitle ? ` “${preview.playlistTitle}”` : ""} — pick tracks to import.`
+                    : `${preview.entries.length} videos — pick tracks to import.`}
                 </span>
                 <button
                   type="button"
@@ -224,7 +296,8 @@ export const ImportUrlDialog = () => {
         <DialogFooter>
           {step === "input" && (
             <Button onClick={() => fetchPreview()} disabled={busy || !url.trim()}>
-              {busy && <Loader2Icon className="size-4 animate-spin" />} Fetch
+              {busy && <Loader2Icon className="size-4 animate-spin" />}
+              {probed ? `Fetching ${probed.done + 1}/${probed.total}…` : "Fetch"}
             </Button>
           )}
           {step === "preview" && (
@@ -232,12 +305,9 @@ export const ImportUrlDialog = () => {
               <Button variant="ghost" onClick={() => setPreview(null)} disabled={busy}>
                 Back
               </Button>
-              <Button
-                onClick={doImport}
-                disabled={busy || (!!preview?.isPlaylist && selectedCount === 0)}
-              >
+              <Button onClick={doImport} disabled={busy || (!single && selectedCount === 0)}>
                 {busy && <Loader2Icon className="size-4 animate-spin" />}
-                {preview?.isPlaylist ? `Import (${selectedCount})` : "Import"}
+                {single ? "Import" : `Import (${selectedCount})`}
               </Button>
             </>
           )}
