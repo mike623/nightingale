@@ -13,6 +13,12 @@ below.
 
 ## [Unreleased]
 
+### Features
+
+- Auto-play next — when a song ends, Nightingale can roll straight into another random analyzed song instead of returning to the menu. Off by default; turn it on under Settings -> General. A scored run holds the result screen for a short countdown first, and any button press cancels it.
+- Next Song — skip to another random analyzed song at any time, from the new playback bar, the pause overlay, the end-of-song result screen, or the right arrow key.
+- Playback bar — pause, next, elapsed time, a progress track, and total duration along the bottom of the playback screen. It fades out while you sing and comes back on any mouse or key activity. The playback HUD no longer shows its own timer.
+
 ## [1.0.0] - 2026-07-25
 
 🎉 **Nightingale 1.0 is here!** Reaching this milestone means a great deal to me. I'm incredibly proud of the app Nightingale has become and grateful to everyone who has tried it, shared feedback, reported issues, contributed, or simply cheered the project on. Thank you for being part of the journey — I hope you enjoy this release as much as I've enjoyed building it.

@@ -136,6 +136,7 @@ export const NAV = {
     micLatency: 4,
     lyricsVerticalPosition: 5,
     lyricsHorizontalPosition: 6,
+    autoPlayNext: 7,
   },
 } as const;
 
@@ -168,8 +169,10 @@ export function getAnalysisNav(isParakeet: boolean) {
 }
 
 export function getSettingsStops(tab: SettingsTab, isParakeet: boolean) {
+  // Tabs, then one entry per general field, then the footer buttons. The
+  // footer is always the last segment (`stops.length - 1`).
   if (tab === "general") {
-    return [2, 2, 1, 1, 2, 1, 1, 2];
+    return [2, 2, 1, 1, 2, 1, 1, 2, 2];
   }
 
   return isParakeet

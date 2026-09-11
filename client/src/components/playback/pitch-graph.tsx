@@ -5,6 +5,7 @@ import type { PitchSeries } from "@/lib/pitch/state";
 import { freqToSemitone, snapToRefOctave } from "@/lib/pitch/state";
 import type { Rgb } from "@/types/Rgb";
 import { useEffect, useRef, useState } from "react";
+import { ABOVE_PLAYBACK_BAR_CLASS } from "./playback-bar";
 
 interface CanvasLayout {
   width: number;
@@ -316,7 +317,8 @@ export function PitchGraph({ series, position = "top" }: PitchGraphProps) {
 
   if (!visible) return null;
 
-  const positionClass = position === "bottom" ? "bottom-2 sm:bottom-3" : "top-2 sm:top-3";
+  // A bottom graph clears the playback bar pinned to the bottom edge.
+  const positionClass = position === "bottom" ? ABOVE_PLAYBACK_BAR_CLASS : "top-2 sm:top-3";
 
   return (
     <div

@@ -34,15 +34,27 @@ interface Props {
   scores: ScoreRecord[];
   activeProfile: string | null;
   onFinish: () => void;
+  onNext: () => void;
+  /** Seconds left before auto-play starts the next song; null when it is off. */
+  autoNextIn: number | null;
 }
 
-export const ResultDialog = ({ open, score, onFinish, song, scores, activeProfile }: Props) => {
+export const ResultDialog = ({
+  open,
+  score,
+  onFinish,
+  onNext,
+  autoNextIn,
+  song,
+  scores,
+  activeProfile,
+}: Props) => {
   const board = topScoresForSong(scores, song.file_hash, TOP_LIMIT);
 
   const { focusedIndex } = useDialogNav({
     open,
-    itemCount: 1,
-    onConfirm: () => onFinish(),
+    itemCount: 2,
+    onConfirm: (index: number) => (index === 0 ? onFinish() : onNext()),
     onBack: onFinish,
   });
 
@@ -115,10 +127,18 @@ export const ResultDialog = ({ open, score, onFinish, song, scores, activeProfil
           <DialogFooter className="mt-2 sm:justify-center">
             <Button
               type="button"
+              variant="secondary"
               className={cn("w-full sm:w-auto", NO_FOCUS_RING, open && focusedIndex === 0 && RING)}
               onClick={onFinish}
             >
               Back to Menu
+            </Button>
+            <Button
+              type="button"
+              className={cn("w-full sm:w-auto", NO_FOCUS_RING, open && focusedIndex === 1 && RING)}
+              onClick={onNext}
+            >
+              {autoNextIn === null ? "Next Song" : `Next Song (${autoNextIn})`}
             </Button>
           </DialogFooter>
         </div>

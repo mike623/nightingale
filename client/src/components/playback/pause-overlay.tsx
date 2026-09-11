@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { useDialogNav } from "@/hooks/navigation/use-dialog-nav";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -19,23 +20,26 @@ interface PauseOverlayProps {
   open: boolean;
   onExit: () => void;
   onContinue: () => void;
+  onNext: () => void;
 }
 
-export const PauseOverlay = ({ open, onExit, onContinue }: PauseOverlayProps) => {
+export const PauseOverlay = ({ open, onExit, onContinue, onNext }: PauseOverlayProps) => {
   const onConfirm = useCallback(
     (index: number) => {
       if (index === 0) {
         onContinue();
+      } else if (index === 1) {
+        onNext();
       } else {
         onExit();
       }
     },
-    [onContinue, onExit],
+    [onContinue, onExit, onNext],
   );
 
   const { focusedIndex } = useDialogNav({
     open,
-    itemCount: 2,
+    itemCount: 3,
     onConfirm,
     onBack: onContinue,
   });
@@ -54,10 +58,17 @@ export const PauseOverlay = ({ open, onExit, onContinue }: PauseOverlayProps) =>
           >
             Continue
           </AlertDialogCancel>
+          <Button
+            variant="secondary"
+            onClick={onNext}
+            className={cn(NO_FOCUS_RING, open && focusedIndex === 1 && RING)}
+          >
+            Next Song
+          </Button>
           <AlertDialogAction
             variant="destructive"
             onClick={onExit}
-            className={cn(NO_FOCUS_RING, open && focusedIndex === 1 && RING)}
+            className={cn(NO_FOCUS_RING, open && focusedIndex === 2 && RING)}
           >
             Exit to Menu
           </AlertDialogAction>

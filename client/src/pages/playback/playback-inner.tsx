@@ -11,6 +11,7 @@ import { ResultDialog } from "@/components/playback/dialogs/result";
 import { LyricsDisplay } from "@/components/playback/lyrics-display";
 import { PauseOverlay } from "@/components/playback/pause-overlay";
 import { PitchGraph } from "@/components/playback/pitch-graph";
+import { PlaybackBar } from "@/components/playback/playback-bar";
 import { PlaybackHud } from "@/components/playback/playback-hud";
 import {
   PlaybackProviders,
@@ -19,7 +20,7 @@ import {
   usePlaybackTransportActions,
   usePlaybackTransportState,
 } from "@/contexts/playback";
-import { usePlaybackInput, usePlaybackResult } from "@/hooks/playback";
+import { usePlaybackInput, usePlaybackNext, usePlaybackResult } from "@/hooks/playback";
 import type { AppConfig } from "@/types/AppConfig";
 import type { Song } from "@/types/Song";
 
@@ -42,8 +43,13 @@ function PlaybackLayout({ song, config }: PlaybackLayoutProps) {
   const lyricsHorizontalPosition = config?.lyrics_horizontal_position ?? "center";
   const hudPosition = lyricsVerticalPosition === "top" ? "bottom" : "top";
 
-  usePlaybackInput(config);
-  const result = usePlaybackResult(song);
+  const playNext = usePlaybackNext(song.file_hash);
+
+  usePlaybackInput(config, playNext);
+  const result = usePlaybackResult(song, {
+    autoPlayNext: config?.auto_play_next === true,
+    playNext,
+  });
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black" style={{ contain: "strict" }}>
@@ -51,6 +57,7 @@ function PlaybackLayout({ song, config }: PlaybackLayoutProps) {
 
       {isReady && (
         <>
+          <PlaybackBar onNext={playNext} />
           <PlaybackHud
             title={song.title}
             artist={song.artist}
@@ -66,7 +73,12 @@ function PlaybackLayout({ song, config }: PlaybackLayoutProps) {
         </>
       )}
 
-      <PauseOverlay open={paused && !result.open} onContinue={handleContinue} onExit={handleExit} />
+      <PauseOverlay
+        open={paused && !result.open}
+        onContinue={handleContinue}
+        onExit={handleExit}
+        onNext={playNext}
+      />
 
       <ResultDialog
         open={result.open}
@@ -75,6 +87,8 @@ function PlaybackLayout({ song, config }: PlaybackLayoutProps) {
         scores={result.scores}
         activeProfile={result.activeProfile}
         onFinish={result.onFinish}
+        onNext={result.onNext}
+        autoNextIn={result.autoNextIn}
       />
     </div>
   );

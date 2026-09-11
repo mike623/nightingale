@@ -2,6 +2,10 @@
  * Drives the end-of-song result dialog: watches transport.isFinished + the
  * skip-outro pending flag, persists the run's score to the active profile,
  * plays the success chime, and exposes the props the result dialog needs.
+ *
+ * With auto-play-next on, finishing continues into another random song instead
+ * of the menu: a scoreless run rolls straight over, and a scored one holds the
+ * result on screen for a short countdown first.
  */
 
 import successSoundUrl from "@/assets/sounds/success.mp3";
@@ -22,15 +26,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
+/** How long the result stays up before auto-play moves on. */
+const AUTO_NEXT_SECONDS = 8;
+
 export interface PlaybackResult {
   open: boolean;
   score: number;
   scores: ScoreRecord[];
   activeProfile: string | null;
   onFinish: () => void;
+  onNext: () => void;
+  /** Seconds left on the auto-advance countdown; null when it is off. */
+  autoNextIn: number | null;
 }
 
-export function usePlaybackResult(song: Song): PlaybackResult {
+export interface PlaybackResultOptions {
+  autoPlayNext: boolean;
+  playNext: () => void;
+}
+
+export function usePlaybackResult(
+  song: Song,
+  { autoPlayNext, playNext }: PlaybackResultOptions,
+): PlaybackResult {
   const fileHash = song.file_hash;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -44,10 +62,14 @@ export function usePlaybackResult(song: Song): PlaybackResult {
 
   const [showResult, setShowResult] = useState(false);
   const [resultScore, setResultScore] = useState(0);
+  const [autoNextIn, setAutoNextIn] = useState<number | null>(null);
 
   const scoreRef = useRef(rawScore);
   scoreRef.current = rawScore;
   const finishHandledRef = useRef(false);
+  // The finish effect must not re-run when these change identity mid-song.
+  const autoNextRef = useRef({ autoPlayNext, playNext });
+  autoNextRef.current = { autoPlayNext, playNext };
 
   useEffect(() => {
     if (!isFinished && !skipOutroPending) {
@@ -69,8 +91,17 @@ export function usePlaybackResult(song: Song): PlaybackResult {
     const active = profileData?.active ?? null;
     const shouldShowResult = finalScore > 0;
 
+    // Leaving without a result: continue into another song, or go home.
+    const leaveSession = () => {
+      if (autoNextRef.current.autoPlayNext) {
+        autoNextRef.current.playNext();
+      } else {
+        navigate("/", { replace: true });
+      }
+    };
+
     if (!shouldShowResult) {
-      navigate("/", { replace: true });
+      leaveSession();
       return;
     }
 
@@ -82,9 +113,12 @@ export function usePlaybackResult(song: Song): PlaybackResult {
         }
         setResultScore(finalScore);
         setShowResult(true);
+        if (autoNextRef.current.autoPlayNext) {
+          setAutoNextIn(AUTO_NEXT_SECONDS);
+        }
       } catch (e) {
         toast.error(`Could not save score: ${e instanceof Error ? e.message : String(e)}`);
-        navigate("/", { replace: true });
+        leaveSession();
       }
     })();
   }, [
@@ -112,7 +146,31 @@ export function usePlaybackResult(song: Song): PlaybackResult {
     };
   }, [showResult]);
 
+  const onNext = useCallback(() => {
+    setAutoNextIn(null);
+    setShowResult(false);
+    playNext();
+  }, [playNext]);
+
+  useEffect(() => {
+    if (autoNextIn === null) {
+      return;
+    }
+
+    if (autoNextIn <= 0) {
+      onNext();
+      return;
+    }
+
+    const timer = setTimeout(
+      () => setAutoNextIn((left) => (left === null ? null : left - 1)),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [autoNextIn, onNext]);
+
   const onFinish = useCallback(() => {
+    setAutoNextIn(null);
     setShowResult(false);
     handleExit();
   }, [handleExit]);
@@ -123,5 +181,7 @@ export function usePlaybackResult(song: Song): PlaybackResult {
     scores: profileData?.scores ?? [],
     activeProfile: profileData?.active ?? null,
     onFinish,
+    onNext,
+    autoNextIn,
   };
 }

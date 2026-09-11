@@ -214,6 +214,10 @@ pub struct AppConfig {
     /// Size multiplier for the on-screen pitch graph. Default 1.0.
     pub pitch_graph_scale: Option<f64>,
     pub song_list_view: Option<String>,
+    /// When set, finishing a song starts a random analyzed song from the
+    /// library instead of returning to the menu. Default (`None`/false) keeps
+    /// the exit-to-menu behaviour.
+    pub auto_play_next: Option<bool>,
     pub language_overrides: Option<HashMap<String, String>>,
 }
 
@@ -252,6 +256,7 @@ impl Default for AppConfig {
             pitch_tolerance_semitones: None,
             pitch_graph_scale: None,
             song_list_view: None,
+            auto_play_next: None,
             language_overrides: None,
         }
     }
@@ -455,4 +460,32 @@ fn has_plaintext_secret(src: &LibrarySource) -> bool {
         LibrarySource::Plex { access_token, .. } => access_token,
     };
     !secret.is_empty() && !secret::is_encrypted(secret)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `AppConfig::load` drops the whole file when deserialization fails, so a
+    /// config written by an older build — one that predates a newly added
+    /// field — must still parse, or every setting silently resets to default.
+    #[test]
+    fn parses_config_without_newer_fields() {
+        let json = r#"{"last_folder":null,"last_theme":3,"guide_volume":0.5,
+            "fullscreen":true,"dark_mode":true,"mic_active":null,
+            "mic_monitoring":null,"mic_monitor_gain":null,
+            "mic_latency_compensation_sec":null,"preferred_mic":null,
+            "whisper_model":null,"beam_size":null,"batch_size":null,
+            "last_video_flavor":null,"lyrics_vertical_position":null,
+            "lyrics_horizontal_position":null,"separator":null,"asr_engine":null,
+            "align_backend":null,"vocal_detection_threshold_pct":null,
+            "auto_analyze":null,"word_level_lyrics":null,
+            "pitch_tolerance_semitones":null,"pitch_graph_scale":null,
+            "song_list_view":null,"language_overrides":null}"#;
+
+        let config: AppConfig = serde_json::from_str(json).expect("older config should parse");
+
+        assert_eq!(config.last_theme, Some(3));
+        assert_eq!(config.auto_play_next, None);
+    }
 }

@@ -293,6 +293,30 @@ export const SettingsPage = () => {
                   }
                 />
               </Field>
+
+              <Field>
+                <Label>Auto-play next song</Label>
+                <Hint>
+                  When a song ends, start another random analyzed song instead of returning to the
+                  menu
+                </Hint>
+                <ButtonGroup>
+                  <Button
+                    variant={config?.auto_play_next === true ? "outline" : "default"}
+                    onClick={() => mutate({ auto_play_next: false })}
+                    className={getFocusClassName(NAV.general.autoPlayNext, 0)}
+                  >
+                    Off
+                  </Button>
+                  <Button
+                    variant={config?.auto_play_next === true ? "default" : "outline"}
+                    onClick={() => mutate({ auto_play_next: true })}
+                    className={getFocusClassName(NAV.general.autoPlayNext, 1)}
+                  >
+                    On
+                  </Button>
+                </ButtonGroup>
+              </Field>
             </FieldGroup>
           </TabsContent>
 

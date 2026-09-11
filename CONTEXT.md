@@ -12,6 +12,18 @@ _Avoid_: backend, provider
 An action that pulls one or more tracks into the current library from outside the active Source — e.g. from a YouTube video or playlist link. An Import is not a Source: it adds Songs but does not scan or replace a library. Only available when the active Source is a **Folder** library: imported files are written into the watched folder (a playlist also writes a matching `.m3u`) and picked up as normal local Songs by the folder scan. Disabled on remote Sources (Plex/Jellyfin/Navidrome). Each track commits atomically and independently; a playlist Import continues past failed tracks. Re-importing a playlist is a delta: videos already imported (tracked by id in a `.nightingale-imports.json` manifest in the folder) are skipped, and the playlist's existing `.m3u` is rewritten in place with the full current membership.
 _Avoid_: source, sync, download (as a noun)
 
+**Auto-play next**:
+A setting (`auto_play_next`, default off) that keeps playback going when a Song ends: instead of returning to the menu, a uniformly random **analyzed** Song from the library starts. A scored run shows its result for a short countdown first. Independent of **Next Song**, which is the same jump performed on demand.
+_Avoid_: autoplay, shuffle (there is no queue or play order — each pick is an independent draw)
+
+**Next Song**:
+The on-demand jump to another random analyzed Song, offered on the **playback bar**, the pause overlay, the result screen, and the right arrow key. Every entry point calls one implementation.
+_Avoid_: skip (skip means **Skip Intro**/**Skip Outro**, which move within the current Song)
+
+**Playback bar**:
+The bar along the bottom edge of playback carrying pause, **Next Song**, elapsed time, progress, and duration. Distinct from the **playback HUD**, which carries title, score, and the settings/shortcut hints. Auto-hides while singing and returns on mouse or key activity.
+_Avoid_: transport bar, controls, seek bar (it does not scrub)
+
 **Word-level lyrics**:
 Per-word lyric timing produced by WhisperX alignment, enabling word-by-word karaoke highlighting. Opt-in (`word_level_lyrics`, default off). The default is **line-level** lyrics from LRCLIB (whole-line timing), which skips WhisperX; WhisperX transcription only runs when LRCLIB has no match or word-level is enabled. See [[import]] and docs/adr/0003.
 _Avoid_: transcription (as a synonym — transcription is one way to obtain timing, not the timing itself)

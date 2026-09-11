@@ -14,15 +14,17 @@ import { useCallback, useEffect, useRef } from "react";
 
 /**
  * Wires keyboard + gamepad input for the playback session. Reads everything it
- * needs from the playback contexts; only the app config is passed in so we can
- * persist guide-volume changes without coupling this hook to the config query.
+ * needs from the playback contexts; the app config is passed in so we can
+ * persist guide-volume changes without coupling this hook to the config query,
+ * and `playNext` because song selection belongs to the route, not the session.
  */
-export function usePlaybackInput(config: AppConfig | null) {
-  const { paused, isReady, guideVolume, guideAvailable } = usePlaybackTransportState();
+export function usePlaybackInput(config: AppConfig | null, playNext: () => void) {
+  const { paused, isReady, isFinished, guideVolume, guideAvailable } = usePlaybackTransportState();
   const { getCurrentTime, setGuideVolume, handlePause, handleContinue } =
     usePlaybackTransportActions();
   const { cycleTheme, cycleFlavor } = usePlaybackThemeActions();
-  const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec } = usePlaybackTranscriptState();
+  const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, skipOutroPending } =
+    usePlaybackTranscriptState();
   const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
   const { handleToggleMic, handleCycleMic, handleToggleMicMonitor } = usePlaybackMicActions();
 
@@ -72,7 +74,7 @@ export function usePlaybackInput(config: AppConfig | null) {
 
   const [, setLyricsHidden] = useLyricsHidden();
 
-  // Keyboard-only shortcuts (G, T, F, L, M, N, R, +/-, Space)
+  // Keyboard-only shortcuts (G, T, F, L, M, N, R, +/-, Space, ArrowRight)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === " ") {
@@ -88,6 +90,15 @@ export function usePlaybackInput(config: AppConfig | null) {
       if (paused) return;
 
       switch (e.key) {
+        // Once the result dialog is up it owns the arrow keys (and has its own
+        // Next Song button), so skipping from here would double up. Skip Outro
+        // opens it via `skipOutroPending` without ever setting `isFinished`.
+        case "ArrowRight":
+          if (isFinished || skipOutroPending) break;
+          e.preventDefault();
+          playNext();
+          break;
+
         case "t":
         case "T":
           cycleTheme();
@@ -162,5 +173,8 @@ export function usePlaybackInput(config: AppConfig | null) {
     handleCycleMic,
     handleToggleMicMonitor,
     setLyricsHidden,
+    playNext,
+    isFinished,
+    skipOutroPending,
   ]);
 }

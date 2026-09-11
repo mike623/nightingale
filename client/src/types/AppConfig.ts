@@ -54,5 +54,11 @@ export type AppConfig = {
    */
   pitch_graph_scale: number | null;
   song_list_view: string | null;
+  /**
+   * When set, finishing a song starts a random analyzed song from the
+   * library instead of returning to the menu. Default (`None`/false) keeps
+   * the exit-to-menu behaviour.
+   */
+  auto_play_next: boolean | null;
   language_overrides: { [key in string]: string } | null;
 };

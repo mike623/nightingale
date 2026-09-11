@@ -14,12 +14,7 @@ import type { AppConfig } from "@/types/AppConfig";
 import { forwardRef, memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLyricsHidden } from "@/hooks/use-lyrics-hidden";
 import { isPixabayTheme, themeName } from "./background";
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds) % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
+import { ABOVE_PLAYBACK_BAR_CLASS } from "./playback-bar";
 
 function formatGuideText(volume: number): string {
   const pct = Math.round(volume * 100);
@@ -140,6 +135,7 @@ function SettingsInfo({
           ? formatThemeText(themeIndex, videoFlavor)
           : `Theme: ${themeName(themeIndex, videoFlavor)}`}
       </HintText>
+      {showShortcuts && <HintText>[&rarr;] Next song</HintText>}
       {showShortcuts && <HintText>[ESC] Back</HintText>}
     </div>
   );
@@ -302,38 +298,24 @@ interface PlaybackHudProps {
 }
 
 function PlaybackHudImpl({ title, artist, config, position = "top" }: PlaybackHudProps) {
-  const { duration, guideVolume, guideAvailable } = usePlaybackTransportState();
-  const { subscribe, getCurrentTime } = usePlaybackTransportActions();
+  const { guideVolume, guideAvailable } = usePlaybackTransportState();
+  const { subscribe } = usePlaybackTransportActions();
   const { themeIndex, videoFlavor } = usePlaybackThemeState();
   const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, transcriptSource } =
     usePlaybackTranscriptState();
   const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
   const { pitchScore, micUserEnabled, micName, micMonitorUserEnabled } = usePlaybackMicState();
 
-  const lastSecondRef = useRef(-1);
-  const timerRef = useRef<HTMLParagraphElement>(null);
   const skipIntroRef = useRef<HTMLButtonElement>(null);
   const skipOutroRef = useRef<HTMLButtonElement>(null);
 
   const showPixabayCredit = isPixabayTheme(themeIndex);
   const hasTouch = useHasTouchInput();
 
-  // Updates the timer text and skip-button visibility via direct DOM mutation
-  // (rAF subscriber), only triggering a text update when the displayed second changes.
+  // Toggles skip-button visibility via direct DOM mutation (rAF subscriber)
+  // rather than React state, which would re-render the HUD 30 times a second.
   useEffect(() => {
-    if (timerRef.current) {
-      timerRef.current.textContent = `${formatTime(getCurrentTime())} / ${formatTime(duration)}`;
-    }
-
     return subscribe((time) => {
-      const sec = Math.floor(time);
-      if (sec !== lastSecondRef.current) {
-        lastSecondRef.current = sec;
-        if (timerRef.current) {
-          timerRef.current.textContent = `${formatTime(time)} / ${formatTime(duration)}`;
-        }
-      }
-
       if (skipIntroRef.current) {
         skipIntroRef.current.style.display =
           time < firstSegmentStart - introSkipLeadSec ? "" : "none";
@@ -342,11 +324,12 @@ function PlaybackHudImpl({ title, artist, config, position = "top" }: PlaybackHu
         skipOutroRef.current.style.display = time > lastSegmentEnd + 1 ? "" : "none";
       }
     });
-  }, [subscribe, getCurrentTime, duration, firstSegmentStart, introSkipLeadSec, lastSegmentEnd]);
+  }, [subscribe, firstSegmentStart, introSkipLeadSec, lastSegmentEnd]);
 
+  // The playback bar owns the bottom strip, so a bottom HUD clears its height.
   const hudPositionClass =
     position === "bottom"
-      ? "bottom-[calc(2rem+env(safe-area-inset-bottom))] items-end md:bottom-3"
+      ? `${ABOVE_PLAYBACK_BAR_CLASS} items-end`
       : "top-[4.25rem] items-start md:top-3";
   const hudFlowClass = position === "bottom" ? "flex-col-reverse" : "flex-col";
   const skipButtonsClass = position === "bottom" ? "mb-2" : "mt-2";
@@ -364,9 +347,6 @@ function PlaybackHudImpl({ title, artist, config, position = "top" }: PlaybackHu
           </h1>
           <p className="line-clamp-1 [overflow-wrap:anywhere] text-sm text-white/70 md:text-base">
             {artist}
-          </p>
-          <p ref={timerRef} className="text-sm text-white/70 md:text-base">
-            0:00 / {formatTime(duration)}
           </p>
           <div className={`flex gap-2 ${skipButtonsClass}`}>
             <SkipButton ref={skipIntroRef} label="Skip Intro" onClick={handleSkipIntro} />
