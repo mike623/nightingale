@@ -1,6 +1,7 @@
 import { usePlaybackMicState } from "@/contexts/playback";
 import { useConfig } from "@/queries/use-config";
 import { PITCH_BUFFER_SIZE } from "@/lib/pitch/constants";
+import { DEFAULTS } from "@/components/menu/settings/constants";
 import type { PitchSeries } from "@/lib/pitch/state";
 import { freqToSemitone, snapToRefOctave } from "@/lib/pitch/state";
 import type { Rgb } from "@/types/Rgb";
@@ -300,7 +301,7 @@ export function PitchGraph({ series, position = "top" }: PitchGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { height: windowHeight, width: windowWidth } = useWindowSize();
   const { data: config } = useConfig();
-  const userScale = config?.pitch_graph_scale ?? 1;
+  const userScale = config?.pitch_graph_scale ?? DEFAULTS.pitch_graph_scale;
 
   useEffect(() => {
     if (!visible) return;

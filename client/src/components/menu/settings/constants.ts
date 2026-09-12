@@ -89,7 +89,7 @@ export const DEFAULTS = {
   mic_latency_compensation_sec: DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   auto_analyze: false,
   pitch_tolerance_semitones: SEMITONE_TOLERANCE,
-  pitch_graph_scale: 1,
+  pitch_graph_scale: 2,
   lyrics_vertical_position: "bottom",
   lyrics_horizontal_position: "center",
 } satisfies Pick<

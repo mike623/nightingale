@@ -355,7 +355,9 @@ function PlaybackHudImpl({ title, artist, config, position = "top" }: PlaybackHu
         </div>
 
         <div className={`flex min-w-0 items-end ${hudFlowClass}`}>
-          <div className={`text-base md:text-lg ${pitchScore ? "text-white" : "text-white/50"}`}>
+          <div
+            className={`text-[2rem] leading-tight md:text-[2.25rem] ${pitchScore ? "text-white" : "text-white/50"}`}
+          >
             Score: {pitchScore ?? "--"}
           </div>
           <div className="hidden sm:block">
