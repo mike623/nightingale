@@ -1,6 +1,6 @@
 /**
- * Playback bar: elapsed/remaining time, a progress track, and pause/next
- * buttons. Auto-hides after a few idle seconds so it never competes with the
+ * Playback bar: elapsed/remaining time, a click-to-seek progress track, and
+ * pause/next buttons. Auto-hides after a few idle seconds so it never competes with the
  * lyrics for the bottom of the screen, and comes back on any pointer or key
  * activity (the same reveal behaviour as a video player's chrome).
  *
@@ -11,7 +11,7 @@
 
 import { usePlaybackTransportActions, usePlaybackTransportState } from "@/contexts/playback";
 import { PauseIcon, SkipForwardIcon } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 
 const IDLE_HIDE_MS = 3000;
 
@@ -63,7 +63,7 @@ interface PlaybackBarProps {
 
 function PlaybackBarImpl({ onNext }: PlaybackBarProps) {
   const { duration } = usePlaybackTransportState();
-  const { subscribe, getCurrentTime, handlePause } = usePlaybackTransportActions();
+  const { subscribe, getCurrentTime, handlePause, seek } = usePlaybackTransportActions();
 
   const visible = useRevealOnActivity();
   const timeRef = useRef<HTMLSpanElement>(null);
@@ -93,6 +93,14 @@ function PlaybackBarImpl({ onNext }: PlaybackBarProps) {
     return subscribe(render);
   }, [subscribe, getCurrentTime, duration]);
 
+  const handleTrackClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    if (width <= 0) return;
+    const ratio = Math.min(1, Math.max(0, (event.clientX - left) / width));
+    seek(ratio * duration);
+  };
+
   return (
     <div
       className={`absolute inset-x-0 bottom-0 z-30 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 transition-opacity duration-300 ${
@@ -113,12 +121,19 @@ function PlaybackBarImpl({ onNext }: PlaybackBarProps) {
         0:00
       </span>
 
-      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-white/20">
-        <div
-          ref={fillRef}
-          className="h-full origin-left scale-x-0 rounded-full bg-white/80"
-          style={{ willChange: "transform" }}
-        />
+      {/* The padding is the touch target; the visible track stays 1px tall. */}
+      <div
+        className="-my-3 min-w-0 flex-1 cursor-pointer py-3"
+        onClick={handleTrackClick}
+        role="presentation"
+      >
+        <div className="h-1 overflow-hidden rounded-full bg-white/20">
+          <div
+            ref={fillRef}
+            className="h-full origin-left scale-x-0 rounded-full bg-white/80"
+            style={{ willChange: "transform" }}
+          />
+        </div>
       </div>
 
       <span className="text-sm tabular-nums text-white/60">{formatTime(duration)}</span>
