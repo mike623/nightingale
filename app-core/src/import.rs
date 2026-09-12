@@ -329,7 +329,19 @@ pub fn run_import(
                 Some(existing) if root.join(existing).exists() => existing.clone(),
                 _ => file_name_of(unique_path(&root, &display, "m3u")),
             };
-            write_m3u_members(&root.join(&m3u_name), &members)?;
+            let m3u_path = root.join(&m3u_name);
+            // A mix only ever shows a window of itself, so its `.m3u` grows
+            // instead of being replaced by the window we happened to see.
+            let members = if is_radio_mix(&key) {
+                let kept: Vec<String> = read_m3u_members(&m3u_path)
+                    .into_iter()
+                    .filter(|n| root.join(n).exists())
+                    .collect();
+                merge_members(&kept, &members)
+            } else {
+                members
+            };
+            write_m3u_members(&m3u_path, &members)?;
             manifest.playlists.insert(key, m3u_name);
             wrote_playlist = true;
             Some(display)
@@ -559,6 +571,37 @@ fn embed_and_move(src: &Path, dest: &Path, title: &str, artist: &str) -> Result<
         .map_err(|e| format!("Failed to move imported file: {e}"))
 }
 
+/// YouTube radio/mix ids (`RDTMAK5…`, `RDMM…`, `RDCLAK5…`) name an endless,
+/// server-generated station. A probe only ever returns a moving window of it,
+/// so unlike a real playlist its membership is not the whole truth.
+fn is_radio_mix(playlist_id: &str) -> bool {
+    playlist_id.starts_with("RD")
+}
+
+/// Existing track basenames in an `.m3u`, ignoring the `#EXTM3U` header and any
+/// other comment lines. Missing or unreadable file reads as empty.
+fn read_m3u_members(path: &Path) -> Vec<String> {
+    std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(str::to_string)
+        .collect()
+}
+
+/// Append what is new, keeping the order already on disk. Used for mixes, where
+/// replacing the file with the current window would drop earlier tracks.
+fn merge_members(existing: &[String], fresh: &[String]) -> Vec<String> {
+    let mut out = existing.to_vec();
+    for name in fresh {
+        if !out.contains(name) {
+            out.push(name.clone());
+        }
+    }
+    out
+}
+
 fn write_m3u_members(path: &Path, basenames: &[String]) -> Result<(), String> {
     let mut body = String::from("#EXTM3U\n");
     for n in basenames {
@@ -715,6 +758,24 @@ mod tests {
         let second = unique_path(&dir, "X - Y", "mp4");
         assert_ne!(first, second);
         assert!(second.to_string_lossy().contains("(1)"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn radio_mix_playlist_grows_instead_of_being_replaced() {
+        assert!(is_radio_mix("RDTMAK5uy_lr0LWzGrq6FU9GIxWvFHTRPQD2LHMqlFA"));
+        assert!(!is_radio_mix("PLabc123"));
+
+        let dir = std::env::temp_dir().join(format!("ng_mix_test_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let m3u = dir.join("Mix.m3u");
+        write_m3u_members(&m3u, &["A - One.mp4".into(), "B - Two.mp4".into()]).unwrap();
+
+        // The next probe of the same mix returns a different window.
+        let window = vec!["B - Two.mp4".to_string(), "C - Three.mp4".to_string()];
+        let merged = merge_members(&read_m3u_members(&m3u), &window);
+        assert_eq!(merged, ["A - One.mp4", "B - Two.mp4", "C - Three.mp4"]);
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -234,7 +234,9 @@ export const ImportUrlDialog = () => {
               value={url}
               rows={4}
               className="max-h-40 overflow-y-auto"
-              placeholder={"https://www.youtube.com/watch?v=…\nhttps://youtu.be/…"}
+              placeholder={
+                "https://www.youtube.com/watch?v=…\nhttps://youtu.be/…\nhttps://music.youtube.com/playlist?list=…"
+              }
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => {
                 // Enter types a newline here, so submitting takes the modifier.
