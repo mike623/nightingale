@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -164,6 +165,11 @@ pub fn probe(url: &str) -> Result<ImportPreview, String> {
     }
 }
 
+/// How many entries download at once. Each is its own yt-dlp process waiting on
+/// the network, so overlapping a few is most of the win; the cap is what keeps a
+/// long playlist from spawning a process per track.
+const DOWNLOAD_CONCURRENCY: usize = 3;
+
 /// Download each entry into the folder, embedding the (possibly user-edited)
 /// title/artist so the folder scan and LRCLIB search see clean metadata.
 ///
@@ -175,7 +181,7 @@ pub fn probe(url: &str) -> Result<ImportPreview, String> {
 /// triggers a rescan.
 pub fn run_import(
     preview: &ImportPreview,
-    mut on_progress: impl FnMut(ImportProgress),
+    on_progress: impl FnMut(ImportProgress) + Send,
 ) -> Result<ImportReport, String> {
     let root = import_folder_root()
         .ok_or_else(|| "Import is only available with a Folder library".to_string())?;
@@ -183,57 +189,108 @@ pub fn run_import(
     std::fs::create_dir_all(&root).map_err(|e| format!("Cannot create library folder: {e}"))?;
 
     let mut manifest = load_manifest(&root);
-    let mut imported = 0usize;
-    let mut skipped = 0usize;
-    let mut failed: Vec<ImportFailure> = Vec::new();
-
     let total = preview.entries.len();
-    for (done, entry) in preview.entries.iter().enumerate() {
-        on_progress(ImportProgress {
-            done,
-            total,
-            current: Some(entry.title.clone()),
-            current_pct: 0.0,
-            imported,
-            skipped,
-            failed: failed.len(),
-        });
-        // Delta skip: already imported and the file is still there.
-        if let Some(name) = manifest.videos.get(&entry.id) {
-            if root.join(name).exists() {
-                skipped += 1;
-                continue;
-            }
-        }
-        let on_pct = |pct: f64| {
-            on_progress(ImportProgress {
-                done,
+
+    /// Counters the download workers share. `done` counts finished entries, so
+    /// the bar still moves monotonically with several downloads in flight.
+    #[derive(Default)]
+    struct Shared {
+        /// Next entry index to claim.
+        next: usize,
+        done: usize,
+        imported: usize,
+        skipped: usize,
+        failed: Vec<ImportFailure>,
+        /// video id -> imported basename, folded into the manifest at the end.
+        videos: Vec<(String, String)>,
+    }
+    let shared = Mutex::new(Shared::default());
+    let emit = Mutex::new(on_progress);
+    // Read-only copy for the delta skip; workers append to `shared.videos`.
+    let known = manifest.videos.clone();
+
+    // Snapshot the counters and emit one tick. `current` is whichever entry
+    // reported last — with several downloading there is no single current one.
+    // Never called while `shared` is held, so the two locks cannot deadlock.
+    let tick = |current: Option<&str>, pct: f64| {
+        let p = {
+            let s = shared.lock().unwrap_or_else(|e| e.into_inner());
+            ImportProgress {
+                done: s.done,
                 total,
-                current: Some(entry.title.clone()),
+                current: current.map(str::to_string),
                 current_pct: pct,
-                imported,
-                skipped,
-                failed: failed.len(),
-            });
+                imported: s.imported,
+                skipped: s.skipped,
+                failed: s.failed.len(),
+            }
         };
-        match download_entry(&yt, &root, entry, ytdlp_updated, on_pct) {
-            Ok(path) => {
-                if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                    manifest.videos.insert(entry.id.clone(), name.to_string());
+        (emit.lock().unwrap_or_else(|e| e.into_inner()))(p);
+    };
+
+    std::thread::scope(|scope| {
+        for _ in 0..DOWNLOAD_CONCURRENCY.min(total) {
+            scope.spawn(|| {
+                loop {
+                    let index = {
+                        let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
+                        let i = s.next;
+                        s.next += 1;
+                        i
+                    };
+                    let Some(entry) = preview.entries.get(index) else {
+                        return;
+                    };
+                    tick(Some(&entry.title), 0.0);
+
+                    // Delta skip: already imported and the file is still there.
+                    if known
+                        .get(&entry.id)
+                        .is_some_and(|name| root.join(name).exists())
+                    {
+                        let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
+                        s.skipped += 1;
+                        s.done += 1;
+                        continue;
+                    }
+
+                    let result = download_entry(&yt, &root, entry, ytdlp_updated, |pct| {
+                        tick(Some(&entry.title), pct)
+                    });
+                    let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
+                    match result {
+                        Ok(path) => {
+                            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                s.videos.push((entry.id.clone(), name.to_string()));
+                            }
+                            s.imported += 1;
+                        }
+                        Err(reason) => {
+                            warn!("[import] \"{}\" failed: {reason}", entry.title);
+                            s.failed.push(ImportFailure {
+                                title: entry.title.clone(),
+                                reason,
+                            });
+                        }
+                    }
+                    s.done += 1;
                 }
-                imported += 1;
-            }
-            Err(reason) => {
-                warn!("[import] \"{}\" failed: {reason}", entry.title);
-                failed.push(ImportFailure {
-                    title: entry.title.clone(),
-                    reason,
-                });
-            }
+            });
         }
+    });
+
+    let Shared {
+        imported,
+        skipped,
+        failed,
+        videos,
+        ..
+    } = shared.into_inner().unwrap_or_else(|e| e.into_inner());
+    for (id, name) in videos {
+        manifest.videos.insert(id, name);
     }
 
-    on_progress(ImportProgress {
+    (emit.lock().unwrap_or_else(|e| e.into_inner()))(ImportProgress {
         done: total,
         total,
         current: None,
@@ -450,8 +507,12 @@ fn download_entry(
         }
 
         let downloaded = first_file_in(&tmp).ok_or("yt-dlp produced no file")?;
-        let dest = unique_path(root, &format!("{} - {}", entry.artist, entry.title), "mp4");
-        embed_and_move(&downloaded, &dest, &entry.title, &entry.artist)?;
+        let dest = reserve_path(root, &format!("{} - {}", entry.artist, entry.title), "mp4");
+        if let Err(e) = embed_and_move(&downloaded, &dest, &entry.title, &entry.artist) {
+            // Don't leave the empty placeholder behind for the folder scan.
+            let _ = std::fs::remove_file(&dest);
+            return Err(e);
+        }
         Ok(dest)
     })();
 
@@ -505,6 +566,18 @@ fn write_m3u_members(path: &Path, basenames: &[String]) -> Result<(), String> {
         body.push('\n');
     }
     std::fs::write(path, body).map_err(|e| format!("Failed to write playlist: {e}"))
+}
+
+/// Claim a free filename by creating it empty, so two concurrent downloads
+/// can't settle on the same one (whoever writes it next overwrites the
+/// placeholder). ponytail: one global lock — it is held for a `create`, per-root
+/// locks only if imports ever run against several libraries at once.
+fn reserve_path(root: &Path, stem: &str, ext: &str) -> PathBuf {
+    static LOCK: Mutex<()> = Mutex::new(());
+    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let path = unique_path(root, stem, ext);
+    let _ = std::fs::File::create(&path);
+    path
 }
 
 fn unique_path(root: &Path, stem: &str, ext: &str) -> PathBuf {
@@ -609,6 +682,28 @@ mod tests {
         let back: ImportManifest = serde_json::from_slice(&json).unwrap();
         assert_eq!(back.videos.get("abc").unwrap(), "A - B.mp4");
         assert_eq!(back.playlists.get("PL1").unwrap(), "List.m3u");
+    }
+
+    #[test]
+    fn reserve_path_gives_each_concurrent_caller_its_own_name() {
+        let dir = std::env::temp_dir().join(format!("ng_reserve_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let paths: Vec<PathBuf> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..DOWNLOAD_CONCURRENCY)
+                .map(|_| scope.spawn(|| reserve_path(&dir, "X - Y", "mp4")))
+                .collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+
+        let unique: std::collections::BTreeSet<_> = paths.iter().collect();
+        assert_eq!(
+            unique.len(),
+            DOWNLOAD_CONCURRENCY,
+            "names collided: {paths:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
