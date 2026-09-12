@@ -207,6 +207,13 @@ pub struct AppConfig {
     /// skips WhisperX entirely — songs with no synced match are left lyric-less
     /// (stems only) rather than transcribed. See docs/adr/0003.
     pub word_level_lyrics: Option<bool>,
+    /// When set, analysis looks the song up on LRCLIB and uses any synced
+    /// lyrics it finds. Default (`None`/false) skips the lookup entirely and
+    /// only separates stems — see docs/adr/0003.
+    pub lyrics_lookup: Option<bool>,
+    /// How many songs are analyzed at once (1-2). Each worker runs its own
+    /// analyzer server process, so 2 doubles GPU/RAM use. Default 2.
+    pub analysis_workers: Option<u32>,
     /// Pitch-scoring tolerance in semitones — the distance at which a sung note
     /// scores zero (`similarity = max(0, 1 - diff/tolerance)`). Lower is
     /// stricter, higher is more forgiving. Default 6.
@@ -253,6 +260,8 @@ impl Default for AppConfig {
             vocal_detection_threshold_pct: None,
             auto_analyze: None,
             word_level_lyrics: None,
+            lyrics_lookup: None,
+            analysis_workers: None,
             pitch_tolerance_semitones: None,
             pitch_graph_scale: None,
             song_list_view: None,
@@ -418,6 +427,17 @@ impl AppConfig {
     /// Opt-in word-level lyric timing. Off by default — see `word_level_lyrics`.
     pub fn word_level_lyrics(&self) -> bool {
         self.word_level_lyrics.unwrap_or(false)
+    }
+
+    /// Opt-in LRCLIB lookup during analysis. Off by default — see `lyrics_lookup`.
+    pub fn lyrics_lookup(&self) -> bool {
+        self.lyrics_lookup.unwrap_or(false)
+    }
+
+    /// Number of concurrent analysis workers, clamped to the 1-2 the analyzer
+    /// server pool supports.
+    pub fn analysis_workers(&self) -> usize {
+        self.analysis_workers.unwrap_or(2).clamp(1, 2) as usize
     }
 
     pub fn mic_monitor_gain(&self) -> f32 {

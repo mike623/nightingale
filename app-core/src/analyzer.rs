@@ -3,8 +3,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -79,9 +78,18 @@ use crate::vendor::{analyzer_dir, ffmpeg_path, python_path, silent_command};
 
 // ─── Server process ──────────────────────────────────────────────────
 
-static SERVER_PID: AtomicU32 = AtomicU32::new(0);
+/// Pids of the live analyzer server processes, one per worker slot.
+static SERVER_PIDS: LazyLock<Mutex<Vec<u32>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+
+fn forget_server_pid(pid: u32) {
+    SERVER_PIDS.lock().unwrap().retain(|p| *p != pid);
+}
 
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Songs analyzed in parallel, each on its own analyzer server process. Two is
+/// the ceiling — a third server is more GPU memory than a consumer card has.
+const MAX_ANALYSIS_WORKERS: usize = 2;
 
 struct ServerProcess {
     child: Child,
@@ -93,7 +101,7 @@ impl Drop for ServerProcess {
     fn drop(&mut self) {
         let pid = self.child.id();
         info!("[analyzer] Killing server process (pid={pid})");
-        SERVER_PID.store(0, Ordering::SeqCst);
+        forget_server_pid(pid);
         if let Ok(stream) = self.writer.get_ref().try_clone() {
             let _ = stream.shutdown(Shutdown::Both);
         }
@@ -102,7 +110,22 @@ impl Drop for ServerProcess {
     }
 }
 
-static ANALYZER_SERVER: LazyLock<Mutex<Option<ServerProcess>>> = LazyLock::new(|| Mutex::new(None));
+/// One independent server process per worker slot. The protocol is a
+/// single-connection request/response pipe, so concurrency means more servers,
+/// not more requests down one socket.
+static ANALYZER_SERVERS: LazyLock<Vec<Mutex<Option<ServerProcess>>>> =
+    LazyLock::new(|| (0..MAX_ANALYSIS_WORKERS).map(|_| Mutex::new(None)).collect());
+
+/// Grab whichever server slot is free, falling back to waiting on the first.
+/// Used by off-queue passes that just need *a* server.
+fn lock_any_server() -> MutexGuard<'static, Option<ServerProcess>> {
+    for slot in ANALYZER_SERVERS.iter() {
+        if let Ok(guard) = slot.try_lock() {
+            return guard;
+        }
+    }
+    ANALYZER_SERVERS[0].lock().unwrap()
+}
 
 #[derive(Debug, Deserialize)]
 struct ReadyHandshake {
@@ -237,7 +260,7 @@ fn spawn_server() -> Result<ServerProcess, NightingaleError> {
         .spawn()
         .map_err(|e| NightingaleError::Other(format!("Failed to start analyzer server: {e}")))?;
     let pid = child.id();
-    SERVER_PID.store(pid, Ordering::SeqCst);
+    SERVER_PIDS.lock().unwrap().push(pid);
     info!("[analyzer] Server process spawned (pid={pid})");
 
     let stdout = match child.stdout.take() {
@@ -245,7 +268,7 @@ fn spawn_server() -> Result<ServerProcess, NightingaleError> {
         None => {
             let _ = child.kill();
             let _ = child.wait();
-            SERVER_PID.store(0, Ordering::SeqCst);
+            forget_server_pid(pid);
             return Err(NightingaleError::Other(
                 "Failed to capture server stdout".into(),
             ));
@@ -258,7 +281,7 @@ fn spawn_server() -> Result<ServerProcess, NightingaleError> {
         Err(e) => {
             let _ = child.kill();
             let _ = child.wait();
-            SERVER_PID.store(0, Ordering::SeqCst);
+            forget_server_pid(pid);
             return Err(e);
         }
     };
@@ -276,7 +299,7 @@ fn spawn_server() -> Result<ServerProcess, NightingaleError> {
         Err(e) => {
             let _ = child.kill();
             let _ = child.wait();
-            SERVER_PID.store(0, Ordering::SeqCst);
+            forget_server_pid(pid);
             return Err(e);
         }
     };
@@ -308,15 +331,17 @@ fn ensure_server(
 
 struct AnalyzerState {
     queue: VecDeque<String>,
-    active_hash: Option<String>,
-    worker_running: bool,
+    /// Hashes a worker is analyzing right now.
+    active: HashSet<String>,
+    /// Server slots held by running workers; also the live worker count.
+    busy_slots: HashSet<usize>,
 }
 
 static ANALYZER: LazyLock<Mutex<AnalyzerState>> = LazyLock::new(|| {
     Mutex::new(AnalyzerState {
         queue: VecDeque::new(),
-        active_hash: None,
-        worker_running: false,
+        active: HashSet::new(),
+        busy_slots: HashSet::new(),
     })
 });
 
@@ -381,10 +406,31 @@ pub(crate) fn update_song_analyzed(
     let _ = library_db::update_song_fields(file_hash, &song);
 }
 
-fn ensure_worker_running(state: &mut AnalyzerState) {
-    if !state.worker_running && !state.queue.is_empty() {
-        state.worker_running = true;
-        spawn_worker();
+/// Server slots to start new workers on: enough that every queued song has a
+/// worker, capped by the configured worker count and the size of the pool.
+fn slots_to_spawn(busy: &HashSet<usize>, queued: usize, configured: usize) -> Vec<usize> {
+    let wanted = configured
+        .min(MAX_ANALYSIS_WORKERS)
+        .min(busy.len() + queued);
+    let mut taken = busy.clone();
+    let mut spawn = Vec::new();
+    while taken.len() < wanted {
+        let Some(slot) = (0..MAX_ANALYSIS_WORKERS).find(|s| !taken.contains(s)) else {
+            break;
+        };
+        taken.insert(slot);
+        spawn.push(slot);
+    }
+    spawn
+}
+
+/// Spawn workers until every queued song has one. Workers retire themselves
+/// (releasing their slot) once the queue drains.
+fn ensure_workers(state: &mut AnalyzerState) {
+    let configured = AppConfig::load().analysis_workers();
+    for slot in slots_to_spawn(&state.busy_slots, state.queue.len(), configured) {
+        state.busy_slots.insert(slot);
+        spawn_worker(slot);
     }
 }
 
@@ -403,14 +449,14 @@ pub fn enqueue_one(file_hash: &str) {
         return;
     }
     let mut state = ANALYZER.lock().unwrap();
-    if state.active_hash.as_deref() == Some(file_hash) {
+    if state.active.contains(file_hash) {
         return;
     }
     if !state.queue.iter().any(|h| h == file_hash) {
         state.queue.push_back(file_hash.to_string());
         update_queue_status(file_hash, QueuedStatus::Queued);
     }
-    ensure_worker_running(&mut state);
+    ensure_workers(&mut state);
 }
 
 pub fn enqueue_all(filters: &LibraryMenuFilters) {
@@ -422,47 +468,48 @@ pub fn enqueue_all(filters: &LibraryMenuFilters) {
 
     let mut newly_queued = Vec::new();
     for file_hash in pending_hashes {
-        let dominated = !queue.entries.contains_key(&file_hash);
-        if dominated
-            && state.active_hash.as_deref() != Some(&file_hash)
+        if !queue.entries.contains_key(&file_hash)
+            && !state.active.contains(&file_hash)
             && !state.queue.iter().any(|h| h == &file_hash)
         {
             state.queue.push_back(file_hash.clone());
             newly_queued.push(file_hash);
         }
     }
-
-    let should_start = !state.worker_running && !state.queue.is_empty();
-    if should_start {
-        state.worker_running = true;
-    }
     drop(state);
 
+    // Write the queued rows before any worker starts, so a worker's
+    // "analyzing" status can't be clobbered by a late "queued" upsert.
     for hash in &newly_queued {
         let _ = library_db::analysis_queue_upsert_row(hash, "queued", None, None);
     }
 
-    if should_start {
-        spawn_worker();
-    }
+    ensure_workers(&mut ANALYZER.lock().unwrap());
 }
 
 pub fn shutdown_server() {
-    let pid = SERVER_PID.swap(0, Ordering::SeqCst);
-    if pid != 0 {
-        info!("[analyzer] Graceful shutdown of server (pid={pid})");
-        if let Ok(mut guard) = ANALYZER_SERVER.try_lock() {
-            if let Some(server) = guard.as_mut() {
-                let _ = server.writer.write_all(b"{\"type\":\"quit\"}\n");
-                let _ = server.writer.flush();
-            }
-        }
-        std::thread::spawn(move || {
-            let _ = Command::new("kill").args([&pid.to_string()]).status();
-            std::thread::sleep(std::time::Duration::from_secs(3));
-            let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
-        });
+    let pids: Vec<u32> = std::mem::take(&mut *SERVER_PIDS.lock().unwrap());
+    if pids.is_empty() {
+        return;
     }
+    info!("[analyzer] Graceful shutdown of servers (pids={pids:?})");
+    for slot in ANALYZER_SERVERS.iter() {
+        if let Ok(mut guard) = slot.try_lock()
+            && let Some(server) = guard.as_mut()
+        {
+            let _ = server.writer.write_all(b"{\"type\":\"quit\"}\n");
+            let _ = server.writer.flush();
+        }
+    }
+    std::thread::spawn(move || {
+        for pid in &pids {
+            let _ = Command::new("kill").args([&pid.to_string()]).status();
+        }
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        for pid in &pids {
+            let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+        }
+    });
 }
 
 pub fn delete_cache(file_hash: &str) {
@@ -597,8 +644,8 @@ fn materialize_lyrics_from_transcript(cache: &CacheDir, file_hash: &str) {
 
 // ─── Worker ──────────────────────────────────────────────────────────
 
-fn spawn_worker() {
-    std::thread::spawn(|| {
+fn spawn_worker(slot: usize) {
+    std::thread::spawn(move || {
         let cache = CacheDir::new();
 
         loop {
@@ -606,42 +653,49 @@ fn spawn_worker() {
                 let mut state = ANALYZER.lock().unwrap();
                 match state.queue.pop_front() {
                     Some(hash) => {
-                        state.active_hash = Some(hash.clone());
+                        state.active.insert(hash.clone());
                         hash
                     }
                     None => {
-                        state.worker_running = false;
-                        state.active_hash = None;
+                        state.busy_slots.remove(&slot);
                         return;
                     }
                 }
             };
 
-            process_song(&file_hash, &cache);
+            process_song(&file_hash, &cache, slot);
 
             let mut state = ANALYZER.lock().unwrap();
-            state.active_hash = None;
+            state.active.remove(&file_hash);
         }
     });
 }
 
-fn process_song(initial_hash: &str, cache: &CacheDir) {
+fn process_song(initial_hash: &str, cache: &CacheDir, slot: usize) {
     let Some(song) = library_db::load_song_by_hash(initial_hash).ok().flatten() else {
         warn!("[analyzer] Song with hash {initial_hash} not found in store, skipping");
         return;
     };
 
-    // Default lyrics path (word-level opt-in, see docs/adr/0003): prefer LRCLIB's
-    // line-level synced lyrics and skip WhisperX entirely. When word-level is off
-    // and this isn't a forced / already-stems-only pass:
-    //   - LRCLIB has a synced match  -> line-level LRC + stem separation, no WhisperX.
-    //   - LRCLIB has no synced match -> separate stems, NO transcription (lyric-less).
+    // Default lyrics path (see docs/adr/0003): no WhisperX, and — unless lyric
+    // lookup is opted into — no LRCLIB lookup either, so analysis is just stem
+    // separation + key. When word-level is off and this isn't a forced /
+    // already-stems-only pass:
+    //   - lookup off (default)       -> separate stems, no lyrics at all.
+    //   - lookup on, synced match    -> line-level LRC + stem separation.
+    //   - lookup on, no synced match -> separate stems, NO transcription.
     // WhisperX runs only when word-level is enabled globally or forced per-song.
-    if !AppConfig::load().word_level_lyrics()
+    let prefs = AppConfig::load();
+    if !prefs.word_level_lyrics()
         && !STEMS_ONLY.lock().unwrap().contains(initial_hash)
         && !FORCE_TRANSCRIBE.lock().unwrap().contains(initial_hash)
     {
-        if let Some(lrc) = crate::lyrics::best_synced_lrc(&song) {
+        if !prefs.lyrics_lookup() {
+            info!(
+                "[analyzer] Lyric lookup off for {}; separating stems only",
+                song.file_hash
+            );
+        } else if let Some(lrc) = crate::lyrics::best_synced_lrc(&song) {
             match crate::lyrics::provide_lrc(&song.file_hash, &lrc, true) {
                 Ok(()) => {
                     info!(
@@ -748,7 +802,7 @@ fn process_song(initial_hash: &str, cache: &CacheDir) {
     let mut retried = false;
 
     loop {
-        let mut guard = ANALYZER_SERVER.lock().unwrap();
+        let mut guard = ANALYZER_SERVERS[slot].lock().unwrap();
 
         if let Err(e) = ensure_server(&mut guard) {
             warn!("[analyzer] Failed to start server: {e}");
@@ -916,7 +970,7 @@ fn run_key_pass(
 
     let mut retried = false;
     loop {
-        let mut guard = ANALYZER_SERVER.lock().unwrap();
+        let mut guard = lock_any_server();
         ensure_server(&mut guard)?;
         let server = guard.as_mut().unwrap();
         // `None` progress hash keeps this off the status pipe (no queue rows).
@@ -1080,5 +1134,26 @@ fn send_and_monitor(
                 warn!("[analyzer] Ignoring unknown event: {line}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spawns_one_worker_per_queued_song_up_to_the_cap() {
+        let idle = HashSet::new();
+        // One song, one worker; two-plus songs fill the pool.
+        assert_eq!(slots_to_spawn(&idle, 1, 2), vec![0]);
+        assert_eq!(slots_to_spawn(&idle, 5, 2), vec![0, 1]);
+        // A worker already running only gets a partner, on the free slot.
+        assert_eq!(slots_to_spawn(&HashSet::from([0]), 3, 2), vec![1]);
+        assert_eq!(slots_to_spawn(&HashSet::from([1]), 3, 2), vec![0]);
+        // Configured down to one worker, or already full: nothing new.
+        assert!(slots_to_spawn(&HashSet::from([0]), 9, 1).is_empty());
+        assert!(slots_to_spawn(&HashSet::from([0, 1]), 9, 2).is_empty());
+        // Empty queue never spawns.
+        assert!(slots_to_spawn(&idle, 0, 2).is_empty());
     }
 }

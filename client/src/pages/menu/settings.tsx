@@ -421,9 +421,9 @@ export const SettingsPage = () => {
               <Field>
                 <Label>Word-level lyric timing</Label>
                 <Hint>
-                  Off uses LRCLIB's line-level synced lyrics and skips the slow WhisperX step
-                  entirely — songs with no LRCLIB match stay lyric-less until you search LRCLIB by
-                  hand (in Edit Lyrics). On always runs WhisperX for per-word karaoke highlighting.
+                  Off skips the slow WhisperX step entirely — songs stay lyric-less unless lyric
+                  lookup finds them, or you search LRCLIB by hand (in Edit Lyrics). On always runs
+                  WhisperX for per-word karaoke highlighting.
                 </Hint>
                 <ButtonGroup>
                   <Button
@@ -437,6 +437,52 @@ export const SettingsPage = () => {
                     onClick={() => mutate({ word_level_lyrics: true })}
                   >
                     On
+                  </Button>
+                </ButtonGroup>
+              </Field>
+
+              {/* TODO: plain button groups, not reachable via the settings controller-nav ring. */}
+              <Field>
+                <Label>Lyric lookup</Label>
+                <Hint>
+                  Off (default) analyzes songs with stem separation only — no lyrics fetched. On
+                  looks each song up on LRCLIB during analysis and uses its line-level synced lyrics
+                  when there's a match.
+                </Hint>
+                <ButtonGroup>
+                  <Button
+                    variant={config?.lyrics_lookup === true ? "outline" : "default"}
+                    onClick={() => mutate({ lyrics_lookup: false })}
+                  >
+                    Off
+                  </Button>
+                  <Button
+                    variant={config?.lyrics_lookup === true ? "default" : "outline"}
+                    onClick={() => mutate({ lyrics_lookup: true })}
+                  >
+                    On
+                  </Button>
+                </ButtonGroup>
+              </Field>
+
+              <Field>
+                <Label>Analysis workers</Label>
+                <Hint>
+                  How many songs are analyzed at once. Two is faster but runs two analyzer processes
+                  — drop to one if analysis runs out of GPU memory.
+                </Hint>
+                <ButtonGroup>
+                  <Button
+                    variant={config?.analysis_workers === 1 ? "default" : "outline"}
+                    onClick={() => mutate({ analysis_workers: 1 })}
+                  >
+                    1
+                  </Button>
+                  <Button
+                    variant={config?.analysis_workers === 1 ? "outline" : "default"}
+                    onClick={() => mutate({ analysis_workers: 2 })}
+                  >
+                    2
                   </Button>
                 </ButtonGroup>
               </Field>

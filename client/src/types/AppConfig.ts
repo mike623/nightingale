@@ -44,6 +44,17 @@ export type AppConfig = {
    */
   word_level_lyrics: boolean | null;
   /**
+   * When set, analysis looks the song up on LRCLIB and uses any synced
+   * lyrics it finds. Default (`None`/false) skips the lookup entirely and
+   * only separates stems — see docs/adr/0003.
+   */
+  lyrics_lookup: boolean | null;
+  /**
+   * How many songs are analyzed at once (1-2). Each worker runs its own
+   * analyzer server process, so 2 doubles GPU/RAM use. Default 2.
+   */
+  analysis_workers: number | null;
+  /**
    * Pitch-scoring tolerance in semitones — the distance at which a sung note
    * scores zero (`similarity = max(0, 1 - diff/tolerance)`). Lower is
    * stricter, higher is more forgiving. Default 6.
