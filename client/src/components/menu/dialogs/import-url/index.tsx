@@ -24,6 +24,13 @@ import { RotateCcwIcon } from "lucide-react";
 
 type Step = "input" | "preview";
 
+/**
+ * How many links are probed at once. Each probe is its own yt-dlp process and
+ * the time goes on the network round-trip, so overlapping a few is most of the
+ * win; the cap is what keeps a long paste from spawning a process per line.
+ */
+const PROBE_CONCURRENCY = 5;
+
 /** Links the user pasted, one per line, trimmed and de-duplicated. */
 function parseUrls(text: string): string[] {
   return [
@@ -46,7 +53,7 @@ export const ImportUrlDialog = () => {
   // Video ids already on disk — shown as "Imported" and unchecked by default.
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  // Multi-link probing is sequential (one yt-dlp process each), so it reports progress.
+  // Probing several links takes a while (a yt-dlp process each), so it reports progress.
   const [probed, setProbed] = useState<{ done: number; total: number } | null>(null);
 
   const step: Step = preview ? "preview" : "input";
@@ -69,33 +76,54 @@ export const ImportUrlDialog = () => {
   const lastPlaylist = open ? readLastPlaylist() : null;
 
   /**
-   * Probes every pasted link in turn and folds the results into one preview.
-   * Several links always resolve to a flat list of videos: only a lone
-   * playlist link keeps its playlist identity (and so its `.m3u`), because
-   * there is no single playlist a merged list could belong to.
+   * Probes the pasted links, up to `PROBE_CONCURRENCY` at a time, and folds the
+   * results into one preview. Several links always resolve to a flat list of
+   * videos: only a lone playlist link keeps its playlist identity (and so its
+   * `.m3u`), because there is no single playlist a merged list could belong to.
+   *
+   * Results and failures are kept against their input index, so finishing out
+   * of order changes nothing the user sees.
    */
   const probeAll = async (urls: string[]): Promise<ImportPreview> => {
-    const merged = new Map<string, ImportEntry>();
-    const failures: string[] = [];
+    const results = Array.from<ImportPreview | null>({ length: urls.length }).fill(null);
+    const failures = Array.from<string | null>({ length: urls.length }).fill(null);
 
-    for (const [index, link] of urls.entries()) {
-      setProbed({ done: index, total: urls.length });
-      try {
-        const p = await probeImport(link);
-        // A later duplicate keeps the first entry: same video id, same file.
-        p.entries.forEach((entry) => {
-          if (!merged.has(entry.id)) merged.set(entry.id, entry);
-        });
-      } catch (e) {
-        failures.push(`${link}: ${String(e)}`);
+    let next = 0;
+    let completed = 0;
+    setProbed({ done: 0, total: urls.length });
+
+    // Each worker takes the next index until the list runs out. `next++` needs
+    // no lock: nothing awaits between reading and incrementing it.
+    const worker = async () => {
+      for (let index = next++; index < urls.length; index = next++) {
+        try {
+          results[index] = await probeImport(urls[index]);
+        } catch (e) {
+          failures[index] = `${urls[index]}: ${String(e)}`;
+        }
+        completed += 1;
+        setProbed({ done: completed, total: urls.length });
       }
-    }
+    };
 
-    if (failures.length > 0) {
+    await Promise.all(
+      Array.from({ length: Math.min(PROBE_CONCURRENCY, urls.length) }, () => worker()),
+    );
+
+    const merged = new Map<string, ImportEntry>();
+    results.forEach((p) => {
+      // A later duplicate keeps the first entry: same video id, same file.
+      p?.entries.forEach((entry) => {
+        if (!merged.has(entry.id)) merged.set(entry.id, entry);
+      });
+    });
+
+    const unread = failures.filter((f): f is string => f !== null);
+    if (unread.length > 0) {
       toast.error(
-        `Could not read ${failures.length} of ${urls.length} links`,
-        // The list can be long; the first failure is the useful one.
-        { description: failures[0] },
+        `Could not read ${unread.length} of ${urls.length} links`,
+        // The list can be long; the first failing link is the useful one.
+        { description: unread[0] },
       );
     }
 
@@ -297,7 +325,7 @@ export const ImportUrlDialog = () => {
           {step === "input" && (
             <Button onClick={() => fetchPreview()} disabled={busy || !url.trim()}>
               {busy && <Loader2Icon className="size-4 animate-spin" />}
-              {probed ? `Fetching ${probed.done + 1}/${probed.total}…` : "Fetch"}
+              {probed ? `Fetching ${probed.done}/${probed.total}…` : "Fetch"}
             </Button>
           )}
           {step === "preview" && (
