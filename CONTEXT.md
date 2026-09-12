@@ -12,6 +12,10 @@ _Avoid_: backend, provider
 An action that pulls one or more tracks into the current library from outside the active Source — e.g. from a YouTube video or playlist link. An Import is not a Source: it adds Songs but does not scan or replace a library. Only available when the active Source is a **Folder** library: imported files are written into the watched folder (a playlist also writes a matching `.m3u`) and picked up as normal local Songs by the folder scan. Disabled on remote Sources (Plex/Jellyfin/Navidrome). Several links can be pasted at once (one per line): they resolve to a flat list of videos, de-duplicated by video id, and such an Import never writes an `.m3u` — only a lone playlist link keeps its playlist identity. Each track commits atomically and independently; a playlist Import continues past failed tracks. Re-importing a playlist is a delta: videos already imported (tracked by id in a `.nightingale-imports.json` manifest in the folder) are skipped, and the playlist's existing `.m3u` is rewritten in place with the full current membership.
 _Avoid_: source, sync, download (as a noun)
 
+**Title Breakdown**:
+A user-triggered action that parses a messy YouTube-derived title (brackets, feat/remix tags, CJK ornamentation) into clean structured `{title, artist}`. Runs a bundled small local LLM (see docs/adr/0004), not the YouTube-Music `track`/`artist` fields, which are already clean and never sent through it. Click-to-call, never automatic; overwrites the editable title/artist fields on success and leaves them untouched on failure. See [[import]].
+_Avoid_: cleanup, AI parse, title fix
+
 **Auto-play next**:
 A setting (`auto_play_next`, default off) that keeps playback going when a Song ends: instead of returning to the menu, a uniformly random **analyzed** Song from the library starts. A scored run shows its result for a short countdown first. Independent of **Next Song**, which is the same jump performed on demand.
 _Avoid_: autoplay, shuffle (there is no queue or play order — each pick is an independent draw)
@@ -25,5 +29,13 @@ The bar along the bottom edge of playback carrying pause, **Next Song**, elapsed
 _Avoid_: transport bar, controls, seek bar (it does not scrub)
 
 **Word-level lyrics**:
-Per-word lyric timing produced by WhisperX alignment, enabling word-by-word karaoke highlighting. Opt-in (`word_level_lyrics`, default off). The default is **line-level** lyrics from LRCLIB (whole-line timing), which skips WhisperX; WhisperX transcription only runs when LRCLIB has no match or word-level is enabled. See [[import]] and docs/adr/0003.
+Per-word lyric timing produced by WhisperX alignment, enabling word-by-word karaoke highlighting. Opt-in (`word_level_lyrics`, default off). WhisperX runs only when word-level is enabled or forced for one Song. See [[import]] and docs/adr/0003.
 _Avoid_: transcription (as a synonym — transcription is one way to obtain timing, not the timing itself)
+
+**Lyric lookup**:
+The LRCLIB search analysis performs to find **line-level** synced lyrics for a Song. Opt-in (`lyrics_lookup`, default off) — by default analysis only separates stems and detects key, leaving the Song lyric-less until lyrics are provided by hand. See docs/adr/0003.
+_Avoid_: lyrics fetch, LRCLIB sync
+
+**Analysis worker**:
+One thread draining the analysis queue, paired with its own analyzer server process. Up to two run at once (`analysis_workers`, default 2), so two Songs analyze in parallel.
+_Avoid_: analysis thread, job runner

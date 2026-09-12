@@ -2,6 +2,8 @@
 
 WhisperX does two jobs during analysis: transcribe lyrics when none are known, and align known lyrics to **word-level** timestamps for per-word karaoke highlighting. It is the slow, GPU-hungry part of the pipeline. LRCLIB already returns **line-level** synced lyrics (LRC) for many songs, for free.
 
+**Update:** the LRCLIB lookup itself is now opt-in too (`config.lyrics_lookup`, default off), so the default analysis pass is stem separation + key detection and nothing else. With lookup turned on, the original behaviour below applies.
+
 We decided analysis defaults to **line-level and never runs WhisperX**:
 - LRCLIB has a synced match → use it directly (via the existing `provide_lrc` stems-only path), skip WhisperX.
 - LRCLIB has **no** synced match → separate stems only, **no transcription** — the song is left **lyric-less** (instrumental karaoke, no words) rather than paying for a slow, often-inaccurate ASR pass on a messy track.

@@ -18,6 +18,8 @@ below.
 - Auto-play next — when a song ends, Nightingale can roll straight into another random analyzed song instead of returning to the menu. Off by default; turn it on under Settings -> General. A scored run holds the result screen for a short countdown first, and any button press cancels it.
 - Next Song — skip to another random analyzed song at any time, from the new playback bar, the pause overlay, the end-of-song result screen, or the right arrow key.
 - Import from URL takes several links at once — paste one YouTube link per line. A single playlist link still imports as a playlist; several links import as individual videos, with duplicates across the links dropped and unreadable links reported without stopping the rest.
+- Two songs analyze at once — the analysis queue now runs up to two workers, each with its own analyzer process. Settings -> Analysis lets you drop back to one if analysis runs out of GPU memory.
+- Lyric lookup is now opt-in — analysis separates stems and detects key without searching LRCLIB, so queued songs finish faster. Turn on Settings -> Analysis -> Lyric lookup to go back to fetching LRCLIB's line-level synced lyrics during analysis; providing lyrics by hand (Edit Lyrics / Provide LRC) is unchanged.
 - Playback bar — pause, next, elapsed time, a progress track, and total duration along the bottom of the playback screen. It fades out while you sing and comes back on any mouse or key activity. The playback HUD no longer shows its own timer.
 
 ## [1.0.0] - 2026-07-25
