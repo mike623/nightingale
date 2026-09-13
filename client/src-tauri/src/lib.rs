@@ -24,7 +24,10 @@ use cache::{
 };
 use config::{load_config, save_config};
 use import::{import_available, imported_video_ids, probe_import, start_import};
-use lyrics::{apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics};
+use lyrics::{
+    apply_timed_lyrics, clear_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
+    search_lrclib_terms,
+};
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
 use playback::{
     ensure_mp3_stems, ensure_playable_source_video, fetch_pixabay_videos, get_audio_paths,
@@ -164,9 +167,11 @@ pub fn run() {
             // Lyrics
             load_lyrics,
             search_lrclib_lyrics,
+            search_lrclib_terms,
             save_lyrics,
             provide_lrc,
             apply_timed_lyrics,
+            clear_lyrics,
             // Playback
             load_transcript,
             get_audio_paths,

@@ -43,18 +43,33 @@ pub struct LyricsFile {
 }
 
 pub(crate) fn lrclib_candidates(song: &Song) -> Vec<LrclibCandidate> {
-    let title = &song.title;
-    let artist = &song.artist;
-
-    if title.is_empty() || artist == "Unknown Artist" {
+    if song.title.is_empty() || song.artist == "Unknown Artist" {
         return Vec::new();
     }
+    lrclib_search(&song.title, &song.artist, &song.album, song.duration_secs)
+}
 
+/// Manual LRCLIB search with user-supplied terms — used by the "search LRCLIB"
+/// box when the auto-derived title/artist (e.g. a messy YouTube MV name) don't
+/// match. Artist may be empty; sorting has no album/duration reference.
+pub fn search_lrclib_terms(track: &str, artist: &str) -> Vec<LrclibCandidate> {
+    let track = track.trim();
+    if track.is_empty() {
+        return Vec::new();
+    }
+    lrclib_search(track, artist.trim(), "", 0.0)
+}
+
+fn lrclib_search(
+    title: &str,
+    artist: &str,
+    album: &str,
+    duration_secs: f64,
+) -> Vec<LrclibCandidate> {
     let agent = ureq::Agent::new_with_defaults();
 
     info!(
-        "[lrclib] Searching: \"{title}\" by \"{artist}\" ({:.0}s, album=\"{}\")",
-        song.duration_secs, song.album
+        "[lrclib] Searching: \"{title}\" by \"{artist}\" ({duration_secs:.0}s, album=\"{album}\")"
     );
 
     let url = format!(
@@ -96,14 +111,14 @@ pub(crate) fn lrclib_candidates(song: &Song) -> Vec<LrclibCandidate> {
         with_lyrics.len()
     );
 
-    let album_lower = song.album.to_lowercase();
+    let album_lower = album.to_lowercase();
     with_lyrics.sort_by_key(|r| {
         let album_bonus: i64 = if r.album_name.to_lowercase() == album_lower {
             0
         } else {
             5_000
         };
-        let duration_penalty = ((r.duration_secs - song.duration_secs).abs() * 10.0) as i64;
+        let duration_penalty = ((r.duration_secs - duration_secs).abs() * 10.0) as i64;
         album_bonus + duration_penalty
     });
 
@@ -298,6 +313,59 @@ pub fn apply_timed_lyrics(file_hash: &str, lrc_text: &str) -> Result<(), String>
     updated.key_offset = 0;
     updated.no_stems = no_stems;
     library_db::update_song_fields(file_hash, &updated).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+pub fn clear_lyrics(file_hash: &str) -> Result<(), String> {
+    if is_usdx_song(file_hash) {
+        return Err("Cannot edit lyrics for USDX songs".to_string());
+    }
+
+    let Some(song) = library_db::load_song_by_hash(file_hash).ok().flatten() else {
+        return Err("Song not found".to_string());
+    };
+
+    let cache = CacheDir::new();
+    let empty = ParsedLrc {
+        segments: Vec::new(),
+    };
+
+    cache.delete_transcript_variants(file_hash);
+    let _ = std::fs::remove_file(cache.lyrics_path(file_hash));
+
+    if song.is_analyzed {
+        // Keep the existing stems and key/tempo; just blank the lyric lines.
+        let meta = read_transcript_meta(&cache, file_hash);
+        let key = song.key.clone().or(meta.key);
+        let no_stems = song.no_stems;
+
+        let value = build_lrc_transcript(
+            &empty,
+            song.language.as_deref(),
+            key.as_deref(),
+            1.0,
+            no_stems,
+        );
+        write_transcript_json(&cache, file_hash, &value)
+            .map_err(|e| format!("Failed to write transcript: {e}"))?;
+
+        let mut updated = song;
+        updated.is_analyzed = true;
+        updated.transcript_source = Some(TranscriptSource::Lrc);
+        updated.key = key;
+        updated.override_key = None;
+        updated.tempo = 1.0;
+        updated.key_offset = 0;
+        updated.no_stems = no_stems;
+        library_db::update_song_fields(file_hash, &updated).map_err(|e| e.to_string())?;
+    } else {
+        // Nothing analyzed yet: make it a lyricless song over the original mix.
+        let value = build_lrc_transcript(&empty, song.language.as_deref(), None, 1.0, true);
+        write_transcript_json(&cache, file_hash, &value)
+            .map_err(|e| format!("Failed to write transcript: {e}"))?;
+        prepare_lrc_no_stems(file_hash).map_err(|e| e.to_string())?;
+    }
 
     Ok(())
 }
