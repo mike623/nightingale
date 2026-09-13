@@ -1,6 +1,7 @@
 mod analyzer;
 mod cache;
 mod config;
+mod import;
 mod logging;
 mod lyrics;
 mod microphones;
@@ -22,6 +23,7 @@ use cache::{
     clear_videos_command, sweep_orphan_cache_command,
 };
 use config::{load_config, save_config};
+use import::{import_available, imported_video_ids, probe_import, start_import};
 use lyrics::{apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics};
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
 use playback::{
@@ -142,6 +144,11 @@ pub fn run() {
             load_songs_meta,
             load_analysis_queue,
             load_library_menu_items,
+            // Import
+            import_available,
+            imported_video_ids,
+            probe_import,
+            start_import,
             // Analyzer
             enqueue,
             cancel_analysis,

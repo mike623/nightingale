@@ -2,6 +2,7 @@ mod analyzer;
 mod cache;
 mod config;
 mod error;
+mod import;
 mod library_db;
 mod library_menu;
 mod library_model;
@@ -31,6 +32,11 @@ pub use cache::{
     same_path, set_default_data_path, sweep_orphan_cache,
 };
 pub use config::{AppConfig, LibrarySource};
+pub use import::{
+    ImportEntry, ImportEntryProgress, ImportEntryStatus, ImportFailure, ImportPreview,
+    ImportProgress, ImportReport, import_available, imported_video_ids, probe as probe_import,
+    run_import,
+};
 pub use library_db::{init_library, library_db_path};
 pub use library_menu::{LibraryMenuItem, LibraryMenuItems, load_library_menu_items};
 pub use library_model::{
