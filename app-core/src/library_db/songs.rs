@@ -268,6 +268,87 @@ pub fn update_song_fields(file_hash: &str, song: &Song) -> rusqlite::Result<()> 
     })
 }
 
+/// Drop one song row and any analysis-queue row keyed by the same hash.
+///
+/// `analysis_queue` has no foreign key onto `songs` (it is keyed by
+/// `file_hash`, not `songs.id`), so the queue row has to be deleted
+/// explicitly or it outlives the song it belongs to.
+pub fn delete_song_by_hash(file_hash: &str) -> rusqlite::Result<()> {
+    with_conn_mut(|c| {
+        let tx = c.transaction()?;
+        tx.execute("DELETE FROM songs WHERE file_hash = ?1", params![file_hash])?;
+        tx.execute(
+            "DELETE FROM analysis_queue WHERE file_hash = ?1",
+            params![file_hash],
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+}
+
+/// Everything in the songs cache directory that is still referenced by the
+/// library: song hashes (which prefix every derived file) and album-art file
+/// names (which are keyed by the *image* hash, not the song's).
+///
+/// Used by the orphan sweep to decide what is safe to reclaim.
+pub fn load_cache_retention_keys() -> rusqlite::Result<(
+    std::collections::HashSet<String>,
+    std::collections::HashSet<String>,
+)> {
+    with_conn(|c| {
+        let mut stmt = c.prepare("SELECT file_hash, album_art_path FROM songs")?;
+        let mut hashes = std::collections::HashSet::new();
+        let mut art_names = std::collections::HashSet::new();
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
+        })?;
+        for row in rows {
+            let (hash, art) = row?;
+            hashes.insert(hash);
+            if let Some(name) = art
+                .as_deref()
+                .and_then(|p| std::path::Path::new(p).file_name())
+                .and_then(|n| n.to_str())
+            {
+                art_names.insert(name.to_string());
+            }
+        }
+        Ok((hashes, art_names))
+    })
+}
+
+/// Reset every song to "not analyzed" after the songs cache is wiped, so the
+/// library stops advertising stems and transcripts that no longer exist.
+///
+/// Updates in place rather than going through `replace_all_songs_sorted`:
+/// that deletes every row first, which would cascade playlist membership away.
+pub fn mark_all_songs_unanalyzed() -> rusqlite::Result<()> {
+    let songs = load_all_songs()?;
+    with_conn_mut(|c| {
+        let tx = c.transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "UPDATE songs SET is_analyzed = 0, language = NULL, transcript_source = NULL,
+                    payload = ?2
+                 WHERE file_hash = ?1",
+            )?;
+            for mut song in songs {
+                song.is_analyzed = false;
+                song.language = None;
+                song.transcript_source = None;
+                song.key = None;
+                song.override_key = None;
+                song.tempo = 1.0;
+                song.key_offset = 0;
+                song.no_stems = false;
+                stmt.execute(params![song.file_hash, song_to_payload(&song)?])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    })
+}
+
 pub fn load_all_songs() -> rusqlite::Result<Vec<Song>> {
     with_conn(|c| {
         let mut stmt = c.prepare(

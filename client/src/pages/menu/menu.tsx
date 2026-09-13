@@ -1,4 +1,5 @@
 import { ClearCacheDialog } from "@/components/menu/dialogs/clear-cache";
+import { DeleteSongDialog } from "@/components/menu/dialogs/delete-song";
 import { DonateDialog } from "@/components/menu/dialogs/donate";
 import { EditLyricsDialog } from "@/components/menu/dialogs/edit-lyrics";
 import { ExitDialog } from "@/components/menu/dialogs/exit";
@@ -77,6 +78,7 @@ export const MenuLayout = () => {
       <SelectLanguageDialog />
       <EditLyricsDialog />
       <ClearCacheDialog />
+      <DeleteSongDialog />
       <JellyfinConnectDialog />
       <NavidromeConnectDialog />
       <PlexConnectDialog />

@@ -1,6 +1,6 @@
 use app_core::{
-    delete_cache as core_delete_cache, enqueue_all as core_enqueue_all,
-    enqueue_one as core_enqueue_one, realign as core_realign,
+    delete_cache as core_delete_cache, delete_song as core_delete_song,
+    enqueue_all as core_enqueue_all, enqueue_one as core_enqueue_one, realign as core_realign,
     reanalyze_force_transcribe as core_reanalyze_force_transcribe,
     reanalyze_full as core_reanalyze_full, reanalyze_transcript as core_reanalyze_transcript,
     shift_key_done_payload, shift_tempo_done_payload, LibraryMenuFilters,
@@ -20,6 +20,11 @@ pub fn enqueue_all(filters: LibraryMenuFilters) {
 #[tauri::command]
 pub fn delete_song_cache(file_hash: String) {
     core_delete_cache(&file_hash);
+}
+
+#[tauri::command]
+pub fn delete_song(file_hash: String) -> Result<(), String> {
+    core_delete_song(&file_hash)
 }
 
 #[tauri::command]

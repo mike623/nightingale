@@ -14,6 +14,10 @@ export const deleteSongCache = async (fileHash: string): Promise<void> => {
   return await invoke<void>("delete_song_cache", { fileHash });
 };
 
+export const deleteSong = async (fileHash: string): Promise<void> => {
+  return await invoke<void>("delete_song", { fileHash });
+};
+
 export const reanalyzeTranscript = async (fileHash: string, language?: string): Promise<void> => {
   return await invoke<void>("reanalyze_transcript", { fileHash, language });
 };

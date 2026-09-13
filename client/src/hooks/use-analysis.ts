@@ -2,6 +2,7 @@ import { ANALYSIS_QUEUE, MENU, SONGS, SONGS_META } from "@/queries/keys";
 import { useLibraryFilter } from "@/hooks/use-library-filter";
 import { useSearch } from "@/hooks/use-search";
 import {
+  deleteSong,
   deleteSongCache,
   enqueueAll,
   enqueueOne,
@@ -93,6 +94,13 @@ export const useAnalysis = () => {
         await deleteSongCache(fileHash);
         markSongCacheDeleted(fileHash);
       }, invalidateSongs),
+      // Unlike the other actions this one rethrows: the caller closes the
+      // details sidebar on success, and must not do that when the file
+      // could not actually be removed.
+      deleteSong: async (fileHash: string) => {
+        await deleteSong(fileHash);
+        invalidateSongs();
+      },
       reanalyzeTranscript: wrap(reanalyzeTranscript, invalidateSongs),
       reanalyzeFull: wrap(reanalyzeFull, invalidateSongs),
       realign: wrap(realign, invalidateSongs),

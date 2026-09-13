@@ -69,9 +69,18 @@ async fn dispatch(events: std::sync::Arc<EventBus>, name: &str, payload: Value) 
             app_core::clear_models();
             Ok(Value::Null)
         }
+        "clear_songs_command" => {
+            app_core::clear_songs();
+            Ok(Value::Null)
+        }
+        "sweep_orphan_cache_command" => {
+            let report = app_core::sweep_orphan_cache().map_err(ApiError::bad_request)?;
+            Ok(serde_json::to_value(report).map_err(serde_err)?)
+        }
         "clear_all" => {
             app_core::clear_models();
             app_core::clear_videos();
+            app_core::clear_songs();
             Ok(Value::Null)
         }
 
@@ -174,10 +183,11 @@ async fn dispatch(events: std::sync::Arc<EventBus>, name: &str, payload: Value) 
                 client_id: Option<String>,
             }
             let args: Args = deserialize(payload)?;
-            let result = tokio::task::spawn_blocking(move || app_core::plex_begin_pin(args.client_id))
-                .await
-                .map_err(blocking_task_err)?
-                .map_err(|error| ApiError::bad_request(error.to_string()))?;
+            let result =
+                tokio::task::spawn_blocking(move || app_core::plex_begin_pin(args.client_id))
+                    .await
+                    .map_err(blocking_task_err)?
+                    .map_err(|error| ApiError::bad_request(error.to_string()))?;
             Ok(serde_json::to_value(result).map_err(serde_err)?)
         }
         "plex_poll_pin" => {
@@ -256,6 +266,11 @@ async fn dispatch(events: std::sync::Arc<EventBus>, name: &str, payload: Value) 
         "delete_song_cache" => {
             let args: FileHashArgs = deserialize(payload)?;
             app_core::delete_cache(&args.file_hash);
+            Ok(Value::Null)
+        }
+        "delete_song" => {
+            let args: FileHashArgs = deserialize(payload)?;
+            app_core::delete_song(&args.file_hash).map_err(ApiError::bad_request)?;
             Ok(Value::Null)
         }
         "reanalyze_transcript" => {

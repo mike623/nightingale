@@ -2,6 +2,7 @@ import type { Song } from "@/types/Song";
 import {
   AlignLeftIcon,
   AudioLinesIcon,
+  FileX2Icon,
   LanguagesIcon,
   MicIcon,
   PencilLineIcon,
@@ -30,6 +31,7 @@ interface BuildActionGroupsParams {
   analysis: AnalysisHandlers;
   onEditLyrics: () => void;
   onChangeLanguage: () => void;
+  onDeleteSong: () => void;
   run: (message: string, action: () => void | Promise<void>) => () => Promise<void>;
 }
 
@@ -41,6 +43,7 @@ export function buildActionGroups({
   analysis,
   onEditLyrics,
   onChangeLanguage,
+  onDeleteSong,
   run,
 }: BuildActionGroupsParams): ActionItemProps[][] {
   const groups: ActionItemProps[][] = [];
@@ -151,6 +154,21 @@ export function buildActionGroups({
         onClick: run(`Cache deleted for "${song.title}"`, () =>
           analysis.deleteSongCache(song.file_hash),
         ),
+      },
+    ]);
+  }
+
+  // Only a song we own the bytes for can be deleted. Remote-origin songs live
+  // on someone else's server, so `song.path` is just a local materialisation.
+  if (song.origin.kind === "local_file") {
+    groups.push([
+      {
+        icon: FileX2Icon,
+        title: "Delete song",
+        description: "Permanently delete the file and its generated files.",
+        destructive: true,
+        disabled: analysisBusy,
+        onClick: onDeleteSong,
       },
     ]);
   }

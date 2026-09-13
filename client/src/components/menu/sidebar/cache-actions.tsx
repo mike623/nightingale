@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useMenuFocus } from "@/contexts/menu-focus-context";
 import { useDialog, type ClearCacheTarget } from "@/hooks/use-dialog";
 import { cn } from "@/lib/utils";
-import { BoxIcon, Trash2Icon, VideoIcon, type LucideIcon } from "lucide-react";
+import { BoxIcon, BrushCleaningIcon, Trash2Icon, VideoIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 interface CacheButton {
@@ -24,6 +24,7 @@ export const CacheActions = ({ focusedSidebarIndex, registerCallback }: CacheAct
   const buttons = useMemo<CacheButton[]>(
     () => [
       { icon: Trash2Icon, label: "Clear all cache", target: "all" },
+      { icon: BrushCleaningIcon, label: "Clean orphaned cache", target: "orphans" },
       { icon: VideoIcon, label: "Clear videos cache", target: "videos" },
       { icon: BoxIcon, label: "Clear models cache", target: "models" },
     ],

@@ -20,12 +20,13 @@ mod vendor;
 mod vendor_scripts;
 
 pub use analyzer::{
-    AnalysisQueue, delete_cache, enqueue_all, enqueue_one, realign, reanalyze_force_transcribe,
-    reanalyze_full, reanalyze_transcript, shutdown_server,
+    AnalysisQueue, delete_cache, delete_song, enqueue_all, enqueue_one, realign,
+    reanalyze_force_transcribe, reanalyze_full, reanalyze_transcript, shutdown_server,
 };
 pub use cache::{
-    CacheDir, CachePaths, CacheStats, cache_roots, change_app_data_path, clear_models,
-    clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path, same_path,
+    CacheDir, CachePaths, CacheStats, SweepReport, cache_roots, change_app_data_path, clear_models,
+    clear_songs, clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path,
+    same_path, sweep_orphan_cache,
 };
 pub use config::{AppConfig, LibrarySource};
 pub use import::{

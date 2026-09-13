@@ -164,12 +164,107 @@ impl CacheDir {
         }
     }
 
-    pub fn clear_all(&self) {
-        if self.path.is_dir() {
-            let _ = std::fs::remove_dir_all(&self.path);
-            let _ = std::fs::create_dir_all(&self.path);
+    /// Delete every cache file whose owning song is gone from the library.
+    ///
+    /// The cache is content-addressed (`{file_hash}_…`), so once the source
+    /// file is deleted its hash can never be recomputed and nothing else will
+    /// ever reference those files again. Nothing in the scan path removes
+    /// them, which is what this sweep is for.
+    ///
+    /// `retained_hashes` are the library's live song hashes; `retained_art`
+    /// are album-art file names, which are keyed by the *image* hash rather
+    /// than the song's and so cannot be matched by hash.
+    pub fn sweep_orphans(
+        &self,
+        retained_hashes: &std::collections::HashSet<String>,
+        retained_art: &std::collections::HashSet<String>,
+    ) -> SweepReport {
+        let mut report = SweepReport::default();
+
+        for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str() else {
+                continue;
+            };
+            if retained_art.contains(name) {
+                continue;
+            }
+            // Anything not shaped like a cache file (`{32-hex hash}…`) is left
+            // alone — the sweep only reclaims files it can positively identify.
+            let Some(hash) = cache_file_hash(name) else {
+                continue;
+            };
+            if retained_hashes.contains(hash) {
+                continue;
+            }
+
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            if std::fs::remove_file(entry.path()).is_ok() {
+                report.files += 1;
+                report.bytes += size;
+            }
         }
+
+        report
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SweepReport {
+    pub files: u64,
+    pub bytes: u64,
+}
+
+/// The song hash a cache file belongs to, for any of the naming schemes in
+/// this module (`{hash}_transcript.json`, `{hash}_instrumental_C#_1.0.mp3`,
+/// `playable_videos/{hash}.mp4`, `sources/{hash}.m4a`, …).
+///
+/// Returns `None` unless the leading segment is a 32-char hex hash, so
+/// unrelated files that happen to live in the cache directory are never
+/// treated as reclaimable.
+fn cache_file_hash(name: &str) -> Option<&str> {
+    let stem = name.split_once('.').map_or(name, |(stem, _)| stem);
+    let hash = stem.split_once('_').map_or(stem, |(hash, _)| hash);
+    (hash.len() == 32 && hash.bytes().all(|b| b.is_ascii_hexdigit())).then_some(hash)
+}
+
+/// Reclaim every cache file whose song is no longer in the library.
+///
+/// Refuses to run against an empty library: a folder source pointing at an
+/// unmounted drive scans zero files and empties the `songs` table, and
+/// sweeping then would destroy the entire cache for a library that is merely
+/// offline.
+pub fn sweep_orphan_cache() -> Result<SweepReport, String> {
+    let (hashes, art_names) = crate::library_db::load_cache_retention_keys()
+        .map_err(|e| format!("failed reading library for cache sweep: {e}"))?;
+
+    if hashes.is_empty() {
+        return Err(
+            "library is empty — refusing to sweep the cache in case the source is offline"
+                .to_string(),
+        );
+    }
+
+    Ok(CacheDir::new().sweep_orphans(&hashes, &art_names))
+}
+
+/// Wipe every generated file for every song, and reset the library's analysis
+/// state to match so nothing advertises stems or transcripts that are gone.
+///
+/// Album art is kept: `songs.album_art_path` points straight at those files
+/// and is only rewritten by a scan, so deleting them would leave every row
+/// pointing at a missing image until the user rescans. Expressed as a sweep
+/// that retains nothing *but* the art.
+pub fn clear_songs() {
+    let retained_art = crate::library_db::load_cache_retention_keys()
+        .map(|(_, art)| art)
+        .unwrap_or_default();
+    CacheDir::new().sweep_orphans(&std::collections::HashSet::new(), &retained_art);
+    let _ = crate::library_db::mark_all_songs_unanalyzed();
+    let _ = crate::library_db::analysis_queue_clear();
 }
 
 fn stem_suffix<'a>(name: &'a str, prefix: &str) -> Option<&'a str> {
@@ -652,4 +747,71 @@ pub fn change_app_data_path(new_path: PathBuf) -> Result<PathBuf, String> {
     cleanup_migrated_source_entries(&old_root, &migrated);
 
     Ok(new_root)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    const HASH: &str = "0123456789abcdef0123456789abcdef";
+    const OTHER: &str = "fedcba9876543210fedcba9876543210";
+
+    #[test]
+    fn cache_file_hash_reads_every_naming_scheme() {
+        for name in [
+            format!("{HASH}_transcript.json"),
+            format!("{HASH}_transcript_1.2.json"),
+            format!("{HASH}_instrumental.mp3"),
+            format!("{HASH}_vocals_C#_1.0.mp3"),
+            format!("{HASH}_instrumental.ogg"),
+            format!("{HASH}_lyrics.json"),
+            format!("{HASH}_cover.jpg"),
+            format!("{HASH}.mp4"),
+            format!("{HASH}.m4a"),
+        ] {
+            assert_eq!(cache_file_hash(&name), Some(HASH), "failed for {name}");
+        }
+    }
+
+    #[test]
+    fn cache_file_hash_rejects_files_it_cannot_identify() {
+        for name in ["notes.txt", "playable_videos", "abc_instrumental.mp3", ""] {
+            assert_eq!(cache_file_hash(name), None, "failed for {name}");
+        }
+    }
+
+    #[test]
+    fn sweep_keeps_referenced_files_and_reclaims_the_rest() {
+        let dir = std::env::temp_dir().join(format!("ng-sweep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("playable_videos")).unwrap();
+
+        let write = |rel: &str| {
+            let path = dir.join(rel);
+            std::fs::write(&path, b"0123456789").unwrap();
+            path
+        };
+        let kept_stem = write(&format!("{HASH}_instrumental.mp3"));
+        let kept_cover = write(&format!("{OTHER}_cover.jpg"));
+        let kept_unknown = write("README.txt");
+        let orphan_stem = write(&format!("{OTHER}_instrumental.mp3"));
+        let orphan_video = write(&format!("playable_videos/{OTHER}.mp4"));
+
+        let cache = CacheDir { path: dir.clone() };
+        let report = cache.sweep_orphans(
+            &HashSet::from([HASH.to_string()]),
+            &HashSet::from([format!("{OTHER}_cover.jpg")]),
+        );
+
+        assert!(kept_stem.exists(), "live song's stem was deleted");
+        assert!(kept_cover.exists(), "referenced album art was deleted");
+        assert!(kept_unknown.exists(), "unidentifiable file was deleted");
+        assert!(!orphan_stem.exists(), "orphaned stem survived");
+        assert!(!orphan_video.exists(), "orphaned video survived");
+        assert_eq!(report.files, 2);
+        assert_eq!(report.bytes, 20);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

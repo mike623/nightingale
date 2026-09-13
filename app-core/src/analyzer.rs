@@ -521,6 +521,35 @@ pub fn delete_cache(file_hash: &str) {
     update_song_analyzed(file_hash, false, None, None, None, None);
 }
 
+/// Remove a song from the library entirely: its source file, every generated
+/// file keyed by its hash, and its library + queue rows.
+///
+/// Local-file songs only. A remote-origin song lives on someone else's
+/// server, so there is nothing here for us to delete and the caller should
+/// not be offering the action in the first place.
+pub fn delete_song(file_hash: &str) -> Result<(), String> {
+    let song = library_db::load_song_by_hash(file_hash)
+        .map_err(|e| format!("failed loading song: {e}"))?
+        .ok_or_else(|| "song is no longer in the library".to_string())?;
+
+    if !matches!(song.origin, SongOrigin::LocalFile) {
+        return Err("only songs from a local folder library can be deleted".to_string());
+    }
+
+    // Cache and rows go first: if the file delete fails (permissions, read-only
+    // volume) we'd rather leave an orphaned file the next scan re-adds than a
+    // library row pointing at media the user believes is gone.
+    CacheDir::new().delete_song_cache(file_hash);
+    library_db::delete_song_by_hash(file_hash)
+        .map_err(|e| format!("failed updating library: {e}"))?;
+
+    match std::fs::remove_file(&song.path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("failed deleting {}: {e}", song.path.display())),
+    }
+}
+
 pub fn reanalyze_transcript(file_hash: &str, language: Option<String>) {
     if is_usdx_song(file_hash) {
         return;

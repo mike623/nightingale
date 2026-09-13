@@ -21,7 +21,13 @@ below.
 - Two songs analyze at once — the analysis queue now runs up to two workers, each with its own analyzer process. Settings -> Analysis lets you drop back to one if analysis runs out of GPU memory.
 - Lyric lookup is now opt-in — analysis separates stems and detects key without searching LRCLIB, so queued songs finish faster. Turn on Settings -> Analysis -> Lyric lookup to go back to fetching LRCLIB's line-level synced lyrics during analysis; providing lyrics by hand (Edit Lyrics / Provide LRC) is unchanged.
 - Playback bar — pause, next, elapsed time, a progress track, and total duration along the bottom of the playback screen. It fades out while you sing and comes back on any mouse or key activity. The playback HUD no longer shows its own timer.
+- Delete song — the song details panel can now delete a song outright: the file in your library folder and every generated file for it, after a confirmation. Only for folder libraries; songs from Jellyfin, Navidrome, or Plex live on the server and aren't Nightingale's to delete.
+- Clean orphaned cache — a new broom button next to the cache stats reclaims the stems, lyrics, and transcripts left behind by songs that are no longer in your library. Because the cache is keyed by file contents, deleting a song file previously orphaned its generated files forever.
 - Import page — Import from URL is now a full page reached from the sidebar instead of a modal, and every track shows its own download bar, so the several downloads that run at once are all visible rather than just one. A search box filters long playlists, and each track ends on Imported, Skipped, or Failed with the reason. Leaving the page doesn't interrupt anything: a one-line notification appears while you're elsewhere and takes you back.
+
+### Fixes
+
+- Clear all cache now clears the songs cache it always said it did — previously it only removed background videos and analysis models, leaving every generated stem and transcript on disk. Album art is kept so covers survive, and every song is marked for re-analysis to match what's actually cached.
 
 ## [1.0.0] - 2026-07-25
 
