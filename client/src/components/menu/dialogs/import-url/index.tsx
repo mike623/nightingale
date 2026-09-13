@@ -171,12 +171,8 @@ export const ImportUrlDialog = () => {
       return next;
     });
 
-  const toggleAll = () =>
-    setSelected((prev) =>
-      preview && prev.size < preview.entries.length
-        ? new Set(preview.entries.map((e) => e.id))
-        : new Set(),
-    );
+  const selectAll = () => setSelected(new Set(preview?.entries.map((e) => e.id) ?? []));
+  const deselectAll = () => setSelected(new Set());
 
   // Fire-and-forget: kick off the background download and close. Progress and
   // the final result surface as a toast (see useImportNotifications).
@@ -214,7 +210,7 @@ export const ImportUrlDialog = () => {
         if (!o) onClose();
       }}
     >
-      <DialogContent>
+      <DialogContent className="h-[80vh] w-[80vw] max-w-[80vw] grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-[80vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <YoutubeIcon className="size-5" /> Import from URL
@@ -227,13 +223,13 @@ export const ImportUrlDialog = () => {
         </DialogHeader>
 
         {step === "input" && (
-          <div className="space-y-2">
+          <div className="flex min-h-0 flex-col gap-2">
             <Label htmlFor="import-url">YouTube URLs</Label>
             <Textarea
               id="import-url"
               value={url}
               rows={4}
-              className="max-h-40 overflow-y-auto"
+              className="min-h-0 flex-1 overflow-y-auto"
               placeholder={
                 "https://www.youtube.com/watch?v=…\nhttps://youtu.be/…\nhttps://music.youtube.com/playlist?list=…"
               }
@@ -256,8 +252,10 @@ export const ImportUrlDialog = () => {
                 disabled={busy}
                 onClick={() => fetchPreview(lastPlaylist.url)}
               >
-                <RotateCcwIcon className="size-4" />
-                Re-import last playlist{lastPlaylist.title ? `: ${lastPlaylist.title}` : ""}
+                <RotateCcwIcon className="size-4 shrink-0" />
+                <span className="truncate">
+                  Re-import last playlist{lastPlaylist.title ? `: ${lastPlaylist.title}` : ""}
+                </span>
               </Button>
             )}
           </div>
@@ -285,22 +283,31 @@ export const ImportUrlDialog = () => {
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>
+            <div className="flex min-h-0 flex-col gap-2">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  className="shrink-0 text-xs underline underline-offset-2 hover:text-foreground disabled:no-underline disabled:opacity-50"
+                  disabled={allSelected}
+                  onClick={selectAll}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 text-xs underline underline-offset-2 hover:text-foreground disabled:no-underline disabled:opacity-50"
+                  disabled={selectedCount === 0}
+                  onClick={deselectAll}
+                >
+                  Deselect all
+                </button>
+                <span className="truncate">
                   {preview.isPlaylist
                     ? `Playlist${preview.playlistTitle ? ` “${preview.playlistTitle}”` : ""} — pick tracks to import.`
                     : `${preview.entries.length} videos — pick tracks to import.`}
                 </span>
-                <button
-                  type="button"
-                  className="text-xs underline underline-offset-2 hover:text-foreground"
-                  onClick={toggleAll}
-                >
-                  {allSelected ? "Deselect all" : "Select all"}
-                </button>
               </div>
-              <ul className="max-h-56 overflow-y-auto rounded-md border p-1 text-sm">
+              <ul className="min-h-0 flex-1 overflow-y-auto rounded-md border p-1 text-sm">
                 {preview.entries.map((e) => (
                   <li key={e.id}>
                     <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-accent">
@@ -323,7 +330,7 @@ export const ImportUrlDialog = () => {
             </div>
           ))}
 
-        <DialogFooter>
+        <DialogFooter className="sm:justify-start">
           {step === "input" && (
             <Button onClick={() => fetchPreview()} disabled={busy || !url.trim()}>
               {busy && <Loader2Icon className="size-4 animate-spin" />}
@@ -332,12 +339,12 @@ export const ImportUrlDialog = () => {
           )}
           {step === "preview" && (
             <>
-              <Button variant="ghost" onClick={() => setPreview(null)} disabled={busy}>
-                Back
-              </Button>
               <Button onClick={doImport} disabled={busy || (!single && selectedCount === 0)}>
                 {busy && <Loader2Icon className="size-4 animate-spin" />}
                 {single ? "Import" : `Import (${selectedCount})`}
+              </Button>
+              <Button variant="ghost" onClick={() => setPreview(null)} disabled={busy}>
+                Back
               </Button>
             </>
           )}
