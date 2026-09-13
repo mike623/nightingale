@@ -2,7 +2,6 @@ import { ClearCacheDialog } from "@/components/menu/dialogs/clear-cache";
 import { DonateDialog } from "@/components/menu/dialogs/donate";
 import { EditLyricsDialog } from "@/components/menu/dialogs/edit-lyrics";
 import { ExitDialog } from "@/components/menu/dialogs/exit";
-import { ImportUrlDialog } from "@/components/menu/dialogs/import-url";
 import { InfoDialog } from "@/components/menu/dialogs/info";
 import { JellyfinConnectDialog } from "@/components/menu/dialogs/remote-source/jellyfin-connect";
 import { NavidromeConnectDialog } from "@/components/menu/dialogs/remote-source/navidrome-connect";
@@ -77,7 +76,6 @@ export const MenuLayout = () => {
       <DonateDialog />
       <SelectLanguageDialog />
       <EditLyricsDialog />
-      <ImportUrlDialog />
       <ClearCacheDialog />
       <JellyfinConnectDialog />
       <NavidromeConnectDialog />

@@ -21,6 +21,7 @@ below.
 - Two songs analyze at once — the analysis queue now runs up to two workers, each with its own analyzer process. Settings -> Analysis lets you drop back to one if analysis runs out of GPU memory.
 - Lyric lookup is now opt-in — analysis separates stems and detects key without searching LRCLIB, so queued songs finish faster. Turn on Settings -> Analysis -> Lyric lookup to go back to fetching LRCLIB's line-level synced lyrics during analysis; providing lyrics by hand (Edit Lyrics / Provide LRC) is unchanged.
 - Playback bar — pause, next, elapsed time, a progress track, and total duration along the bottom of the playback screen. It fades out while you sing and comes back on any mouse or key activity. The playback HUD no longer shows its own timer.
+- Import page — Import from URL is now a full page reached from the sidebar instead of a modal, and every track shows its own download bar, so the several downloads that run at once are all visible rather than just one. A search box filters long playlists, and each track ends on Imported, Skipped, or Failed with the reason. Leaving the page doesn't interrupt anything: a one-line notification appears while you're elsewhere and takes you back.
 
 ## [1.0.0] - 2026-07-25
 

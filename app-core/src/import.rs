@@ -62,6 +62,34 @@ pub struct ImportReport {
     pub playlist_name: Option<String>,
 }
 
+/// Where one entry has got to. Terminal for everything but `Downloading`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum ImportEntryStatus {
+    Downloading,
+    Imported,
+    /// Already on disk from an earlier run, or a repeat of an id this run
+    /// already claimed (see `already_have`).
+    Skipped,
+    Failed,
+}
+
+/// One entry's state at a point in time. Several entries download at once
+/// (`DOWNLOAD_CONCURRENCY`), so a listener keyed by `id` can show each of them
+/// moving independently — which the aggregate counters below cannot express.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportEntryProgress {
+    /// YouTube video id — the stable key a listener addresses rows by.
+    pub id: String,
+    pub status: ImportEntryStatus,
+    /// Download fraction (0.0–1.0). 1.0 for every terminal status.
+    pub pct: f64,
+    /// Failure text, present only on `Failed`.
+    pub reason: Option<String>,
+}
+
 /// Progress tick emitted while a (possibly background) import runs.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -76,6 +104,10 @@ pub struct ImportProgress {
     pub imported: usize,
     pub skipped: usize,
     pub failed: usize,
+    /// The single entry this tick is about, so a listener can accumulate
+    /// per-entry state without the aggregate carrying the whole list every
+    /// tick. `None` on the closing summary tick.
+    pub entry: Option<ImportEntryProgress>,
 }
 
 /// Persisted in the watched folder as `.nightingale-imports.json`. Lets a
@@ -212,9 +244,10 @@ pub fn run_import(
     let known = manifest.videos.clone();
 
     // Snapshot the counters and emit one tick. `current` is whichever entry
-    // reported last — with several downloading there is no single current one.
+    // reported last — with several downloading there is no single current one,
+    // which is exactly why `entry` carries the per-entry state alongside it.
     // Never called while `shared` is held, so the two locks cannot deadlock.
-    let tick = |current: Option<&str>, pct: f64| {
+    let tick = |current: Option<&str>, pct: f64, entry: Option<ImportEntryProgress>| {
         let p = {
             let s = shared.lock().unwrap_or_else(|e| e.into_inner());
             ImportProgress {
@@ -225,9 +258,17 @@ pub fn run_import(
                 imported: s.imported,
                 skipped: s.skipped,
                 failed: s.failed.len(),
+                entry,
             }
         };
         (emit.lock().unwrap_or_else(|e| e.into_inner()))(p);
+    };
+
+    let downloading = |id: &str, pct: f64| ImportEntryProgress {
+        id: id.to_string(),
+        status: ImportEntryStatus::Downloading,
+        pct,
+        reason: None,
     };
 
     std::thread::scope(|scope| {
@@ -243,7 +284,7 @@ pub fn run_import(
                     let Some(entry) = preview.entries.get(index) else {
                         return;
                     };
-                    tick(Some(&entry.title), 0.0);
+                    tick(Some(&entry.title), 0.0, Some(downloading(&entry.id, 0.0)));
 
                     // Delta skip: already imported and the file is still there.
                     // Also skip a repeat of an id this run already claimed: a
@@ -263,29 +304,58 @@ pub fn run_import(
                         seen
                     };
                     if skip {
+                        tick(
+                            Some(&entry.title),
+                            1.0,
+                            Some(ImportEntryProgress {
+                                id: entry.id.clone(),
+                                status: ImportEntryStatus::Skipped,
+                                pct: 1.0,
+                                reason: None,
+                            }),
+                        );
                         continue;
                     }
 
                     let result = download_entry(&yt, &root, entry, ytdlp_updated, |pct| {
-                        tick(Some(&entry.title), pct)
+                        tick(Some(&entry.title), pct, Some(downloading(&entry.id, pct)))
                     });
-                    let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
-                    match result {
-                        Ok(path) => {
-                            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                                s.videos.push((entry.id.clone(), name.to_string()));
+                    // Fold the result into the counters and build this entry's
+                    // terminal state, then drop the lock before ticking — `tick`
+                    // takes `shared` itself and would deadlock against this guard.
+                    let finished = {
+                        let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
+                        let finished = match result {
+                            Ok(path) => {
+                                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                    s.videos.push((entry.id.clone(), name.to_string()));
+                                }
+                                s.imported += 1;
+                                ImportEntryProgress {
+                                    id: entry.id.clone(),
+                                    status: ImportEntryStatus::Imported,
+                                    pct: 1.0,
+                                    reason: None,
+                                }
                             }
-                            s.imported += 1;
-                        }
-                        Err(reason) => {
-                            warn!("[import] \"{}\" failed: {reason}", entry.title);
-                            s.failed.push(ImportFailure {
-                                title: entry.title.clone(),
-                                reason,
-                            });
-                        }
-                    }
-                    s.done += 1;
+                            Err(reason) => {
+                                warn!("[import] \"{}\" failed: {reason}", entry.title);
+                                s.failed.push(ImportFailure {
+                                    title: entry.title.clone(),
+                                    reason: reason.clone(),
+                                });
+                                ImportEntryProgress {
+                                    id: entry.id.clone(),
+                                    status: ImportEntryStatus::Failed,
+                                    pct: 1.0,
+                                    reason: Some(reason),
+                                }
+                            }
+                        };
+                        s.done += 1;
+                        finished
+                    };
+                    tick(Some(&entry.title), 1.0, Some(finished));
                 }
             });
         }
@@ -310,6 +380,7 @@ pub fn run_import(
         imported,
         skipped,
         failed: failed.len(),
+        entry: None,
     });
 
     let mut wrote_playlist = false;

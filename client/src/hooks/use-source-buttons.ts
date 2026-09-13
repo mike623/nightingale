@@ -1,5 +1,6 @@
 import { useMemo, type ComponentType, type SVGProps } from "react";
 import { Disc3Icon, FolderIcon, RefreshCwIcon, YoutubeIcon } from "lucide-react";
+import { useNavigate } from "react-router";
 
 import { JellyfinIcon } from "@/components/icons/jellyfin";
 import { PlexIcon } from "@/components/icons/plex";
@@ -59,6 +60,7 @@ const remoteBadge = ({
  */
 export const useSourceButtons = (): SourceButton[] => {
   const { setMode } = useDialog();
+  const navigate = useNavigate();
   const {
     selectFolder,
     rescan,
@@ -152,11 +154,11 @@ export const useSourceButtons = (): SourceButton[] => {
     // in the watched folder and are reaped by any remote source's scan (ADR-0001).
     if (isFolderSource) {
       buttons.push({
-        key: "import-url",
+        key: "import",
         icon: YoutubeIcon,
-        label: "Import from URL",
+        label: "Import",
         tooltip: "Import a YouTube video or playlist",
-        handler: () => setMode("import-url"),
+        handler: () => navigate("/import"),
         disabled: isPending,
       });
     }
@@ -185,5 +187,6 @@ export const useSourceButtons = (): SourceButton[] => {
     rescanDisabled,
     selectFolder,
     setMode,
+    navigate,
   ]);
 };

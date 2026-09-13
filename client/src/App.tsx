@@ -5,6 +5,7 @@ import { Toaster } from "./components/ui/sonner";
 import { TauriAppShell } from "./components/window/title-bar";
 import { NavInputProvider } from "./contexts/nav-input-context";
 import { MenuFocusProvider } from "./contexts/menu-focus-context";
+import { ImportPage } from "./pages/menu/import";
 import { MenuIndex, MenuLayout } from "./pages/menu/menu";
 import { SettingsPage } from "./pages/menu/settings";
 import { Playback } from "./pages/playback/playback";
@@ -30,6 +31,7 @@ const InnerWrapper = () => (
           <Route path="/" element={<MenuLayout />}>
             <Route index element={<MenuIndex />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="import" element={<ImportPage />} />
           </Route>
           <Route path="/playback" element={<Playback />} />
         </Routes>
