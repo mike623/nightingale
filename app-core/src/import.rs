@@ -5,7 +5,7 @@
 //! up by the normal folder scan, so they flow through analysis + LRCLIB lyrics
 //! exactly like any other local file.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -203,6 +203,8 @@ pub fn run_import(
         failed: Vec<ImportFailure>,
         /// video id -> imported basename, folded into the manifest at the end.
         videos: Vec<(String, String)>,
+        /// Video ids this run has already taken responsibility for downloading.
+        claimed: BTreeSet<String>,
     }
     let shared = Mutex::new(Shared::default());
     let emit = Mutex::new(on_progress);
@@ -244,13 +246,23 @@ pub fn run_import(
                     tick(Some(&entry.title), 0.0);
 
                     // Delta skip: already imported and the file is still there.
-                    if known
-                        .get(&entry.id)
-                        .is_some_and(|name| root.join(name).exists())
-                    {
+                    // Also skip a repeat of an id this run already claimed: a
+                    // mix window can list the same video more than once, and
+                    // `known` is a pre-run snapshot that never sees what the
+                    // workers just downloaded. Without the claim, each repeat
+                    // downloads again and `reserve_path` hides the clash behind
+                    // a "(1)" suffix, orphaning every copy but the last (which
+                    // is all the manifest keeps).
+                    let skip = {
                         let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
-                        s.skipped += 1;
-                        s.done += 1;
+                        let seen = already_have(&known, &mut s.claimed, &root, &entry.id);
+                        if seen {
+                            s.skipped += 1;
+                            s.done += 1;
+                        }
+                        seen
+                    };
+                    if skip {
                         continue;
                     }
 
@@ -301,6 +313,11 @@ pub fn run_import(
     });
 
     let mut wrote_playlist = false;
+    // A failed `.m3u` write must not cost us the manifest: every id this run
+    // downloaded lives only in `manifest` until `save_manifest` below, and
+    // losing it would re-download the whole batch next time. Hold the error
+    // and propagate it after the save.
+    let mut m3u_error: Option<String> = None;
     let playlist_name = if preview.is_playlist {
         let display = preview
             .playlist_title
@@ -341,16 +358,26 @@ pub fn run_import(
             } else {
                 members
             };
-            write_m3u_members(&m3u_path, &members)?;
-            manifest.playlists.insert(key, m3u_name);
-            wrote_playlist = true;
-            Some(display)
+            match write_m3u_members(&m3u_path, &members) {
+                Ok(()) => {
+                    manifest.playlists.insert(key, m3u_name);
+                    wrote_playlist = true;
+                    Some(display)
+                }
+                Err(e) => {
+                    m3u_error = Some(e);
+                    None
+                }
+            }
         }
     } else {
         None
     };
 
     save_manifest(&root, &manifest);
+    if let Some(e) = m3u_error {
+        return Err(e);
+    }
 
     if imported > 0 || wrote_playlist {
         crate::scanner::start_scan();
@@ -571,6 +598,27 @@ fn embed_and_move(src: &Path, dest: &Path, title: &str, artist: &str) -> Result<
         .map_err(|e| format!("Failed to move imported file: {e}"))
 }
 
+/// Whether this video is already accounted for, so the worker can skip it.
+///
+/// Two ways that happens: a previous run imported it and the file is still on
+/// disk (`known`, the delta skip), or this run already claimed it. The second
+/// case is what stops a mix window that lists the same video twice from
+/// downloading it twice — `known` is a pre-run snapshot, so it never sees what
+/// the workers are producing right now, and `reserve_path` would happily give
+/// the second copy a "(1)" name instead of colliding. Claims the id as a side
+/// effect, so callers must hold the shared lock across the call.
+fn already_have(
+    known: &BTreeMap<String, String>,
+    claimed: &mut BTreeSet<String>,
+    root: &Path,
+    id: &str,
+) -> bool {
+    if known.get(id).is_some_and(|name| root.join(name).exists()) {
+        return true;
+    }
+    !claimed.insert(id.to_string())
+}
+
 /// YouTube radio/mix ids (`RDTMAK5…`, `RDMM…`, `RDCLAK5…`) name an endless,
 /// server-generated station. A probe only ever returns a moving window of it,
 /// so unlike a real playlist its membership is not the whole truth.
@@ -758,6 +806,30 @@ mod tests {
         let second = unique_path(&dir, "X - Y", "mp4");
         assert_ne!(first, second);
         assert!(second.to_string_lossy().contains("(1)"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn repeated_video_id_downloads_once_per_run() {
+        let dir = std::env::temp_dir().join(format!("ng_claim_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut known = BTreeMap::new();
+        let mut claimed = BTreeSet::new();
+
+        // A mix window listing the same video three times downloads it once.
+        assert!(!already_have(&known, &mut claimed, &dir, "vid1"));
+        assert!(already_have(&known, &mut claimed, &dir, "vid1"));
+        assert!(already_have(&known, &mut claimed, &dir, "vid1"));
+
+        // Delta skip still applies, but only when the file is really there.
+        known.insert("vid2".to_string(), "A - Two.mp4".to_string());
+        assert!(!already_have(&known, &mut claimed, &dir, "vid2"));
+        std::fs::write(dir.join("A - Two.mp4"), b"x").unwrap();
+        let mut fresh = BTreeSet::new();
+        assert!(already_have(&known, &mut fresh, &dir, "vid2"));
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
