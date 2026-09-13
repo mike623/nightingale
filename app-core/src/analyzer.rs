@@ -611,6 +611,48 @@ pub fn delete_cache(target: SongTarget) -> Result<usize, String> {
     )
 }
 
+/// Remove one song from the library entirely: its source file, every
+/// generated file keyed by its hash, and its library + queue rows.
+///
+/// Local-file songs only. A remote-origin song lives on someone else's
+/// server, so `song.path` is only a local materialisation and deleting it
+/// would say nothing about the library the user actually sees.
+fn delete_song_one(file_hash: &str) -> Result<bool, String> {
+    let Some(song) = library_db::load_song_by_hash(file_hash)
+        .map_err(|e| format!("failed loading song: {e}"))?
+    else {
+        return Ok(false);
+    };
+
+    if !matches!(song.origin, SongOrigin::LocalFile) {
+        return Err("only songs from a local folder library can be deleted".to_string());
+    }
+
+    // Cache and rows go first: if the file delete fails (permissions,
+    // read-only volume) we would rather leave a file the next scan re-adds
+    // than a library row pointing at media the user believes is gone.
+    CacheDir::new().delete_song_cache(file_hash);
+    library_db::delete_song_by_hash(file_hash)
+        .map_err(|e| format!("failed updating library: {e}"))?;
+
+    match std::fs::remove_file(&song.path) {
+        Ok(()) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(e) => Err(format!("failed deleting {}: {e}", song.path.display())),
+    }
+}
+
+/// Delete songs outright. Irreversible: the files leave the disk.
+pub fn delete_song(target: SongTarget) -> Result<usize, String> {
+    // Deliberately hash-only. There is no "every song matching this filter"
+    // query, and adding one for an irreversible delete would make wiping a
+    // whole filtered view a single click away.
+    if matches!(target, SongTarget::Filter { .. }) {
+        return Err("songs can only be deleted by explicit selection".to_string());
+    }
+    run_for_target(target, |_| Ok(Vec::new()), delete_song_one)
+}
+
 fn reanalyze_transcript_one(file_hash: &str, language: Option<String>) -> bool {
     if is_usdx_song(file_hash) {
         return false;

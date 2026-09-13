@@ -21,13 +21,14 @@ mod vendor;
 mod vendor_scripts;
 
 pub use analyzer::{
-    AnalysisQueue, cancel_analysis, delete_cache, enqueue, realign, reanalyze_force_transcribe,
-    reanalyze_full, reanalyze_transcript, refresh_metadata, shutdown_server,
+    AnalysisQueue, cancel_analysis, delete_cache, delete_song, enqueue, realign,
+    reanalyze_force_transcribe, reanalyze_full, reanalyze_transcript, refresh_metadata,
+    shutdown_server,
 };
 pub use cache::{
-    CacheDir, CachePaths, CacheStats, cache_roots, change_app_data_path, clear_models,
-    clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path, same_path,
-    set_default_data_path,
+    CacheDir, CachePaths, CacheStats, SweepReport, cache_roots, change_app_data_path, clear_models,
+    clear_songs, clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path,
+    same_path, set_default_data_path, sweep_orphan_cache,
 };
 pub use config::{AppConfig, LibrarySource};
 pub use library_db::{init_library, library_db_path};

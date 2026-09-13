@@ -12,12 +12,15 @@ mod scanner;
 mod vendor;
 
 use analyzer::{
-    cancel_analysis, delete_song_cache, enqueue, realign, reanalyze_force_transcribe,
+    cancel_analysis, delete_song, delete_song_cache, enqueue, realign, reanalyze_force_transcribe,
     reanalyze_full, reanalyze_transcript, refresh_metadata, shift_key, shift_tempo,
 };
 use app_core::{AppConfig, PlaybackQueue, PlaybackSessionStore, SongsStore};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-use cache::{calculate_cache_stats, clear_all, clear_models_command, clear_videos_command};
+use cache::{
+    calculate_cache_stats, clear_all, clear_models_command, clear_songs_command,
+    clear_videos_command, sweep_orphan_cache_command,
+};
 use config::{load_config, save_config};
 use lyrics::{apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics};
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
@@ -105,6 +108,8 @@ pub fn run() {
             calculate_cache_stats,
             clear_videos_command,
             clear_models_command,
+            clear_songs_command,
+            sweep_orphan_cache_command,
             clear_all,
             // Profile
             load_profiles,
@@ -141,6 +146,7 @@ pub fn run() {
             enqueue,
             cancel_analysis,
             delete_song_cache,
+            delete_song,
             reanalyze_transcript,
             reanalyze_full,
             realign,

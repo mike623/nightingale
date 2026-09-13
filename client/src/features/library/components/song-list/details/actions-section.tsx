@@ -17,6 +17,7 @@ type ActionsSectionProps = {
   status: SongStatusInfo;
   analysisBusy: boolean;
   supportsAnalysisActions: boolean;
+  onDeleted: () => void;
 };
 
 const run =
@@ -37,6 +38,7 @@ export const ActionsSection = ({
   status,
   analysisBusy,
   supportsAnalysisActions,
+  onDeleted,
 }: ActionsSectionProps) => {
   const { setMode } = useDialog();
   const analysis = useAnalysis();
@@ -51,6 +53,7 @@ export const ActionsSection = ({
     analysis,
     onEditLyrics: () => setMode({ mode: 'edit-lyrics', song }),
     onChangeLanguage: () => setMode({ mode: 'language', song }),
+    onDeleteSong: () => setMode({ mode: 'delete-song', song, onDeleted }),
     run,
   });
 
