@@ -370,6 +370,13 @@ pub fn clear_lyrics(file_hash: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The first LRCLIB match that carries line-level synced lyrics, if any.
+pub(crate) fn best_synced_lrc(song: &Song) -> Option<String> {
+    lrclib_candidates(song)
+        .into_iter()
+        .find_map(|c| c.synced_lyrics.filter(|s| !s.trim().is_empty()))
+}
+
 pub(crate) fn write_lyrics_file(
     cache: &CacheDir,
     file_hash: &str,

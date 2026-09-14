@@ -877,6 +877,48 @@ fn process_song(initial_hash: &str, cache: &CacheDir) {
         return;
     };
 
+    // Default lyrics path (see docs/adr/0003): no WhisperX, and — unless lyric
+    // lookup is opted into — no LRCLIB lookup either, so analysis is just stem
+    // separation + key. When word-level is off and this isn't a forced /
+    // already-stems-only pass:
+    //   - lookup off (default)       -> separate stems, no lyrics at all.
+    //   - lookup on, synced match    -> line-level LRC + stem separation.
+    //   - lookup on, no synced match -> separate stems, NO transcription.
+    // WhisperX runs only when word-level is enabled globally or forced per-song.
+    let prefs = AppConfig::load();
+    if !prefs.word_level_lyrics()
+        && !lock_unpoisoned(&STEMS_ONLY).contains(initial_hash)
+        && !lock_unpoisoned(&FORCE_TRANSCRIBE).contains(initial_hash)
+    {
+        if !prefs.lyrics_lookup() {
+            info!(
+                "[analyzer] Lyric lookup off for {}; separating stems only",
+                song.file_hash
+            );
+        } else if let Some(lrc) = crate::lyrics::best_synced_lrc(&song) {
+            match crate::lyrics::provide_lrc(&song.file_hash, &lrc, true) {
+                Ok(()) => {
+                    info!(
+                        "[analyzer] Using LRCLIB line-level lyrics for {} (skipping WhisperX)",
+                        song.file_hash
+                    );
+                    return;
+                }
+                Err(e) => {
+                    warn!("[analyzer] LRC path failed ({e}); separating stems without lyrics")
+                }
+            }
+        } else {
+            info!(
+                "[analyzer] No LRCLIB synced lyrics for {}; separating stems without lyrics \
+                 (enable word-level timing or search LRCLIB manually to get lyrics)",
+                song.file_hash
+            );
+        }
+        // Lyric-less: run the stems-only pass (separation + key), no WhisperX.
+        mark_stems_only(&song.file_hash);
+    }
+
     let (song, local_path, file_hash_owned) = match prepare_audio_for_analysis(&song, cache) {
         Ok(out) => out,
         Err(e) => {

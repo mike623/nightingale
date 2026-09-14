@@ -95,6 +95,8 @@ const analysisSettings = (config: AppConfig | undefined) => {
       beamSize: DEFAULTS.beam_size,
       alignBackend: DEFAULTS.align_backend,
       autoAnalyze: DEFAULTS.auto_analyze,
+      wordLevelLyrics: false,
+      lyricsLookup: false,
       batchSize: DEFAULTS.batch_size,
       vocalThreshold: DEFAULTS.vocal_detection_threshold_pct,
     };
@@ -107,6 +109,8 @@ const analysisSettings = (config: AppConfig | undefined) => {
     beamSize: config.beam_size ?? DEFAULTS.beam_size,
     alignBackend: config.align_backend ?? DEFAULTS.align_backend,
     autoAnalyze: config.auto_analyze === true,
+    wordLevelLyrics: config.word_level_lyrics === true,
+    lyricsLookup: config.lyrics_lookup === true,
     batchSize: config.batch_size ?? DEFAULTS.batch_size,
     vocalThreshold: config.vocal_detection_threshold_pct ?? DEFAULTS.vocal_detection_threshold_pct,
   };
@@ -502,6 +506,34 @@ export const SettingsPage = () => {
                   segment={analysisNav.autoAnalyze}
                   getFocusClassName={getFocusClassName}
                   onChange={(auto_analyze) => mutate({ auto_analyze })}
+                />
+              </Field>
+
+              <Field>
+                <Label>Lyric lookup</Label>
+                <Hint>
+                  Search LRCLIB during analysis and use its line-level synced lyrics. Off analyzes
+                  faster and leaves songs lyric-less until you provide lyrics yourself
+                </Hint>
+                <OnOffButtonGroup
+                  value={analysis.lyricsLookup}
+                  segment={analysisNav.lyricsLookup}
+                  getFocusClassName={getFocusClassName}
+                  onChange={(lyrics_lookup) => mutate({ lyrics_lookup })}
+                />
+              </Field>
+
+              <Field>
+                <Label>Word-level lyric timing</Label>
+                <Hint>
+                  Run WhisperX to time every word for karaoke highlighting. Much slower than
+                  line-level lyrics from LRCLIB
+                </Hint>
+                <OnOffButtonGroup
+                  value={analysis.wordLevelLyrics}
+                  segment={analysisNav.wordLevelLyrics}
+                  getFocusClassName={getFocusClassName}
+                  onChange={(word_level_lyrics) => mutate({ word_level_lyrics })}
                 />
               </Field>
 

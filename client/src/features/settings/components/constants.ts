@@ -173,8 +173,10 @@ export function getAnalysisNav(isParakeet: boolean) {
         beamSize: -1,
         alignBackend: 3,
         autoAnalyze: 4,
-        vocalThreshold: 5,
-        batchSize: 6,
+        wordLevelLyrics: 5,
+        lyricsLookup: 6,
+        vocalThreshold: 7,
+        batchSize: 8,
       }
     : {
         separator: 1,
@@ -183,8 +185,10 @@ export function getAnalysisNav(isParakeet: boolean) {
         beamSize: 4,
         alignBackend: 5,
         autoAnalyze: 6,
-        vocalThreshold: 7,
-        batchSize: 8,
+        wordLevelLyrics: 7,
+        lyricsLookup: 8,
+        vocalThreshold: 9,
+        batchSize: 10,
       };
 }
 
@@ -198,6 +202,6 @@ export function getSettingsStops(tab: SettingsTab, isParakeet: boolean) {
   }
 
   return isParakeet
-    ? [3, 1, 1, 1, 2, 1, NUMBER_PICKER_SIZE, 2]
-    : [3, 1, 1, 1, NUMBER_PICKER_SIZE, 1, 2, 1, NUMBER_PICKER_SIZE, 2];
+    ? [3, 1, 1, 1, 2, 2, 2, 1, NUMBER_PICKER_SIZE, 2]
+    : [3, 1, 1, 1, NUMBER_PICKER_SIZE, 1, 2, 2, 2, 1, NUMBER_PICKER_SIZE, 2];
 }
