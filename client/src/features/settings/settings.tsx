@@ -4,6 +4,11 @@ import { useNavigate } from 'react-router';
 import { setFullScreen, isFullScreen as tauriIsFullScreen } from '@/bridge/fullScreen';
 import { clampPlaybackScale } from '@/features/playback/lib/display-scale';
 import {
+  MAX_SEMITONE_TOLERANCE,
+  MIN_SEMITONE_TOLERANCE,
+  SEMITONE_TOLERANCE,
+} from '@/features/playback/lib/pitch/constants';
+import {
   ALIGN_BACKENDS,
   ASR_ENGINES,
   DEFAULTS,
@@ -59,12 +64,23 @@ const generalSettings = (config: AppConfig | undefined) => {
   };
 };
 
-const playbackSettings = (config: AppConfig | undefined) => ({
-  mode: config?.playback_mode ?? DEFAULTS.playback_mode,
+const clampScoringTolerance = (semitones: number | null | undefined): number =>
+  Math.min(
+    MAX_SEMITONE_TOLERANCE,
+    Math.max(MIN_SEMITONE_TOLERANCE, semitones ?? SEMITONE_TOLERANCE),
+  );
+
+const lyricsLayoutSettings = (config: AppConfig | undefined) => ({
   lyricsVertical: config?.lyrics_vertical_position ?? DEFAULTS.lyrics_vertical_position,
   lyricsHorizontal: config?.lyrics_horizontal_position ?? DEFAULTS.lyrics_horizontal_position,
   lyricsScale: clampPlaybackScale(config?.lyrics_scale),
+});
+
+const playbackSettings = (config: AppConfig | undefined) => ({
+  mode: config?.playback_mode ?? DEFAULTS.playback_mode,
+  ...lyricsLayoutSettings(config),
   pitchGraphScale: clampPlaybackScale(config?.pitch_graph_scale),
+  scoringTolerance: clampScoringTolerance(config?.pitch_tolerance_semitones),
   autoPlayNext: config?.auto_play_next === true,
 });
 
@@ -122,6 +138,8 @@ export const SettingsPage = () => {
   const lyricsScale = pendingValue(lyricsScaleInput, playback.lyricsScale);
   const [pitchGraphScaleInput, setPitchGraphScale] = useState<number | null>(null);
   const pitchGraphScale = pendingValue(pitchGraphScaleInput, playback.pitchGraphScale);
+  const [scoringToleranceInput, setScoringTolerance] = useState<number | null>(null);
+  const scoringTolerance = pendingValue(scoringToleranceInput, playback.scoringTolerance);
   const [vocalThresholdPctInput, setVocalThresholdPct] = useState<number | null>(null);
   const vocalThresholdPct = vocalThresholdPctInput ?? analysis.vocalThreshold;
 
@@ -167,6 +185,11 @@ export const SettingsPage = () => {
     mutate({ pitch_graph_scale: scale });
   };
 
+  const updateScoringTolerance = (semitones: number) => {
+    setScoringTolerance(semitones);
+    mutate({ pitch_tolerance_semitones: semitones });
+  };
+
   const updateVocalThreshold = (pct: number) => {
     setVocalThresholdPct(pct);
     mutate({ vocal_detection_threshold_pct: pct });
@@ -197,6 +220,7 @@ export const SettingsPage = () => {
     micLatencySec,
     lyricsScale,
     pitchGraphScale,
+    scoringTolerance,
     vocalThresholdPct,
     onBack: close,
     onTabChange: setTab,
@@ -204,6 +228,7 @@ export const SettingsPage = () => {
     onMicLatencyChange: updateMicLatency,
     onLyricsScaleChange: updateLyricsScale,
     onPitchGraphScaleChange: updatePitchGraphScale,
+    onScoringToleranceChange: updateScoringTolerance,
     onVocalThresholdChange: updateVocalThreshold,
   });
 
@@ -358,6 +383,23 @@ export const SettingsPage = () => {
                     value={[pitchGraphScalePct]}
                     onValueChange={([pct]) => updatePitchGraphScale(pct / 100)}
                     className={getFocusClassName(NAV.playback.pitchGraphScale)}
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Scoring tolerance</Label>
+                  <Hint>
+                    How far off-pitch a note can be before it scores zero. Lower is stricter, higher
+                    is more forgiving ({scoringTolerance} semitone
+                    {scoringTolerance === 1 ? '' : 's'})
+                  </Hint>
+                  <Slider
+                    min={MIN_SEMITONE_TOLERANCE}
+                    max={MAX_SEMITONE_TOLERANCE}
+                    step={1}
+                    value={[scoringTolerance]}
+                    onValueChange={([semitones]) => updateScoringTolerance(semitones)}
+                    className={getFocusClassName(NAV.playback.scoringTolerance)}
                   />
                 </Field>
 

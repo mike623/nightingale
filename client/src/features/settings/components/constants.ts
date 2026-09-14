@@ -155,7 +155,8 @@ export const NAV = {
     lyricsHorizontalPosition: 3,
     lyricsScale: 4,
     pitchGraphScale: 5,
-    autoPlayNext: 6,
+    scoringTolerance: 6,
+    autoPlayNext: 7,
   },
 } as const;
 
@@ -192,7 +193,8 @@ export function getSettingsStops(tab: SettingsTab, isParakeet: boolean) {
     return [3, 2, 1, 1, 2, 2, 2];
   }
   if (tab === 'playback') {
-    return [3, 1, 1, 1, 1, 1, 2, 2];
+    // tabs, mode, lyrics v/h, lyrics scale, graph scale, tolerance, auto-next, footer
+    return [3, 1, 1, 1, 1, 1, 1, 2, 2];
   }
 
   return isParakeet
