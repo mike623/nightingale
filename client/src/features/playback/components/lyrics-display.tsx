@@ -1,5 +1,6 @@
 import { memo, useLayoutEffect, useRef, useState } from 'react';
 
+import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
 import { clampPlaybackScale } from '@/features/playback/lib/display-scale';
 import {
   usePlaybackTransportActions,
@@ -244,6 +245,7 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
   const nextFontSize = `clamp(${0.9 * scale}rem, ${4.5 * scale}svh, ${1.5 * scale}rem)`;
   const { isPlaying, paused } = usePlaybackTransportState();
   const { subscribe, getCurrentTime } = usePlaybackTransportActions();
+  const [lyricsHidden] = useLyricsHidden();
   const animate = isPlaying && !paused;
 
   const [segIdx, setSegIdx] = useState(() =>
@@ -341,7 +343,7 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
     }
   }, [segIdx, getCurrentTime]);
 
-  if (segments.length === 0) {
+  if (segments.length === 0 || lyricsHidden) {
     return null;
   }
 

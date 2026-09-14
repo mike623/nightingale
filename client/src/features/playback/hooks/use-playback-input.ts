@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 
 import { useNavInput } from '@/features/menu/hooks/use-nav-input';
+import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
 import { usePlaybackConfigPersist } from '@/features/playback/hooks/use-playback-config-persist';
 import {
   usePlaybackMicActions,
@@ -26,6 +27,7 @@ type KeyboardActions = {
   handleContinue: () => void;
   cycleTheme: () => void;
   cycleFlavor: () => void;
+  toggleLyricsHidden: () => void;
   handleToggleMic: () => void;
   handleCycleMic: () => void;
   handleToggleMicMonitor: () => void;
@@ -81,6 +83,7 @@ function handleKeyboardShortcut(event: KeyboardEvent, actions: KeyboardActions):
     m: actions.handleToggleMic,
     n: actions.handleCycleMic,
     r: actions.handleToggleMicMonitor,
+    l: actions.toggleLyricsHidden,
   };
   shortcuts[event.key.toLowerCase()]?.();
 }
@@ -96,6 +99,10 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
   const { getCurrentTime, setGuideVolume, handlePause, handleContinue } =
     usePlaybackTransportActions();
   const { cycleTheme, cycleFlavor } = usePlaybackThemeActions();
+  const [, setLyricsHidden] = useLyricsHidden();
+  const toggleLyricsHidden = useCallback(() => {
+    setLyricsHidden((hidden) => !hidden);
+  }, [setLyricsHidden]);
   const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, skipOutroPending } =
     usePlaybackTranscriptState();
   const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
@@ -166,6 +173,7 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
       handleToggleMic,
       handleCycleMic,
       handleToggleMicMonitor,
+      toggleLyricsHidden,
     };
     const onKeyDown = (event: KeyboardEvent) => handleKeyboardShortcut(event, actions);
 
@@ -187,5 +195,6 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
     handleToggleMic,
     handleCycleMic,
     handleToggleMicMonitor,
+    toggleLyricsHidden,
   ]);
 }
