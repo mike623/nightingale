@@ -12,8 +12,9 @@ import { ResultDialog } from '@/features/playback/components/dialogs/result';
 import { LyricsDisplay } from '@/features/playback/components/lyrics-display';
 import { PauseOverlay } from '@/features/playback/components/pause-overlay';
 import { PitchGraph } from '@/features/playback/components/pitch-graph';
+import { PlaybackBar } from '@/features/playback/components/playback-bar';
 import { PlaybackHud } from '@/features/playback/components/playback-hud';
-import { usePlaybackInput, usePlaybackResult } from '@/features/playback/hooks';
+import { usePlaybackInput, usePlaybackNext, usePlaybackResult } from '@/features/playback/hooks';
 import {
   PlaybackProviders,
   usePlaybackMicState,
@@ -52,8 +53,14 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
   const hudPosition = lyricsVerticalPosition === 'top' ? 'bottom' : 'top';
   const sessionWindowControls = sessionPlayback && isTauri;
 
-  usePlaybackInput(config);
-  const result = usePlaybackResult(song, queuePlayback);
+  const playNext = usePlaybackNext(song.file_hash);
+
+  usePlaybackInput(config, playNext);
+  const result = usePlaybackResult(song, {
+    queuePlayback,
+    autoPlayNext: config?.auto_play_next === true,
+    playNext,
+  });
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black" style={{ contain: 'strict' }}>
@@ -61,6 +68,7 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
 
       {isReady && (
         <>
+          <PlaybackBar onNext={playNext} />
           <PlaybackHud
             title={song.title}
             artist={song.artist}
@@ -83,6 +91,7 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
         exitLabel={sessionPlayback ? 'Exit Playback' : 'Exit to Menu'}
         onContinue={handleContinue}
         onExit={handleExit}
+        onNext={playNext}
       />
 
       <ResultDialog
@@ -92,6 +101,7 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
         scores={result.scores}
         activeProfile={result.activeProfile}
         nextPending={result.nextPending}
+        autoNextIn={result.autoNextIn}
         exitLabel={sessionPlayback ? 'Exit Playback' : 'Back to Menu'}
         onBack={result.onBack}
         onNext={result.onNext}

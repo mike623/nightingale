@@ -102,6 +102,7 @@ export const DEFAULTS = {
   mic_monitor_gain: 0.65,
   mic_latency_compensation_sec: DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   auto_analyze: false,
+  auto_play_next: false,
   playback_mode: 'classic',
   lyrics_vertical_position: 'bottom',
   lyrics_horizontal_position: 'center',
@@ -119,6 +120,7 @@ export const DEFAULTS = {
   | 'mic_monitor_gain'
   | 'mic_latency_compensation_sec'
   | 'auto_analyze'
+  | 'auto_play_next'
   | 'playback_mode'
   | 'lyrics_vertical_position'
   | 'lyrics_horizontal_position'
@@ -153,6 +155,7 @@ export const NAV = {
     lyricsHorizontalPosition: 3,
     lyricsScale: 4,
     pitchGraphScale: 5,
+    autoPlayNext: 6,
   },
 } as const;
 
@@ -189,7 +192,7 @@ export function getSettingsStops(tab: SettingsTab, isParakeet: boolean) {
     return [3, 2, 1, 1, 2, 2, 2];
   }
   if (tab === 'playback') {
-    return [3, 1, 1, 1, 1, 1, 2];
+    return [3, 1, 1, 1, 1, 1, 2, 2];
   }
 
   return isParakeet

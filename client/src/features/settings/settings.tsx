@@ -26,6 +26,7 @@ import { PlaybackPreview } from '@/features/settings/components/playback-preview
 import {
   Hint,
   NumberButtonGroup,
+  OnOffButtonGroup,
   PageHeader,
   SettingsSelect,
 } from '@/features/settings/components/settings-controls';
@@ -64,6 +65,7 @@ const playbackSettings = (config: AppConfig | undefined) => ({
   lyricsHorizontal: config?.lyrics_horizontal_position ?? DEFAULTS.lyrics_horizontal_position,
   lyricsScale: clampPlaybackScale(config?.lyrics_scale),
   pitchGraphScale: clampPlaybackScale(config?.pitch_graph_scale),
+  autoPlayNext: config?.auto_play_next === true,
 });
 
 const pendingValue = <T,>(input: T | null, saved: T): T => input ?? saved;
@@ -358,6 +360,20 @@ export const SettingsPage = () => {
                     className={getFocusClassName(NAV.playback.pitchGraphScale)}
                   />
                 </Field>
+
+                <Field>
+                  <Label>Auto-play next</Label>
+                  <Hint>
+                    When a song ends, start another random analyzed song instead of returning to the
+                    menu
+                  </Hint>
+                  <OnOffButtonGroup
+                    value={playback.autoPlayNext}
+                    segment={NAV.playback.autoPlayNext}
+                    getFocusClassName={getFocusClassName}
+                    onChange={(auto_play_next) => mutate({ auto_play_next })}
+                  />
+                </Field>
               </FieldGroup>
             </div>
           </TabsContent>
@@ -439,22 +455,12 @@ export const SettingsPage = () => {
               <Field>
                 <Label>Auto-analyze</Label>
                 <Hint>Automatically queue every unanalyzed song after scans finish</Hint>
-                <ButtonGroup>
-                  <Button
-                    variant={analysis.autoAnalyze ? 'outline' : 'default'}
-                    onClick={() => mutate({ auto_analyze: false })}
-                    className={getFocusClassName(analysisNav.autoAnalyze, 0)}
-                  >
-                    Off
-                  </Button>
-                  <Button
-                    variant={analysis.autoAnalyze ? 'default' : 'outline'}
-                    onClick={() => mutate({ auto_analyze: true })}
-                    className={getFocusClassName(analysisNav.autoAnalyze, 1)}
-                  >
-                    On
-                  </Button>
-                </ButtonGroup>
+                <OnOffButtonGroup
+                  value={analysis.autoAnalyze}
+                  segment={analysisNav.autoAnalyze}
+                  getFocusClassName={getFocusClassName}
+                  onChange={(auto_analyze) => mutate({ auto_analyze })}
+                />
               </Field>
 
               <Field>
