@@ -15,6 +15,7 @@ below.
 
 ### Fixes
 
+- Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
 - Analysis status sorting now orders ready songs by the transcript source shown in their status badge.
 
 ## [1.2.0] - 2026-09-02
