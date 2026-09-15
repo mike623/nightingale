@@ -2,12 +2,15 @@ name: Quality
 
 on:
   pull_request:
+  push:
+    branches:
+      - dev-port
 
 permissions:
   contents: read
 
 concurrency:
-  group: quality-${{ github.event.pull_request.number }}
+  group: quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
