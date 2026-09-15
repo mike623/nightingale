@@ -13,6 +13,10 @@ below.
 
 ## [Unreleased]
 
+### Improvements
+
+- Desktop updates are now signed with this fork's own key and fetched from this fork's releases.
+
 ### Fixes
 
 - Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
