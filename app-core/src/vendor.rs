@@ -766,6 +766,7 @@ pub fn step_install_packages() -> Result<(), String> {
     if gpu.legacy_torch {
         pkg_args.push("torch<2.3");
         pkg_args.push("torchaudio<2.3");
+        pkg_args.push("numba<0.63");
     }
 
     pkg_args.push("--python");
