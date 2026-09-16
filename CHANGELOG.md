@@ -16,9 +16,12 @@ below.
 ### Improvements
 
 - Desktop updates are now signed with this fork's own key and fetched from this fork's releases.
+- YouTube imports now prefer H.264 video and AAC audio, so downloaded videos play in the desktop webview without conversion.
+- Added `scripts/repair-videos.sh`, which converts already-imported videos the webview cannot decode into cached playable copies. Source files, song identity, and existing analysis are left untouched.
 
 ### Fixes
 
+- A cached playable copy of a video is now used ahead of the original, so an MP4 holding codecs the webview cannot decode no longer plays as a black or silent screen.
 - Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
 - Analysis status sorting now orders ready songs by the transcript source shown in their status badge.
 
