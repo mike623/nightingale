@@ -77,10 +77,13 @@ FFMPEG="$(command -v "$VENDOR_DIR/ffmpeg" 2>/dev/null || command -v ffmpeg)" \
 FFPROBE="$(command -v "$VENDOR_DIR/ffprobe" 2>/dev/null || command -v ffprobe)" \
   || die "ffprobe not found (looked in $VENDOR_DIR and \$PATH) — install ffmpeg"
 
+# The loop below reads the song list on stdin. ffmpeg would otherwise consume
+# those rows as interactive input, so it gets -nostdin; ffprobe has no such
+# flag and is handed /dev/null instead.
 # Codecs the playback webview is known to decode. Everything else gets a copy.
 stream_codec() {
   "$FFPROBE" -v error -select_streams "$1" -show_entries stream=codec_name \
-    -of csv=p=0 -- "$2" 2>/dev/null | head -1
+    -of csv=p=0 -- "$2" </dev/null 2>/dev/null | head -1
 }
 
 ok=0 remuxed=0 encoded=0 skipped=0 missing=0 failed=0 planned_remux=0 planned_encode=0
@@ -130,7 +133,7 @@ while IFS=$'\t' read -r hash path; do
     # Video already decodes; only the audio track needs replacing.
     echo "audio  $name"
     set +e
-    "$FFMPEG" -v error -y -i "$path" \
+    "$FFMPEG" -nostdin -v error -y -i "$path" \
       -c:v copy -c:a aac -b:a 160k -ac 2 -ar 48000 \
       -movflags +faststart -sn -dn "$tmp"
     status=$?
@@ -140,7 +143,7 @@ while IFS=$'\t' read -r hash path; do
     # 1080p: 4K AV1 decodes in software on the machines that need this most.
     echo "video  $name"
     set +e
-    "$FFMPEG" -v error -y -i "$path" \
+    "$FFMPEG" -nostdin -v error -y -i "$path" \
       -vf "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2" \
       -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
       -movflags +faststart -c:a aac -b:a 160k -ac 2 -ar 48000 -sn -dn "$tmp"
