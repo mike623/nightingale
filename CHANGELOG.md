@@ -16,6 +16,7 @@ below.
 ### Features
 
 - The playback pause overlay now offers Edit Lyrics, opening the lyrics editor for the playing song without leaving playback.
+- The lyrics editor now opens an analyzed song on its transcript rendered as Enhanced LRC, so the timing a song plays with is visible and editable instead of being replaced by plain lines. Songs with no transcript yet still open on their saved lyrics.
 - The lyrics editor's Edit tab offers ±0.1s, ±0.5s, and ±1s shift buttons that move every LRC line and word timestamp at once, keeping each tag's own precision.
 - The lyrics editor has a third tab that opens Lyricsify in an embedded, sandboxed frame, already searched for the song's artist and title, with a button to open the same page in the system browser.
 

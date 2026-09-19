@@ -1,6 +1,6 @@
 import type { DialogMode } from '@/features/menu/hooks/use-dialog';
 import type { Song } from '@/types/Song';
-import type { Transcript } from '@/types/Transcript';
+import type { Segment, Transcript } from '@/types/Transcript';
 
 export type EditLyricsDialogMode = { mode: 'edit-lyrics'; song: Song };
 
@@ -60,6 +60,51 @@ export function stripLrcToPlainLines(text: string): string[] {
         .trim(),
     )
     .filter((line) => line.length > 0);
+}
+
+/**
+ * `mm:ss.xxx` timestamp. Milliseconds rather than the more common hundredths:
+ * transcript times are seconds as floats, and the LRC parser accepts three
+ * fractional digits, so rounding coarser would drop alignment precision.
+ */
+function lrcTimestamp(seconds: number): string {
+  const total = Math.round(Math.max(0, seconds) * 1000);
+  const wholeSeconds = Math.floor(total / 1000);
+  const minutes = String(Math.floor(wholeSeconds / 60)).padStart(2, '0');
+  const secs = String(wholeSeconds % 60).padStart(2, '0');
+  return `${minutes}:${secs}.${String(total % 1000).padStart(3, '0')}`;
+}
+
+/**
+ * Render a segment as one Enhanced LRC line, or as a plain line-level one when
+ * the segment carries no word timings.
+ *
+ * Word tags are separated the way the segment's own text is: a space for
+ * space-delimited scripts, nothing for scripts that don't space their words, so
+ * re-parsing the line cannot inject whitespace the lyrics never had.
+ */
+function lrcLineFromSegment(segment: Segment): string | null {
+  const head = `[${lrcTimestamp(segment.start)}]`;
+  const words = segment.words.filter((word) => word.word.trim().length > 0);
+
+  if (words.length === 0) {
+    const text = segment.text.trim();
+    return text.length === 0 ? null : `${head}${text}`;
+  }
+
+  const separator = segment.text.includes(' ') ? ' ' : '';
+  return head + words.map((w) => `<${lrcTimestamp(w.start)}>${w.word.trim()}`).join(separator);
+}
+
+/**
+ * Render a transcript as Enhanced LRC so the editor can show, and shift, the
+ * timing a song is actually playing with.
+ */
+export function lrcFromTranscript(transcript: Transcript): string {
+  return transcript.segments
+    .map(lrcLineFromSegment)
+    .filter((line) => line !== null)
+    .join('\n');
 }
 
 export function linesFromTranscript(transcript: Transcript): string {
