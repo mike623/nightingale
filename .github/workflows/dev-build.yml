@@ -101,6 +101,23 @@ jobs:
             --bundles app,dmg
             --config '{"version":"${{ needs.prepare.outputs.version }}"}'
 
+  discard:
+    name: Discard the draft
+    needs: [prepare, build]
+    # A build that never finished leaves a draft release with some or none of
+    # its bundles attached. Nothing can use it, so take it back out rather
+    # than leaving it to be mistaken for a real one.
+    if: failure() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the unpublished draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ needs.prepare.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --yes --cleanup-tag
+
   publish:
     name: Publish dev release
     needs: [prepare, build]
