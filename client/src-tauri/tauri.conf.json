@@ -49,7 +49,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5REVFMzAxMDQyMzA4RjkKUldUNUNDTUVBZVBlR1hrL1BGSHhvMldCWnJkUUFqSnVDSnp6MWtJcU1BWUxCR3JsUWcwSVVLU0QK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwRTRGMUNDMTcxQjVENTIKUldSU1hSc1h6UEhrY09YWEY0Z2FvRnlvOGM1eWJIc1ZycXpoQ2NKUS9GcWtDSHQ5WnlCUlRYcGsK",
       "endpoints": ["https://github.com/mike623/nightingale/releases/latest/download/latest.json"],
       "windows": {
         "installMode": "passive"
