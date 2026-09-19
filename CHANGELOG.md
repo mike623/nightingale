@@ -31,6 +31,7 @@ below.
 
 ### Fixes
 
+- A song's own video now plays letterboxed inside the playback stage, so a video whose aspect ratio differs from the window keeps its full frame instead of being cropped. Pixabay ambient backgrounds still fill the stage.
 - About now reports the version of the running build, read from the bundle. It read the manifest at compile time, so a dev build claimed to be the last released version.
 - Saving lyrics while a song is playing now updates the running playback. The transcript was loaded once per song, so new timing only appeared after a restart.
 - A cached playable copy of a video is now used ahead of the original, so an MP4 holding codecs the webview cannot decode no longer plays as a black or silent screen.
