@@ -2,6 +2,8 @@ import { TrophyIcon } from 'lucide-react';
 import { Fragment } from 'react';
 import { toast } from 'sonner';
 
+import { openUrl } from '@/bridge/opener';
+import { youtubeWatchUrl } from '@/features/import/lib/youtube-url';
 import { useAnalysis } from '@/features/library/hooks/use-analysis';
 import { useRedownloadSong } from '@/features/library/hooks/use-redownload-song';
 import { useImportedVideoId } from '@/features/library/queries/use-imported-video-id';
@@ -55,10 +57,18 @@ export const ActionsSection = ({
     analysisBusy,
     supportsAnalysisActions,
     analysis,
-    // Only a song still traceable to a YouTube video can be fetched again.
-    onRedownload:
+    // Only a song still traceable to a YouTube video has anything to re-fetch
+    // or to link back to.
+    youtube:
       typeof importedVideoId === 'string' && importedVideoId !== ''
-        ? () => void redownload(song)
+        ? {
+            onRedownload: () => void redownload(song),
+            onOpen: () => {
+              void openUrl(youtubeWatchUrl(importedVideoId)).catch((error: unknown) => {
+                toast.error(error instanceof Error ? error.message : 'Opening the video failed.');
+              });
+            },
+          }
         : null,
     onEditLyrics: () => setMode({ mode: 'edit-lyrics', song }),
     onChangeLanguage: () => setMode({ mode: 'language', song }),

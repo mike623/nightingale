@@ -10,6 +10,7 @@ import {
   RefreshCwIcon,
   Trash2Icon,
   XCircleIcon,
+  YoutubeIcon,
 } from 'lucide-react';
 
 import type { Song } from '@/types/Song';
@@ -36,9 +37,9 @@ type BuildActionGroupsParams = {
   analysisBusy: boolean;
   supportsAnalysisActions: boolean;
   analysis: AnalysisHandlers;
-  /** Set only for a song imported from YouTube, which is the only kind that
-   * can be fetched again. */
-  onRedownload: (() => void) | null;
+  /** Set only for a song imported from YouTube. Both actions are handles on
+   * the video it came from, so they arrive and disappear together. */
+  youtube: { onRedownload: () => void; onOpen: () => void } | null;
   onEditLyrics: () => void;
   onChangeLanguage: () => void;
   onDeleteSong: () => void;
@@ -55,7 +56,7 @@ export function buildActionGroups({
   analysisBusy,
   supportsAnalysisActions,
   analysis,
-  onRedownload,
+  youtube,
   onEditLyrics,
   onChangeLanguage,
   onDeleteSong,
@@ -198,7 +199,7 @@ export function buildActionGroups({
     ]);
   }
 
-  if (onRedownload !== null) {
+  if (youtube !== null) {
     groups.push([
       {
         icon: DownloadIcon,
@@ -206,7 +207,13 @@ export function buildActionGroups({
         description:
           'Fetch the video from YouTube again, replacing the file. Keeps lyrics, timing, and stems when the new video runs the same length.',
         disabled: analysisBusy,
-        onClick: onRedownload,
+        onClick: youtube.onRedownload,
+      },
+      {
+        icon: YoutubeIcon,
+        title: 'Open on YouTube',
+        description: 'Open the video this song was imported from in your browser.',
+        onClick: youtube.onOpen,
       },
     ]);
   }

@@ -34,6 +34,15 @@ function isFetchable(url: URL): boolean {
 }
 
 /**
+ * The watch page for a video id. The id comes off the import manifest on disk
+ * rather than from this build, so it is encoded rather than trusted to be
+ * URL-safe.
+ */
+export function youtubeWatchUrl(videoId: string): string {
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+}
+
+/**
  * The link `text` holds, unchanged, when it is a YouTube video or playlist the
  * importer can read; `null` otherwise.
  *
