@@ -1,5 +1,6 @@
 import {
   AlignLeftIcon,
+  DownloadIcon,
   AudioLinesIcon,
   FileX2Icon,
   ImageIcon,
@@ -35,6 +36,9 @@ type BuildActionGroupsParams = {
   analysisBusy: boolean;
   supportsAnalysisActions: boolean;
   analysis: AnalysisHandlers;
+  /** Set only for a song imported from YouTube, which is the only kind that
+   * can be fetched again. */
+  onRedownload: (() => void) | null;
   onEditLyrics: () => void;
   onChangeLanguage: () => void;
   onDeleteSong: () => void;
@@ -51,6 +55,7 @@ export function buildActionGroups({
   analysisBusy,
   supportsAnalysisActions,
   analysis,
+  onRedownload,
   onEditLyrics,
   onChangeLanguage,
   onDeleteSong,
@@ -189,6 +194,19 @@ export function buildActionGroups({
         onClick: run(`Cache deleted for "${song.title}"`, () =>
           analysis.deleteSongCache(song.file_hash),
         ),
+      },
+    ]);
+  }
+
+  if (onRedownload !== null) {
+    groups.push([
+      {
+        icon: DownloadIcon,
+        title: 'Re-download video',
+        description:
+          'Fetch the video from YouTube again, replacing the file. Keeps lyrics, timing, and stems when the new video runs the same length.',
+        disabled: analysisBusy,
+        onClick: onRedownload,
       },
     ]);
   }

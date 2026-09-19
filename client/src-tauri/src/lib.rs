@@ -25,7 +25,10 @@ use cache::{
     clear_videos_command, sweep_orphan_cache_command,
 };
 use config::{load_config, save_config};
-use import::{import_available, imported_video_ids, probe_import, start_import};
+use import::{
+    import_available, imported_video_id, imported_video_ids, probe_import, redownload_song,
+    start_import,
+};
 use lyrics::{
     apply_timed_lyrics, clear_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
     search_lrclib_terms,
@@ -162,6 +165,8 @@ pub fn run() {
             imported_video_ids,
             probe_import,
             start_import,
+            imported_video_id,
+            redownload_song,
             // Analyzer
             enqueue,
             cancel_analysis,

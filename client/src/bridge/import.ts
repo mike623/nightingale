@@ -1,6 +1,7 @@
 import type { ImportPreview } from '@/types/ImportPreview';
 import type { ImportProgress } from '@/types/ImportProgress';
 import type { ImportReport } from '@/types/ImportReport';
+import type { Song } from '@/types/Song';
 
 import { invoke, listen } from './runtime';
 
@@ -18,6 +19,16 @@ export const probeImport = async (url: string): Promise<ImportPreview> =>
 /** YouTube video ids already imported into the active folder (file still on disk). */
 export const importedVideoIds = async (): Promise<string[]> =>
   await invoke<string[]>('imported_video_ids');
+
+/** The YouTube video id a song's file was imported from, or `null` for a file
+ * that came from anywhere else. */
+export const importedVideoId = async (fileHash: string): Promise<string | null> =>
+  await invoke<string | null>('imported_video_id', { fileHash });
+
+/** Download a song's YouTube video again over the file on disk. Resolves with
+ * the song under its new hash once the download lands. */
+export const redownloadSong = async (fileHash: string): Promise<Song> =>
+  await invoke<Song>('redownload_song', { fileHash });
 
 /** Kick off a background download of the previewed entries. Returns immediately;
  * progress/completion arrive via the events below. */

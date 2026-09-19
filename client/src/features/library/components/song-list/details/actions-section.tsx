@@ -3,6 +3,8 @@ import { Fragment } from 'react';
 import { toast } from 'sonner';
 
 import { useAnalysis } from '@/features/library/hooks/use-analysis';
+import { useRedownloadSong } from '@/features/library/hooks/use-redownload-song';
+import { useImportedVideoId } from '@/features/library/queries/use-imported-video-id';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useProfiles } from '@/features/profiles/queries/use-profiles';
 import { Separator } from '@/shared/components/ui/separator';
@@ -42,6 +44,8 @@ export const ActionsSection = ({
 }: ActionsSectionProps) => {
   const { setMode } = useDialog();
   const analysis = useAnalysis();
+  const redownload = useRedownloadSong();
+  const { data: importedVideoId } = useImportedVideoId(song.file_hash);
   const { data: profiles } = useProfiles();
   const hasScores = profiles?.scores.some((score) => score.song_hash === song.file_hash) ?? false;
 
@@ -51,6 +55,11 @@ export const ActionsSection = ({
     analysisBusy,
     supportsAnalysisActions,
     analysis,
+    // Only a song still traceable to a YouTube video can be fetched again.
+    onRedownload:
+      typeof importedVideoId === 'string' && importedVideoId !== ''
+        ? () => void redownload(song)
+        : null,
     onEditLyrics: () => setMode({ mode: 'edit-lyrics', song }),
     onChangeLanguage: () => setMode({ mode: 'language', song }),
     onDeleteSong: () => setMode({ mode: 'delete-song', song, onDeleted }),

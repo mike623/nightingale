@@ -121,4 +121,24 @@ impl ProfileStore {
         sorted.truncate(limit);
         sorted
     }
+
+    /// Carry every score onto a new song hash after the song's bytes were
+    /// replaced by an equivalent file. A score belongs to the performance, not
+    /// to the copy of the song on disk, so a re-download must not strand the
+    /// leaderboard behind a hash nothing plays any more.
+    pub fn rekey_song(old_hash: &str, new_hash: &str) {
+        let mut store = Self::load();
+        let mut moved = false;
+
+        for record in &mut store.scores {
+            if record.song_hash == old_hash {
+                record.song_hash = new_hash.to_string();
+                moved = true;
+            }
+        }
+
+        if moved {
+            store.save();
+        }
+    }
 }

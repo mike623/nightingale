@@ -181,6 +181,30 @@ impl CacheDir {
     /// `retained_hashes` are the library's live song hashes; `retained_art`
     /// are album-art file names, which are keyed by the *image* hash rather
     /// than the song's and so cannot be matched by hash.
+    /// Re-point every cache file belonging to `old_hash` at `new_hash`.
+    ///
+    /// The cache is content-addressed, so replacing a song's bytes with an
+    /// equivalent file — a re-download of the same YouTube video — leaves its
+    /// generated files correct but named after a hash nothing references any
+    /// more. Renaming them is the whole migration; no contents are touched.
+    /// Only the caller can judge "equivalent", so this makes no such check.
+    pub fn rekey(&self, old_hash: &str, new_hash: &str) {
+        for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str() else {
+                continue;
+            };
+            if cache_file_hash(name) != Some(old_hash) {
+                continue;
+            }
+
+            let renamed = format!("{new_hash}{}", &name[old_hash.len()..]);
+            let _ = std::fs::rename(entry.path(), entry.path().with_file_name(renamed));
+        }
+    }
+
     pub fn sweep_orphans(
         &self,
         retained_hashes: &std::collections::HashSet<String>,

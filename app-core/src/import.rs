@@ -16,6 +16,7 @@ use tracing::warn;
 use ts_rs::TS;
 
 use crate::config::{AppConfig, LibrarySource};
+use crate::song::Song;
 use crate::vendor::{ensure_ytdlp, ffmpeg_path, silent_command};
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -151,6 +152,112 @@ pub fn imported_video_ids() -> Vec<String> {
         .filter(|(_, name)| root.join(name).exists())
         .map(|(id, _)| id)
         .collect()
+}
+
+/// How far a re-downloaded video's duration may drift from the one on record
+/// and still count as the same cut. Durations come from container metadata and
+/// the two files are muxed separately, so an exact match is too strict; a
+/// second is far tighter than the gap between two different edits of a song.
+const REDOWNLOAD_SAME_CUT_TOLERANCE_SECS: f64 = 1.0;
+
+/// The YouTube video id this song's file was imported from, or `None` for a
+/// file that came from anywhere else. The manifest keys imports by video id, so
+/// the lookup is by the file the entry points at.
+pub fn imported_video_id(file_hash: &str) -> Option<String> {
+    let root = import_folder_root()?;
+    let song = crate::library_db::load_song_by_hash(file_hash)
+        .ok()
+        .flatten()?;
+
+    load_manifest(&root)
+        .videos
+        .into_iter()
+        .find(|(_, name)| root.join(name) == song.path)
+        .map(|(id, _)| id)
+}
+
+/// Download this song's YouTube video again over the file already on disk, for
+/// a download that arrived broken or in a codec the player cannot decode.
+///
+/// The file's bytes change, and the library, cache, scores and play history are
+/// all keyed by the Blake3 of those bytes — so the song's identity has to be
+/// carried across to the new hash rather than left behind. Its analysis can
+/// only come with it when the new video is the same cut, which is judged by
+/// duration: stems and lyric timing built against a different edit would play
+/// against the picture. Anything else drops the stale cache and re-queues
+/// analysis. Scores and play history follow the song either way — they belong
+/// to the performances, not to the copy of the file that was on disk.
+pub fn redownload_song(file_hash: &str) -> Result<Song, String> {
+    let root = import_folder_root()
+        .ok_or_else(|| "Import is only available with a Folder library".to_string())?;
+    let song = crate::library_db::load_song_by_hash(file_hash)
+        .map_err(|e| format!("Cannot read the library: {e}"))?
+        .ok_or_else(|| "That song is no longer in the library".to_string())?;
+    let id = imported_video_id(file_hash)
+        .ok_or_else(|| "That song did not come from a YouTube import".to_string())?;
+    let (yt, ytdlp_updated) = ensure_ytdlp()?;
+
+    // Re-tag with the names the library holds now, which may be a rename the
+    // video's own metadata never had.
+    let entry = ImportEntry {
+        id,
+        title: song.title.clone(),
+        artist: song.artist.clone(),
+        duration_secs: song.duration_secs,
+    };
+    download_entry(&yt, &root, &entry, ytdlp_updated, Some(&song.path), |_| {})?;
+
+    let cache = crate::cache::CacheDir::new();
+    let mut fresh = crate::song::build_song(&song.path, &cache, song.is_video)
+        .map_err(|e| format!("Cannot read the re-downloaded file: {e}"))?;
+
+    // Byte-identical download: the hash everything is keyed by still holds, so
+    // there is nothing to migrate.
+    if fresh.file_hash == song.file_hash {
+        return Ok(song);
+    }
+
+    // Naming and playback preferences live in the library, not in the file.
+    fresh.title = song.title.clone();
+    fresh.artist = song.artist.clone();
+    fresh.album = song.album.clone();
+    fresh.origin = song.origin.clone();
+    fresh.override_key = song.override_key.clone();
+    fresh.key_offset = song.key_offset;
+
+    let same_cut =
+        (fresh.duration_secs - song.duration_secs).abs() <= REDOWNLOAD_SAME_CUT_TOLERANCE_SECS;
+    let keep_analysis = song.is_analyzed && same_cut;
+
+    if keep_analysis {
+        // The cache is content-addressed, so renaming its files onto the new
+        // hash is the whole migration. `build_song` read the cache before this
+        // and so found nothing; restore what the transcript records.
+        cache.rekey(&song.file_hash, &fresh.file_hash);
+        fresh.is_analyzed = true;
+        fresh.transcript_source = song.transcript_source;
+        fresh.language = song.language.clone();
+        fresh.key = song.key.clone();
+        fresh.tempo = song.tempo;
+        fresh.no_stems = song.no_stems;
+    } else {
+        cache.delete_song_cache(&song.file_hash);
+    }
+
+    crate::library_db::rekey_song(&song.file_hash, &fresh.file_hash, &fresh)
+        .map_err(|e| format!("Re-downloaded, but the library row could not be updated: {e}"))?;
+    crate::library_db::rekey_play_stats(&song.file_hash, &fresh.file_hash)
+        .map_err(|e| format!("Re-downloaded, but the play history could not be moved: {e}"))?;
+    crate::profile::ProfileStore::rekey_song(&song.file_hash, &fresh.file_hash);
+
+    // Only a song that had analysis and lost it here is queued again. One that
+    // was never analyzed stays that way: re-downloading it is not a request to
+    // start.
+    if song.is_analyzed && !keep_analysis {
+        crate::analyzer::enqueue_one(&fresh.file_hash);
+    }
+
+    Ok(fresh)
 }
 
 /// Resolve a YouTube URL to a preview without downloading media. `--flat-playlist`
@@ -317,7 +424,7 @@ pub fn run_import(
                         continue;
                     }
 
-                    let result = download_entry(&yt, &root, entry, ytdlp_updated, |pct| {
+                    let result = download_entry(&yt, &root, entry, ytdlp_updated, None, |pct| {
                         tick(Some(&entry.title), pct, Some(downloading(&entry.id, pct)))
                     });
                     // Fold the result into the counters and build this entry's
@@ -545,11 +652,15 @@ fn split_title_artist(raw_title: &str, track: Option<String>, artist: String) ->
     (raw_title.trim().to_string(), artist)
 }
 
+/// Download one entry into the folder. `replacing` names a file this download
+/// is a fresh copy of — the re-download path — and is `None` for an import,
+/// which claims a new name from the entry's title and artist instead.
 fn download_entry(
     yt: &Path,
     root: &Path,
     entry: &ImportEntry,
     ytdlp_updated: bool,
+    replacing: Option<&Path>,
     mut on_pct: impl FnMut(f64),
 ) -> Result<PathBuf, String> {
     let tmp = root.join(format!(".import_tmp_{}", sanitize(&entry.id)));
@@ -626,13 +737,26 @@ fn download_entry(
         }
 
         let downloaded = first_file_in(&tmp).ok_or("yt-dlp produced no file")?;
-        let dest = reserve_path(root, &format!("{} - {}", entry.artist, entry.title), "mp4");
+        // A re-download is tagged inside the scratch directory and swapped in
+        // with a single rename. Writing over the file directly would destroy
+        // the only copy of it if the tagging step failed halfway, and a staging
+        // file in the watched folder could be picked up by a scan mid-write.
+        let dest = match replacing {
+            Some(_) => tmp.join("staged.mp4"),
+            None => reserve_path(root, &format!("{} - {}", entry.artist, entry.title), "mp4"),
+        };
         if let Err(e) = embed_and_move(&downloaded, &dest, &entry.title, &entry.artist) {
             // Don't leave the empty placeholder behind for the folder scan.
             let _ = std::fs::remove_file(&dest);
             return Err(e);
         }
-        Ok(dest)
+
+        let Some(existing) = replacing else {
+            return Ok(dest);
+        };
+        std::fs::rename(&dest, existing)
+            .map_err(|e| format!("Failed to replace the existing file: {e}"))?;
+        Ok(existing.to_path_buf())
     })();
 
     let _ = std::fs::remove_dir_all(&tmp);

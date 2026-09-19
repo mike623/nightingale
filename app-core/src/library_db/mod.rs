@@ -36,7 +36,9 @@ pub(crate) use analysis_queue::{
     analysis_queue_save_rows, analysis_queue_upsert_row,
 };
 pub(crate) use migrations::rewrite_legacy_jellyfin_paths;
-pub(crate) use play_stats::{PlayOutcome, pick_weighted_analyzed_song, record_play};
+pub(crate) use play_stats::{
+    PlayOutcome, pick_weighted_analyzed_song, record_play, rekey_play_stats,
+};
 pub(crate) use playlists::{PlaylistDefinition, PlaylistSongKeyKind, replace_all_playlists};
 pub(crate) use queries::{
     iter_file_hashes_filtered_analysis_busy, iter_file_hashes_filtered_full_reanalyzable,

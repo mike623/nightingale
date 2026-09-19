@@ -54,6 +54,25 @@ pub(crate) fn record_play(
     })
 }
 
+/// Carry a song's play history onto a new `file_hash` after its bytes were
+/// replaced by an equivalent file. Counters belong to the song, not to the
+/// copy of it on disk, so a re-download must not reset its weight in the draw.
+/// Any row already standing at `new_hash` is dropped first, mirroring the
+/// same guard in `rekey_song`.
+pub(crate) fn rekey_play_stats(old_hash: &str, new_hash: &str) -> rusqlite::Result<()> {
+    with_conn(|c| {
+        c.execute(
+            "DELETE FROM song_play_stats WHERE file_hash = ?1",
+            params![new_hash],
+        )?;
+        c.execute(
+            "UPDATE song_play_stats SET file_hash = ?2 WHERE file_hash = ?1",
+            params![old_hash, new_hash],
+        )?;
+        Ok(())
+    })
+}
+
 /// Draws an analyzed song, biased towards the ones the room has sung least.
 ///
 /// Each candidate gets `1 / (1 + sung + 0.5 * skip)`, so a song nobody has
