@@ -1,5 +1,7 @@
+import { getVersion } from '@tauri-apps/api/app';
 import { platform } from '@tauri-apps/plugin-os';
 
+import { version as packageVersion } from '../../package.json';
 import { isTauri } from './runtime';
 
 /**
@@ -30,3 +32,19 @@ const updateChannel = (): UpdateChannel => {
 export const UPDATE_CHANNEL = updateChannel();
 
 export const UPDATES_SUPPORTED: boolean = UPDATE_CHANNEL === 'auto';
+
+/**
+ * Version of the running build.
+ *
+ * Read from the bundle rather than `package.json`, because dev builds take
+ * their version at bundle time while the manifests stay on the last released
+ * version. The web target has no bundle, so it falls back to the manifest it
+ * was in fact built from.
+ */
+export const appVersion = async (): Promise<string> => {
+  if (!isTauri) {
+    return packageVersion;
+  }
+
+  return await getVersion();
+};

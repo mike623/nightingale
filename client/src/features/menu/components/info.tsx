@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { openUrl } from '@/bridge/opener';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
+import { useAppVersion } from '@/features/menu/queries/use-app-version';
 import { Button } from '@/shared/components/ui/button';
 import {
   Dialog,
@@ -14,8 +15,6 @@ import {
 import { Separator } from '@/shared/components/ui/separator';
 import { Table, TableBody, TableCell, TableRow } from '@/shared/components/ui/table';
 import { cn } from '@/shared/utils/cn';
-
-import { version } from '../../../../package.json';
 
 const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -43,6 +42,7 @@ const attributions = [
 
 export const InfoDialog = () => {
   const { mode, close } = useDialog();
+  const version = useAppVersion();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +87,7 @@ export const InfoDialog = () => {
               </Button>
             </div>
             <div className="text-sm text-muted-foreground">
-              <p>Version {version}</p>
+              <p>Version {version ?? '\u2026'}</p>
               <p>License: GPL-3.0-or-later</p>
             </div>
           </DialogHeader>

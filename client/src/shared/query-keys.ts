@@ -7,6 +7,7 @@ export const SONGS_META = ['songs-meta'];
 export const ANALYSIS_QUEUE = ['analysis-queue'];
 export const MENU = ['menu'];
 export const UPDATER = ['updater'];
+export const APP_VERSION = ['app-version'];
 export const LYRICS = ['lyrics'];
 export const TRANSCRIPT = ['transcript'];
 export const LRCLIB = ['lrclib'];
