@@ -19,6 +19,7 @@ below.
 - The lyrics editor now opens an analyzed song on its transcript rendered as Enhanced LRC, so the timing a song plays with is visible and editable instead of being replaced by plain lines. Songs with no transcript yet still open on their saved lyrics.
 - The lyrics editor's Edit tab offers ±0.1s, ±0.5s, and ±1s shift buttons that move every LRC line and word timestamp at once, keeping each tag's own precision.
 - The lyrics editor has a third tab that opens Lyricsify in its own application window, already searched for the song's artist and title.
+- Copying lyrics while that Lyricsify window is open closes it and drops the text straight into the Edit tab, leaving unsaved edits untouched.
 
 ### Improvements
 

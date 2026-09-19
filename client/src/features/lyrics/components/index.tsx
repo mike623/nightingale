@@ -3,8 +3,9 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { searchLrclibTerms } from '@/bridge/lyrics';
-import { openBrowserWindow, openUrl } from '@/bridge/opener';
+import { openUrl } from '@/bridge/opener';
 import { useLyricsEditor } from '@/features/lyrics/hooks/use-lyrics-editor';
+import { useLyricsifyWindow } from '@/features/lyrics/hooks/use-lyricsify-window';
 import { useSaveLyricsMutation } from '@/features/lyrics/mutations/use-save-lyrics-mutation';
 import {
   useApplyTimedLyricsMutation,
@@ -532,9 +533,24 @@ export const EditLyricsDialog = () => {
 
   // The Lyricsify tab opens straight on this song's search results.
   const lyricsifyUrl = lyricsifySearchUrl(searchTrack, searchArtist);
-  const openLyricsify = () => {
-    void openBrowserWindow('lyricsify', lyricsifyUrl);
+  const applyCopiedLyrics = (text: string) => {
+    if (editor.isDirty) {
+      toast.info('Lyrics copied \u2014 paste them into the Edit tab to keep your changes.');
+      return;
+    }
+
+    editor.setText(text);
+    setTimingChoice('provided');
+    setActiveTab('edit');
+    toast.success('Pasted the lyrics you copied from Lyricsify.');
   };
+
+  const { openLyricsify } = useLyricsifyWindow({
+    dialogOpen: open,
+    onWebTab: activeTab === 'web',
+    url: lyricsifyUrl,
+    onLyrics: applyCopiedLyrics,
+  });
 
   const currentCandidate = selectedCandidate(candidates, carouselIndex);
   const nav = navigationState({

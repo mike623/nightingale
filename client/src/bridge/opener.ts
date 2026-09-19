@@ -3,6 +3,9 @@ import { openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
 
 import { isTauri } from './runtime';
 
+/** Handles for browser-build popups, which can only be closed by their opener. */
+const popups = new Map<string, Window>();
+
 export const openUrl = async (url: string): Promise<void> => {
   if (isTauri) {
     await tauriOpenUrl(url);
@@ -21,7 +24,10 @@ export const openUrl = async (url: string): Promise<void> => {
  */
 export const openBrowserWindow = async (label: string, url: string): Promise<void> => {
   if (!isTauri) {
-    window.open(url, label, 'noopener,noreferrer,popup,width=1024,height=800');
+    const popup = window.open(url, label, 'noopener,noreferrer,popup,width=1024,height=800');
+    if (popup !== null) {
+      popups.set(label, popup);
+    }
     return;
   }
 
@@ -41,4 +47,16 @@ export const openBrowserWindow = async (label: string, url: string): Promise<voi
       reject(new Error(String(payload))),
     );
   });
+};
+
+/** Closes a window opened by `openBrowserWindow`. A missing window is a no-op. */
+export const closeBrowserWindow = async (label: string): Promise<void> => {
+  if (!isTauri) {
+    popups.get(label)?.close();
+    popups.delete(label);
+    return;
+  }
+
+  const existing = await WebviewWindow.getByLabel(label);
+  await existing?.close();
 };
