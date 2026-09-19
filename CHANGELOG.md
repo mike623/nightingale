@@ -21,7 +21,7 @@ below.
 - The lyrics editor's Edit tab offers ±0.1s, ±0.5s, and ±1s shift buttons that move every LRC line and word timestamp at once, keeping each tag's own precision.
 - The lyrics editor has a third tab that opens Lyricsify in its own application window, already searched for the song's artist and title.
 - Copying lyrics while that Lyricsify window is open closes it and drops the text straight into the Edit tab, leaving unsaved edits untouched.
-- The lyrics editor's LRCLIB tab lists the words of the Track and Artist boxes as chips under each field, so a noisy imported title can be narrowed to one word with a click instead of retyping.
+- The lyrics editor's LRCLIB tab lists the words of the Track and Artist boxes as chips under each field, so a noisy imported title can be narrowed to one word with a click instead of retyping. Punctuation-only words such as separators are left out.
 
 ### Improvements
 

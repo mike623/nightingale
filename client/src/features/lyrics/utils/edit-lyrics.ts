@@ -158,6 +158,9 @@ export function shiftLrcTimestamps(text: string, deltaSeconds: number): string {
   return rewrite(WORD_TS_PARTS, '<', '>', rewrite(LINE_TS_PARTS, '[', ']', text));
 }
 
+/** A separator such as `-`, `|`, or `•` is no use as a search term on its own. */
+const hasSearchableText = (word: string): boolean => /[\p{L}\p{N}]/u.test(word);
+
 /**
  * Words of an LRCLIB search field, offered as one-click replacements. A
  * derived title such as a raw YouTube video name usually carries the real
@@ -165,6 +168,6 @@ export function shiftLrcTimestamps(text: string, deltaSeconds: number): string {
  * A single-word value has nothing to narrow down.
  */
 export function searchWordChips(value: string): string[] {
-  const words = Array.from(new Set(value.split(/\s+/).filter((word) => word.length > 0)));
+  const words = Array.from(new Set(value.split(/\s+/).filter(hasSearchableText)));
   return words.length > 1 ? words : [];
 }
