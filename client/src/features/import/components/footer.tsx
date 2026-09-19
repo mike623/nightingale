@@ -15,7 +15,9 @@ type ImportFooterProps = {
   url: string;
   probed: { done: number; total: number } | null;
   selectedCount: number;
+  failedCount: number;
   onFetch: () => void;
+  onRetryFailed: () => void;
   onNewImport: () => void;
   onImport: () => void;
   onBack: () => void;
@@ -90,7 +92,22 @@ export const ImportFooter = (props: ImportFooterProps) => {
         />
       )}
       {/* The finished run holds the view; this is the way back to the form. */}
-      {mode === 'new-import' && <Button onClick={props.onNewImport}>New import</Button>}
+      {mode === 'new-import' && (
+        <>
+          {props.failedCount > 0 && (
+            <Button onClick={props.onRetryFailed} disabled={props.busy}>
+              {props.busy && <Loader2Icon className="size-4 animate-spin" />}
+              Retry {props.failedCount} failed
+            </Button>
+          )}
+          <Button
+            variant={props.failedCount > 0 ? 'secondary' : 'default'}
+            onClick={props.onNewImport}
+          >
+            New import
+          </Button>
+        </>
+      )}
       {mode === 'preview' && (
         <PreviewActions
           busy={props.busy}

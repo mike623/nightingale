@@ -244,6 +244,28 @@ export const ImportPage = () => {
     }
   };
 
+  /**
+   * Run the finished import again. It re-submits the whole batch rather than
+   * only the failures: every entry already on disk is skipped by the manifest
+   * delta without downloading, so the failures are what actually run — and a
+   * playlist still sees its full membership, which is what its `.m3u` is
+   * rewritten from.
+   */
+  const retryFailed = async () => {
+    if (!runningPreview || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      beginImport(runningPreview);
+      await startImport(runningPreview);
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const editSingle = (patch: Partial<{ title: string; artist: string }>) =>
     setPreview((p) =>
       p && !p.isPlaylist ? { ...p, entries: [{ ...p.entries[0], ...patch }] } : p,
@@ -318,7 +340,9 @@ export const ImportPage = () => {
           url={url}
           probed={probed}
           selectedCount={selectedCount}
+          failedCount={report?.failed.length ?? 0}
           onFetch={() => void fetchPreview()}
+          onRetryFailed={() => void retryFailed()}
           onNewImport={clearImport}
           onImport={() => void doImport()}
           onBack={() => setPreview(null)}
