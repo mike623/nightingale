@@ -15,7 +15,7 @@ below.
 
 ### Features
 
-- A phone on the same network can now control playback. Turn on Remote control in Settings → Playback and scan the QR code shown there: the phone opens a touch page with transport, guide-vocals volume, lyrics, background, microphone, and skip intro/outro. The phone sends the same commands the keyboard shortcuts do, so both surfaces behave identically. One phone holds control at a time and another can take it over; audio never leaves the host screen. Remote control is off by default, and on the desktop app nothing listens on the network until it is switched on — anyone who can reach the address can take control, so it should stay off on untrusted networks.
+- A phone on the same network can now control playback. Turn on Remote control in Settings → Playback and scan the QR code shown there: the phone opens a touch page with transport, guide-vocals volume, lyrics, background, microphone, and skip intro/outro. The phone sends the same commands the keyboard shortcuts do, so both surfaces behave identically. One phone holds control at a time and another can take it over; audio never leaves the host screen. Remote control is off by default, and on the desktop app nothing listens on the network until it is switched on and the port is released again when it is switched off — anyone who can reach the address can take control, so it should stay off on untrusted networks.
 
 - The playback bar has a Restart button beside pause and next, which sends the song back to its start without changing whether it is playing.
 - The playback pause overlay now offers Edit Lyrics, opening the lyrics editor for the playing song without leaving playback.

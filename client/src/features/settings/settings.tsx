@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 
 import { setFullScreen, isFullScreen as tauriIsFullScreen } from '@/bridge/fullScreen';
 import { clampPlaybackScale } from '@/features/playback/lib/display-scale';
@@ -9,6 +10,7 @@ import {
   SEMITONE_TOLERANCE,
 } from '@/features/playback/lib/pitch/constants';
 import { RemoteQr } from '@/features/remote/components/remote-qr';
+import { useReleaseRemoteHost } from '@/features/remote/queries/use-remote-share-url';
 import {
   ALIGN_BACKENDS,
   ASR_ENGINES,
@@ -125,6 +127,7 @@ export const SettingsPage = () => {
   const navigate = useNavigate();
   const { data: config } = useConfig();
   const { mutate } = useConfigMutation();
+  const releaseRemoteHost = useReleaseRemoteHost();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<SettingsTab>('general');
@@ -433,7 +436,18 @@ export const SettingsPage = () => {
                     value={playback.remoteControl}
                     segment={NAV.playback.remoteControl}
                     getFocusClassName={getFocusClassName}
-                    onChange={(remote_control) => mutate({ remote_control })}
+                    onChange={(remote_control) => {
+                      mutate({ remote_control });
+                      if (!remote_control) {
+                        void releaseRemoteHost().catch((error: unknown) => {
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : 'Remote control could not be stopped.',
+                          );
+                        });
+                      }
+                    }}
                   />
                   {playback.remoteControl && <RemoteQr className="mt-3" />}
                 </Field>
