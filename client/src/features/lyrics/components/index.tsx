@@ -15,8 +15,10 @@ import { useLrclibCandidates } from '@/features/lyrics/queries/use-lyrics';
 import {
   detectLrcLevel,
   isEditLyricsDialogMode,
+  shiftLrcTimestamps,
   stripLrcToPlainLines,
 } from '@/features/lyrics/utils/edit-lyrics';
+import { SHIFT_SLOTS, shiftStepAt } from '@/features/lyrics/utils/lrc-shift';
 import { lyricsifySearchUrl } from '@/features/lyrics/utils/lyricsify';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
@@ -34,6 +36,7 @@ import type { Song } from '@/types/Song';
 import { CarouselNav } from './carousel-nav';
 import { EditLyricsFooter } from './edit-lyrics-footer';
 import { LrcOptions, type TimingChoice } from './lrc-options';
+import { LrcShift } from './lrc-shift';
 import { LrclibMatches } from './lrclib-matches';
 import { LRCLIB_SEARCH_SLOTS, LrclibSearch } from './lrclib-search';
 import { LyricsEditor } from './lyrics-editor';
@@ -80,6 +83,7 @@ const navigationState = (input: NavigationStateInput) => ({
   // candidate buttons, so their slots have to leave the ring as well.
   hasCandidates: input.candidateCount > 0 && !input.matchesLoading,
   useSlots: input.currentHasLrc ? 2 : 1,
+  shiftNav: input.hasLrc && !input.saving,
   timingNav: input.hasLrc && !input.saving,
   audioNav: input.useProvidedTiming && !input.stemsSeparated && !input.saving,
 });
@@ -198,6 +202,9 @@ type NavLayout = {
   searchSegment: number | null;
   // "Open in browser" on the Lyricsify pane.
   webSegment: number | null;
+  // Timestamp offset buttons on the edit pane, present only while the text
+  // carries LRC timing.
+  shiftSegment: number | null;
   // Timing / audio radio rows (each 2 slots) on the edit pane, present only
   // when their controls are enabled.
   timingSegment: number | null;
@@ -209,6 +216,7 @@ type NavLayout = {
 type NavLayoutInput = {
   activeTab: EditLyricsTab;
   hasCandidates: boolean;
+  shiftNav: boolean;
   // Number of action buttons on the current LRCLIB candidate: 2 when it has
   // synced lyrics ("Use LRC" + "Use as plain text"), otherwise 1.
   useSlots: number;
@@ -220,6 +228,7 @@ function navLayout({
   activeTab,
   hasCandidates,
   useSlots,
+  shiftNav,
   timingNav,
   audioNav,
 }: NavLayoutInput): NavLayout {
@@ -244,6 +253,9 @@ function navLayout({
     segments.push({ key: 'web', width: 1 });
   } else {
     segments.push({ key: 'editor', width: 1 });
+    if (shiftNav) {
+      segments.push({ key: 'shift', width: SHIFT_SLOTS });
+    }
     if (timingNav) {
       segments.push({ key: 'timing', width: 2 });
     }
@@ -266,6 +278,7 @@ function navLayout({
     searchSegment: indexOf('search'),
     webSegment: indexOf('web'),
     editorSegment: indexOf('editor'),
+    shiftSegment: indexOf('shift'),
     timingSegment: indexOf('timing'),
     audioSegment: indexOf('audio'),
     useThisSegment: indexOf('use'),
@@ -580,7 +593,15 @@ export const EditLyricsDialog = () => {
         return true;
       };
 
+      // Shift / timing / audio rows all sit under the editor on the edit pane.
       const handleOption = (): boolean => {
+        if (layout.shiftSegment !== null && segment === layout.shiftSegment) {
+          const step = shiftStepAt(slot);
+          if (step !== undefined) {
+            editor.setText(shiftLrcTimestamps(editor.text, step));
+          }
+          return true;
+        }
         if (layout.timingSegment !== null && segment === layout.timingSegment) {
           setTimingChoice(slot === 0 ? 'provided' : 'align');
           return true;
@@ -662,15 +683,14 @@ export const EditLyricsDialog = () => {
     }
   };
 
-  const focusedSlotIn = (segment: number | null): number | null => {
+  const focusedSlotIn = (segment: number | null, slots = 2): number | null => {
     if (segment === null) {
       return null;
     }
-    if (isFocused(segment, 0)) {
-      return 0;
-    }
-    if (isFocused(segment, 1)) {
-      return 1;
+    for (let slot = 0; slot < slots; slot++) {
+      if (isFocused(segment, slot)) {
+        return slot;
+      }
     }
     return null;
   };
@@ -719,6 +739,18 @@ export const EditLyricsDialog = () => {
         isDirty={editor.isDirty}
         focused={editorFocused}
       />
+      {hasLrc && (
+        <LrcShift
+          onShift={(seconds) => editor.setText(shiftLrcTimestamps(editor.text, seconds))}
+          disabled={saving}
+          focusedSlot={focusedSlotIn(layout.shiftSegment, SHIFT_SLOTS)}
+          onFocusSlot={(slot) => {
+            if (layout.shiftSegment !== null) {
+              focusSegment(layout.shiftSegment, slot);
+            }
+          }}
+        />
+      )}
       <LrcOptions
         level={lrcLevel}
         stemsSeparated={stemsSeparated}
