@@ -8,6 +8,7 @@ import { ImportPage } from '@/features/import/import';
 import { MenuIndex, MenuLayout } from '@/features/menu/menu';
 import { MenuFocusProvider } from '@/features/menu/providers/menu-focus-context';
 import { Playback } from '@/features/playback/playback';
+import { RemotePage } from '@/features/remote/remote';
 import { SettingsPage } from '@/features/settings/settings';
 import { useUpdate } from '@/features/updates/queries/use-update';
 import { Toaster } from '@/shared/components/ui/sonner';
@@ -37,6 +38,7 @@ const InnerWrapper = () => (
             <Route path="import" element={<ImportPage />} />
           </Route>
           <Route path="/playback" element={<Playback />} />
+          <Route path="/remote" element={<RemotePage />} />
         </Routes>
       </BrowserRouter>
     </MenuFocusProvider>

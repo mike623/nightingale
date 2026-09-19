@@ -15,6 +15,8 @@ below.
 
 ### Features
 
+- A phone on the same network can now control playback. Turn on Remote control in Settings → Playback and scan the QR code shown there: the phone opens a touch page with transport, guide-vocals volume, lyrics, background, microphone, and skip intro/outro. The phone sends the same commands the keyboard shortcuts do, so both surfaces behave identically. One phone holds control at a time and another can take it over; audio never leaves the host screen. Remote control is off by default, and on the desktop app nothing listens on the network until it is switched on — anyone who can reach the address can take control, so it should stay off on untrusted networks.
+
 - The playback bar has a Restart button beside pause and next, which sends the song back to its start without changing whether it is playing.
 - The playback pause overlay now offers Edit Lyrics, opening the lyrics editor for the playing song without leaving playback.
 - The lyrics editor now opens an analyzed song on its transcript rendered as Enhanced LRC, so the timing a song plays with is visible and editable instead of being replaced by plain lines. Songs with no transcript yet still open on their saved lyrics.
@@ -29,6 +31,7 @@ below.
 
 ### Improvements
 
+- Next Song and auto-play now favour songs the room has sung least instead of drawing uniformly, so an evening works through the library rather than circling the same few tracks. Every song keeps a chance of being drawn; a song nobody has sung is twice as likely as one sung once. A run counts as sung only when it scored, and a skip counts half as much as a sing. The history is shared by everyone rather than kept per profile, and it survives a library rescan.
 - Desktop updates are now signed with this fork's own key and fetched from this fork's releases.
 - Pushes to `dev-port` now publish a signed release the desktop updater picks up, versioned `<next-minor>-mike.<run>` so each dev build supersedes the last without outranking a real release of that version.
 - YouTube imports now prefer H.264 video and AAC audio, so downloaded videos play in the desktop webview without conversion.

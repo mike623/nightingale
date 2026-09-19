@@ -8,6 +8,7 @@ import {
   MIN_SEMITONE_TOLERANCE,
   SEMITONE_TOLERANCE,
 } from '@/features/playback/lib/pitch/constants';
+import { RemoteQr } from '@/features/remote/components/remote-qr';
 import {
   ALIGN_BACKENDS,
   ASR_ENGINES,
@@ -82,6 +83,7 @@ const playbackSettings = (config: AppConfig | undefined) => ({
   pitchGraphScale: clampPlaybackScale(config?.pitch_graph_scale),
   scoringTolerance: clampScoringTolerance(config?.pitch_tolerance_semitones),
   autoPlayNext: config?.auto_play_next === true,
+  remoteControl: config?.remote_control === true,
 });
 
 const pendingValue = <T,>(input: T | null, saved: T): T => input ?? saved;
@@ -419,6 +421,21 @@ export const SettingsPage = () => {
                     getFocusClassName={getFocusClassName}
                     onChange={(auto_play_next) => mutate({ auto_play_next })}
                   />
+                </Field>
+
+                <Field>
+                  <Label>Remote control</Label>
+                  <Hint>
+                    Let a phone on this network control playback. Anyone who can reach the address
+                    below can take control, so leave it off on a network you do not trust
+                  </Hint>
+                  <OnOffButtonGroup
+                    value={playback.remoteControl}
+                    segment={NAV.playback.remoteControl}
+                    getFocusClassName={getFocusClassName}
+                    onChange={(remote_control) => mutate({ remote_control })}
+                  />
+                  {playback.remoteControl && <RemoteQr className="mt-3" />}
                 </Field>
               </FieldGroup>
             </div>

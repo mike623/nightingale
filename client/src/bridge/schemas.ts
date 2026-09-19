@@ -81,6 +81,9 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   analysis_workers: nullableNumber,
   pitch_tolerance_semitones: nullableNumber,
   auto_play_next: nullableBoolean,
+  // Non-nullable in the core config: an older stored config without the key
+  // deserializes to `false` rather than to a missing value.
+  remote_control: z.boolean().default(false),
   song_list_view: nullableString,
   song_list_sort: z
     .array(

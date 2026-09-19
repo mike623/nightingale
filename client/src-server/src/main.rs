@@ -1,7 +1,6 @@
 mod bootstrap;
 mod commands;
 mod events;
-mod jukebox;
 mod media;
 mod state;
 mod static_files;
@@ -71,7 +70,25 @@ async fn main() -> Result<(), String> {
         pin_folder_library(library);
     }
 
-    let state = AppState::new(data.is_some(), library.is_some());
+    let listener = match tokio::net::TcpListener::bind(args.bind).await {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::error!("failed to bind {}: {e}", args.bind);
+            std::process::exit(1);
+        }
+    };
+
+    // Bind first: with `:0` the configured port is not the one phones must
+    // dial, and the bootstrap response carries that URL.
+    let bind_port = match listener.local_addr() {
+        Ok(addr) => addr.port(),
+        Err(e) => {
+            tracing::error!("bound listener has no local address: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let state = AppState::new(data.is_some(), library.is_some(), bind_port);
 
     let app = Router::new()
         .route("/api/bootstrap", get(bootstrap::handle))
@@ -81,14 +98,6 @@ async fn main() -> Result<(), String> {
         .route("/ws", any(ws::handle_upgrade))
         .fallback(static_files::handle)
         .with_state(state.clone());
-
-    let listener = match tokio::net::TcpListener::bind(args.bind).await {
-        Ok(l) => l,
-        Err(e) => {
-            tracing::error!("failed to bind {}: {e}", args.bind);
-            std::process::exit(1);
-        }
-    };
 
     tracing::info!(addr = %args.bind, "Nightingale self-hosted server listening");
 

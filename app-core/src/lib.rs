@@ -9,6 +9,7 @@ mod library_model;
 mod lrc;
 mod lyrics;
 pub mod media_server;
+mod play_history;
 mod playback;
 mod playback_queue;
 mod playback_session;
@@ -48,6 +49,7 @@ pub use lyrics::{
     save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,
 };
 pub use media_server::MediaEndpoint;
+pub use play_history::{pick_next_song, record_song_play};
 pub use playback::{
     AudioPaths, PixabayVideoDownloaded, ShiftDone, ShiftResult, StemsReady,
     download_pixabay_videos, ensure_mp3_stems, ensure_mp3_stems_ready_payload,

@@ -17,6 +17,8 @@ import { PitchGraph } from '@/features/playback/components/pitch-graph';
 import { PlaybackBar } from '@/features/playback/components/playback-bar';
 import { PlaybackHud } from '@/features/playback/components/playback-hud';
 import { usePlaybackInput, usePlaybackNext, usePlaybackResult } from '@/features/playback/hooks';
+import { usePlaybackHistory } from '@/features/playback/hooks/use-playback-history';
+import { useRemoteHost } from '@/features/playback/hooks/use-remote-host';
 import {
   PlaybackProviders,
   usePlaybackMicState,
@@ -62,6 +64,8 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
   const openLyricsEditor = () => setMode({ mode: 'edit-lyrics', song });
 
   usePlaybackInput(config, playNext);
+  usePlaybackHistory(song.file_hash);
+  useRemoteHost(song, config, playNext);
   const result = usePlaybackResult(song, {
     queuePlayback,
     autoPlayNext: config?.auto_play_next === true,

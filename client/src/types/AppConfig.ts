@@ -44,4 +44,9 @@ pitch_tolerance_semitones: number | null,
  * library instead of returning to the menu. Default (`None`/false) keeps
  * the exit-to-menu behaviour.
  */
-auto_play_next: boolean | null, song_list_view: string | null, song_list_sort: Array<SongSort> | null, language_overrides: { [key in string]: string } | null, };
+auto_play_next: boolean | null,
+/**
+ * Opt-in for the LAN remote-control listener. Defaults to false, and the
+ * listener still only starts when the UI asks for it.
+ */
+remote_control: boolean, song_list_view: string | null, song_list_sort: Array<SongSort> | null, language_overrides: { [key in string]: string } | null, };

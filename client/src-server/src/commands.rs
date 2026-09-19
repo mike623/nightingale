@@ -324,6 +324,30 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
                 .map_err(ApiError::bad_request)?;
             Ok(serde_json::to_value(song).map_err(serde_err)?)
         }
+        "record_song_play" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                file_hash: String,
+                sung: bool,
+            }
+            let args: Args = deserialize(payload)?;
+            app_core::record_song_play(&args.file_hash, args.sung)
+                .map_err(ApiError::bad_request)?;
+            Ok(Value::Null)
+        }
+        "pick_next_song" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                #[serde(default)]
+                exclude_file_hash: Option<String>,
+            }
+            let args: Args = deserialize(payload)?;
+            let song = app_core::pick_next_song(args.exclude_file_hash.as_deref())
+                .map_err(|e| ApiError::internal(e.to_string()))?;
+            Ok(serde_json::to_value(song).map_err(serde_err)?)
+        }
         "load_songs_meta" => Ok(serde_json::to_value(SongsStore::load_meta()).map_err(serde_err)?),
         "load_analysis_queue" => {
             Ok(serde_json::to_value(AnalysisQueue::load()).map_err(serde_err)?)

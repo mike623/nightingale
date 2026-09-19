@@ -15,6 +15,9 @@ pub(crate) struct Bootstrap {
     /// The library folder is fixed by the operator (via
     /// `NIGHTINGALE_LIBRARY_PATH`), so the UI hides the folder-select action.
     library_pinned: bool,
+    /// Page a phone on the same network opens to control playback. `None`
+    /// when this host has no routable LAN address.
+    remote_url: Option<String>,
 }
 
 /// Replaces the `initialization_script` Tauri injects on window creation:
@@ -28,5 +31,6 @@ pub(crate) async fn handle(State(state): State<AppState>) -> Json<Bootstrap> {
         songs_meta,
         data_path_pinned: state.data_path_pinned,
         library_pinned: state.library_pinned,
+        remote_url: remote::lan_url(state.bind_port),
     })
 }

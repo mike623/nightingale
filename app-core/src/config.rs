@@ -228,6 +228,10 @@ pub struct AppConfig {
     /// library instead of returning to the menu. Default (`None`/false) keeps
     /// the exit-to-menu behaviour.
     pub auto_play_next: Option<bool>,
+    /// Opt-in for the LAN remote-control listener. Defaults to false, and the
+    /// listener still only starts when the UI asks for it.
+    #[serde(default)]
+    pub remote_control: bool,
     pub song_list_view: Option<String>,
     #[serde(default, deserialize_with = "deserialize_song_list_sort")]
     pub song_list_sort: Option<Vec<SongSort>>,
@@ -292,6 +296,7 @@ impl Default for AppConfig {
             analysis_workers: None,
             pitch_tolerance_semitones: None,
             auto_play_next: None,
+            remote_control: false,
             song_list_view: None,
             song_list_sort: None,
             language_overrides: None,

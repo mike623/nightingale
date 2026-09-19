@@ -12,6 +12,7 @@ dependencies = [
  "dirs",
  "dotenvy",
  "once_cell",
+ "remote",
  "serde",
  "serde_json",
  "tauri",
@@ -22,6 +23,7 @@ dependencies = [
  "tauri-plugin-os",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "ts-rs",
@@ -4240,6 +4242,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
+name = "remote"
+version = "1.2.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "mime_guess",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "reqwest"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4825,6 +4841,7 @@ dependencies = [
  "mime_guess",
  "once_cell",
  "percent-encoding",
+ "remote",
  "rust-embed",
  "serde",
  "serde_json",

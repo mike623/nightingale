@@ -24,6 +24,7 @@ use crate::cache::nightingale_dir;
 mod analysis_queue;
 mod connection;
 mod migrations;
+mod play_stats;
 mod playlists;
 mod queries;
 mod rebase;
@@ -35,6 +36,7 @@ pub(crate) use analysis_queue::{
     analysis_queue_save_rows, analysis_queue_upsert_row,
 };
 pub(crate) use migrations::rewrite_legacy_jellyfin_paths;
+pub(crate) use play_stats::{PlayOutcome, pick_weighted_analyzed_song, record_play};
 pub(crate) use playlists::{PlaylistDefinition, PlaylistSongKeyKind, replace_all_playlists};
 pub(crate) use queries::{
     iter_file_hashes_filtered_analysis_busy, iter_file_hashes_filtered_full_reanalyzable,

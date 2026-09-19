@@ -36,6 +36,10 @@ _Avoid_: transcription (as a synonym — transcription is one way to obtain timi
 The LRCLIB search analysis performs to find **line-level** synced lyrics for a Song. Opt-in (`lyrics_lookup`, default off) — by default analysis only separates stems and detects key, leaving the Song lyric-less until lyrics are provided by hand. See docs/adr/0003.
 _Avoid_: lyrics fetch, LRCLIB sync
 
+**Remote**:
+A phone on the same network controlling the running Song, opened by scanning a QR code shown on the host screen. The phone renders a snapshot the host publishes and sends back commands — the same commands the keyboard shortcuts fire, never a parallel implementation. Audio never leaves the host. One phone holds control at a time; the others watch and can take it over explicitly. On desktop the listener is opt-in (`remote_control`, default off); self-hosted serves it from the existing port. Unauthenticated by decision — see docs/adr/0005.
+_Avoid_: jukebox, companion app, second screen (the phone controls the host, it does not play anything)
+
 **Analysis worker**:
 One thread draining the analysis queue, paired with its own analyzer server process. Up to two run at once (`analysis_workers`, default 2), so two Songs analyze in parallel.
 _Avoid_: analysis thread, job runner

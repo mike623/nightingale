@@ -5,10 +5,12 @@ mod import;
 mod logging;
 mod lyrics;
 mod microphones;
+mod play_history;
 mod playback;
 mod playback_queue;
 mod playback_session;
 mod profile;
+mod remote_control;
 mod scanner;
 mod vendor;
 
@@ -29,6 +31,7 @@ use lyrics::{
     search_lrclib_terms,
 };
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
+use play_history::{pick_next_song, record_song_play};
 use playback::{
     ensure_mp3_stems, ensure_playable_source_video, fetch_pixabay_videos, get_audio_paths,
     load_transcript,
@@ -39,6 +42,7 @@ use playback_queue::{
 };
 use playback_session::{load_playback_session, save_playback_session};
 use profile::{add_score, create_profile, delete_profile, load_profiles, switch_profile};
+use remote_control::{remote_start, remote_status, remote_stop, RemoteControl};
 use scanner::{
     clear_library_source, jellyfin_login, jellyfin_ping, load_analysis_queue,
     load_library_menu_items, load_songs, load_songs_by_hashes, load_songs_meta, navidrome_login,
@@ -97,6 +101,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(PlaybackQueue::default())
         .manage(PlaybackSessionStore::default())
+        .manage(RemoteControl::default())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -131,6 +136,9 @@ pub fn run() {
             // Playback session
             load_playback_session,
             save_playback_session,
+            // Play history
+            pick_next_song,
+            record_song_play,
             // Scanner
             trigger_scan,
             rename_song,
@@ -184,6 +192,10 @@ pub fn run() {
             list_microphones,
             start_mic_capture,
             stop_mic_capture,
+            // Remote control
+            remote_start,
+            remote_stop,
+            remote_status,
             // Vendor
             is_ready,
             trigger_setup
