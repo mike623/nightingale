@@ -25,6 +25,7 @@ below.
 ### Improvements
 
 - Desktop updates are now signed with this fork's own key and fetched from this fork's releases.
+- Pushes to `dev-port` now publish a signed release the desktop updater picks up, versioned `<next-minor>-mike.<run>` so each dev build supersedes the last without outranking a real release of that version.
 - YouTube imports now prefer H.264 video and AAC audio, so downloaded videos play in the desktop webview without conversion.
 - Added `scripts/repair-videos.sh`, which converts already-imported videos the webview cannot decode into cached playable copies. Source files, song identity, and existing analysis are left untouched.
 
