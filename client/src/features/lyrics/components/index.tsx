@@ -3,7 +3,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { searchLrclibTerms } from '@/bridge/lyrics';
-import { openUrl } from '@/bridge/opener';
+import { openBrowserWindow, openUrl } from '@/bridge/opener';
 import { useLyricsEditor } from '@/features/lyrics/hooks/use-lyrics-editor';
 import { useSaveLyricsMutation } from '@/features/lyrics/mutations/use-save-lyrics-mutation';
 import {
@@ -532,6 +532,9 @@ export const EditLyricsDialog = () => {
 
   // The Lyricsify tab opens straight on this song's search results.
   const lyricsifyUrl = lyricsifySearchUrl(searchTrack, searchArtist);
+  const openLyricsify = () => {
+    void openBrowserWindow('lyricsify', lyricsifyUrl);
+  };
 
   const currentCandidate = selectedCandidate(candidates, carouselIndex);
   const nav = navigationState({
@@ -589,7 +592,7 @@ export const EditLyricsDialog = () => {
         if (layout.webSegment === null || segment !== layout.webSegment) {
           return false;
         }
-        void openUrl(lyricsifyUrl);
+        openLyricsify();
         return true;
       };
 
@@ -722,7 +725,7 @@ export const EditLyricsDialog = () => {
 
   const webPane = (
     <LyricsifyWeb
-      url={lyricsifyUrl}
+      onOpen={openLyricsify}
       focused={layout.webSegment !== null && isFocused(layout.webSegment)}
     />
   );
