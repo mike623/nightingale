@@ -13,6 +13,7 @@ import {
   usePlaybackTransportState,
 } from '@/features/playback/providers';
 import { computeLyricGapCaption, findCurrentSegment } from '@/features/playback/utils/lyrics-gap';
+import { transcriptLabel } from '@/features/playback/utils/transcript-label';
 import type { AppConfig } from '@/types/AppConfig';
 
 import { ABOVE_PLAYBACK_BAR_CLASS } from './playback-bar';
@@ -93,6 +94,7 @@ function TouchButton({
 }
 
 function SettingsInfo({
+  lyrics,
   guideVolume,
   guideAvailable,
   micUserEnabled,
@@ -102,6 +104,7 @@ function SettingsInfo({
   videoFlavor,
   showShortcuts,
 }: {
+  lyrics: string;
   guideVolume: number;
   guideAvailable: boolean;
   micUserEnabled: boolean;
@@ -113,6 +116,7 @@ function SettingsInfo({
 }) {
   return (
     <div className="flex flex-col items-end">
+      <HintText>Lyrics: {lyrics}</HintText>
       {guideAvailable && (
         <HintText>
           {showShortcuts
@@ -155,6 +159,7 @@ function TouchControls({
   const { handleToggleMic, handleCycleMic, handleToggleMicMonitor } = usePlaybackMicActions();
   const { themeIndex, videoFlavor } = usePlaybackThemeState();
   const { cycleTheme, cycleFlavor } = usePlaybackThemeActions();
+  const { segments, transcriptSource } = usePlaybackTranscriptState();
   const persistConfig = usePlaybackConfigPersist(config);
 
   const setPersistedGuideVolume = useCallback(
@@ -176,6 +181,7 @@ function TouchControls({
     <div className={`flex w-[min(18rem,80vw)] items-end gap-2 ${touchLayoutClass}`}>
       <div className="sm:hidden">
         <SettingsInfo
+          lyrics={transcriptLabel(transcriptSource, segments)}
           guideVolume={guideVolume}
           guideAvailable={guideAvailable}
           micUserEnabled={micUserEnabled}
@@ -410,6 +416,7 @@ function PlaybackHudImpl({
           </div>
           <div className="hidden sm:block">
             <SettingsInfo
+              lyrics={transcriptLabel(transcriptSource, segments)}
               guideVolume={guideVolume}
               guideAvailable={guideAvailable}
               micUserEnabled={micUserEnabled}
