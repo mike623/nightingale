@@ -7,6 +7,8 @@
  */
 
 import { isTauri } from '@/bridge/runtime';
+import { EditLyricsDialog, isEditLyricsDialogMode } from '@/features/lyrics/components';
+import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { Background } from '@/features/playback/components/background';
 import { ResultDialog } from '@/features/playback/components/dialogs/result';
 import { LyricsDisplay } from '@/features/playback/components/lyrics-display';
@@ -55,6 +57,10 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
 
   const playNext = usePlaybackNext(song.file_hash);
 
+  const { mode, setMode } = useDialog();
+  const editingLyrics = isEditLyricsDialogMode(mode);
+  const openLyricsEditor = () => setMode({ mode: 'edit-lyrics', song });
+
   usePlaybackInput(config, playNext);
   const result = usePlaybackResult(song, {
     queuePlayback,
@@ -87,12 +93,15 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
       )}
 
       <PauseOverlay
-        open={paused && !result.open}
+        open={paused && !result.open && !editingLyrics}
         exitLabel={sessionPlayback ? 'Exit Playback' : 'Exit to Menu'}
         onContinue={handleContinue}
         onExit={handleExit}
         onNext={playNext}
+        onEditLyrics={openLyricsEditor}
       />
+
+      <EditLyricsDialog />
 
       <ResultDialog
         open={result.open}

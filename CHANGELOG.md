@@ -13,6 +13,10 @@ below.
 
 ## [Unreleased]
 
+### Features
+
+- The playback pause overlay now offers Edit Lyrics, opening the lyrics editor for the playing song without leaving playback.
+
 ### Improvements
 
 - Desktop updates are now signed with this fork's own key and fetched from this fork's releases.

@@ -23,6 +23,7 @@ type PauseOverlayProps = {
   onExit: () => void;
   onContinue: () => void;
   onNext: () => void;
+  onEditLyrics: () => void;
 };
 
 export const PauseOverlay = ({
@@ -31,6 +32,7 @@ export const PauseOverlay = ({
   onExit,
   onContinue,
   onNext,
+  onEditLyrics,
 }: PauseOverlayProps) => {
   const onConfirm = useCallback(
     (index: number) => {
@@ -38,16 +40,18 @@ export const PauseOverlay = ({
         onContinue();
       } else if (index === 1) {
         onNext();
+      } else if (index === 2) {
+        onEditLyrics();
       } else {
         onExit();
       }
     },
-    [onContinue, onExit, onNext],
+    [onContinue, onEditLyrics, onExit, onNext],
   );
 
   const { focusedIndex } = useDialogNav({
     open,
-    itemCount: 3,
+    itemCount: 4,
     onConfirm,
     onBack: onContinue,
   });
@@ -73,10 +77,17 @@ export const PauseOverlay = ({
           >
             Next Song
           </Button>
+          <Button
+            variant="secondary"
+            onClick={onEditLyrics}
+            className={cn(NO_FOCUS_RING, open && focusedIndex === 2 && RING)}
+          >
+            Edit Lyrics
+          </Button>
           <AlertDialogAction
             variant="destructive"
             onClick={onExit}
-            className={cn(NO_FOCUS_RING, open && focusedIndex === 2 && RING)}
+            className={cn(NO_FOCUS_RING, open && focusedIndex === 3 && RING)}
           >
             {exitLabel}
           </AlertDialogAction>

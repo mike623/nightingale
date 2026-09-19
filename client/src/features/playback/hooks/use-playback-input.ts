@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 
+import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useNavInput } from '@/features/menu/hooks/use-nav-input';
 import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
 import { usePlaybackConfigPersist } from '@/features/playback/hooks/use-playback-config-persist';
@@ -110,12 +111,23 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
 
   const persistConfig = usePlaybackConfigPersist(config);
 
+  // A dialog opened from the pause overlay (lyrics editor) owns input while it
+  // is up: its own controls handle confirm/back, and typing must not reach the
+  // playback shortcuts.
+  const { mode } = useDialog();
+  const dialogOpen = mode !== null;
+
   const pausedRef = useLatestRef(paused);
+  const dialogOpenRef = useLatestRef(dialogOpen);
 
   // Gamepad: nav.back = pause/resume, nav.confirm = skip intro/outro
   useNavInput(
     useCallback(
       (action) => {
+        if (dialogOpenRef.current) {
+          return;
+        }
+
         if (action.back) {
           if (pausedRef.current) {
             handleContinue();
@@ -152,6 +164,7 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
         introSkipLeadSec,
         handleSkipIntro,
         handleSkipOutro,
+        dialogOpenRef,
       ],
     ),
   );
@@ -175,11 +188,17 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
       handleToggleMicMonitor,
       toggleLyricsHidden,
     };
-    const onKeyDown = (event: KeyboardEvent) => handleKeyboardShortcut(event, actions);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (dialogOpen) {
+        return;
+      }
+      handleKeyboardShortcut(event, actions);
+    };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
+    dialogOpen,
     paused,
     isFinished,
     skipOutroPending,
