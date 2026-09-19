@@ -1,5 +1,5 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { openUrl as tauriOpenUrl } from '@tauri-apps/plugin-opener';
+import { openUrl as tauriOpenUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 
 import { isTauri } from './runtime';
 
@@ -13,6 +13,18 @@ export const openUrl = async (url: string): Promise<void> => {
   }
 
   window.open(url, '_blank', 'noopener,noreferrer');
+};
+
+/**
+ * Opens the folder holding `path` in the system file manager, with the file
+ * itself selected. Desktop only: the browser build has no filesystem to show.
+ */
+export const revealPath = async (path: string): Promise<void> => {
+  if (!isTauri) {
+    return;
+  }
+
+  await revealItemInDir(path);
 };
 
 /**

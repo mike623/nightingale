@@ -34,6 +34,28 @@ export const UPDATE_CHANNEL = updateChannel();
 export const UPDATES_SUPPORTED: boolean = UPDATE_CHANNEL === 'auto';
 
 /**
+ * What this system calls the program that shows a file in its folder, for
+ * labelling the action that opens one. Same `!isTauri` ordering rule as above.
+ */
+const fileManagerName = (): string => {
+  if (!isTauri) {
+    return 'the file manager';
+  }
+
+  const os = platform();
+  if (os === 'macos') {
+    return 'Finder';
+  }
+  if (os === 'windows') {
+    return 'File Explorer';
+  }
+
+  return 'the file manager';
+};
+
+export const FILE_MANAGER_NAME = fileManagerName();
+
+/**
  * Version of the running build.
  *
  * Read from the bundle rather than `package.json`, because dev builds take

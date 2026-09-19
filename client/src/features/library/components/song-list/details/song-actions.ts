@@ -1,6 +1,7 @@
 import {
   AlignLeftIcon,
   DownloadIcon,
+  FolderOpenIcon,
   AudioLinesIcon,
   FileX2Icon,
   ImageIcon,
@@ -13,6 +14,7 @@ import {
   YoutubeIcon,
 } from 'lucide-react';
 
+import { FILE_MANAGER_NAME } from '@/bridge/platform';
 import type { Song } from '@/types/Song';
 
 import type { SongStatusInfo } from '../shared/song-status';
@@ -40,6 +42,8 @@ type BuildActionGroupsParams = {
   /** Set only for a song imported from YouTube. Both actions are handles on
    * the video it came from, so they arrive and disappear together. */
   youtube: { onRedownload: () => void; onOpen: () => void } | null;
+  /** Set only where the file is this machine's to show. */
+  onRevealFile: (() => void) | null;
   onEditLyrics: () => void;
   onChangeLanguage: () => void;
   onDeleteSong: () => void;
@@ -57,6 +61,7 @@ export function buildActionGroups({
   supportsAnalysisActions,
   analysis,
   youtube,
+  onRevealFile,
   onEditLyrics,
   onChangeLanguage,
   onDeleteSong,
@@ -214,6 +219,17 @@ export function buildActionGroups({
         title: 'Open on YouTube',
         description: 'Open the video this song was imported from in your browser.',
         onClick: youtube.onOpen,
+      },
+    ]);
+  }
+
+  if (onRevealFile !== null) {
+    groups.push([
+      {
+        icon: FolderOpenIcon,
+        title: `Show in ${FILE_MANAGER_NAME}`,
+        description: 'Open the folder holding this file, with the file selected.',
+        onClick: onRevealFile,
       },
     ]);
   }

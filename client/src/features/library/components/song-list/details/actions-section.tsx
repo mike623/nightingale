@@ -2,7 +2,8 @@ import { TrophyIcon } from 'lucide-react';
 import { Fragment } from 'react';
 import { toast } from 'sonner';
 
-import { openUrl } from '@/bridge/opener';
+import { openUrl, revealPath } from '@/bridge/opener';
+import { isTauri } from '@/bridge/runtime';
 import { youtubeWatchUrl } from '@/features/import/lib/youtube-url';
 import { useAnalysis } from '@/features/library/hooks/use-analysis';
 import { useRedownloadSong } from '@/features/library/hooks/use-redownload-song';
@@ -68,6 +69,16 @@ export const ActionsSection = ({
                 toast.error(error instanceof Error ? error.message : 'Opening the video failed.');
               });
             },
+          }
+        : null,
+    // A remote-origin song's path is a local materialisation of someone
+    // else's file, so there is nothing meaningful to show for it.
+    onRevealFile:
+      isTauri && song.origin.kind === 'local_file'
+        ? () => {
+            void revealPath(song.path).catch((error: unknown) => {
+              toast.error(error instanceof Error ? error.message : 'Opening the folder failed.');
+            });
           }
         : null,
     onEditLyrics: () => setMode({ mode: 'edit-lyrics', song }),
