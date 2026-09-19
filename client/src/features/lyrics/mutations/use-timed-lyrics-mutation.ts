@@ -2,9 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { applyTimedLyrics, clearLyrics, provideLrc } from '@/bridge/lyrics';
-import { ANALYSIS_QUEUE, LYRICS, MENU, SONGS, SONGS_META } from '@/shared/query-keys';
+import { ANALYSIS_QUEUE, LYRICS, MENU, SONGS, SONGS_META, TRANSCRIPT } from '@/shared/query-keys';
 
-const LYRICS_QUERY_KEYS = [LYRICS, MENU, SONGS, SONGS_META, ANALYSIS_QUEUE];
+const LYRICS_QUERY_KEYS = [LYRICS, TRANSCRIPT, MENU, SONGS, SONGS_META, ANALYSIS_QUEUE];
 
 const invalidateLyricsQueries = (queryClient: ReturnType<typeof useQueryClient>) => {
   for (const key of LYRICS_QUERY_KEYS) {

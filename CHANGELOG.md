@@ -29,6 +29,7 @@ below.
 
 ### Fixes
 
+- Saving lyrics while a song is playing now updates the running playback. The transcript was loaded once per song, so new timing only appeared after a restart.
 - A cached playable copy of a video is now used ahead of the original, so an MP4 holding codecs the webview cannot decode no longer plays as a black or silent screen.
 - Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
 - Analysis status sorting now orders ready songs by the transcript source shown in their status badge.

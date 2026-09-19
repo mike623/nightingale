@@ -347,8 +347,13 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
     return null;
   }
 
-  const seg = segments[segIdx];
-  const nextSeg = segIdx + 1 < segments.length ? segments[segIdx + 1] : null;
+  // Saving lyrics mid-song swaps in a new transcript, which can be shorter
+  // than the one the retained index was found in. That renders once before the
+  // layout effect below re-runs and resolves the index against the new
+  // segments, so clamp rather than index out of bounds.
+  const safeIdx = Math.min(segIdx, segments.length - 1);
+  const seg = segments[safeIdx];
+  const nextSeg = safeIdx + 1 < segments.length ? segments[safeIdx + 1] : null;
 
   const segHasReading = seg.words.some(hasReading);
   const nextHasReading = nextSeg?.words.some(hasReading) ?? false;
