@@ -16,7 +16,6 @@ import { useLrclibCandidates } from '@/features/lyrics/queries/use-lyrics';
 import {
   detectLrcLevel,
   isEditLyricsDialogMode,
-  searchWordChips,
   shiftLrcTimestamps,
   stripLrcToPlainLines,
 } from '@/features/lyrics/utils/edit-lyrics';
@@ -32,6 +31,7 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { wordChips } from '@/shared/utils/word-chips';
 import type { LrclibCandidate } from '@/types/LrclibCandidate';
 import type { Song } from '@/types/Song';
 
@@ -432,8 +432,8 @@ export const EditLyricsDialog = () => {
   const [manualLoading, setManualLoading] = useState(false);
   const [searchTrack, setSearchTrack] = useState(() => defaultSearchTerms(song).track);
   const [searchArtist, setSearchArtist] = useState(() => defaultSearchTerms(song).artist);
-  const trackChips = useMemo(() => searchWordChips(searchTrack), [searchTrack]);
-  const artistChips = useMemo(() => searchWordChips(searchArtist), [searchArtist]);
+  const trackChips = useMemo(() => wordChips(searchTrack), [searchTrack]);
+  const artistChips = useMemo(() => wordChips(searchArtist), [searchArtist]);
   const candidates = resolveCandidates(manualResults, candidatesQuery.data);
   const candidateCount = candidates.length;
   const matchesLoading = [candidatesQuery.isLoading, manualLoading].some(Boolean);

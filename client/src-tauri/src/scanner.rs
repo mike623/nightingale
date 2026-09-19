@@ -95,6 +95,15 @@ pub(crate) fn load_songs_by_hashes(file_hashes: Vec<String>) -> Vec<Song> {
 }
 
 #[tauri::command]
+pub(crate) fn rename_song(
+    file_hash: String,
+    title: Option<String>,
+    artist: Option<String>,
+) -> Result<Song, String> {
+    app_core::rename_song(&file_hash, title, artist)
+}
+
+#[tauri::command]
 pub(crate) fn load_songs_meta() -> SongsMeta {
     SongsStore::load_meta()
 }

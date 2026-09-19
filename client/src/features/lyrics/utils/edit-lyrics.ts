@@ -157,28 +157,3 @@ export function shiftLrcTimestamps(text: string, deltaSeconds: number): string {
 
   return rewrite(WORD_TS_PARTS, '<', '>', rewrite(LINE_TS_PARTS, '[', ']', text));
 }
-
-/** Apostrophes sit inside a word, so removing them keeps `Don't` in one piece. */
-const WORD_INNER_MARKS = /['’ʼ]/gu;
-
-/** Every other punctuation or symbol separates words: `Title(Live)` is two. */
-const WORD_SEPARATOR_MARKS = /[\p{P}\p{S}]/gu;
-
-/**
- * Words of an LRCLIB search field, offered as one-click replacements. A
- * derived title such as a raw YouTube video name usually carries the real
- * track or artist plus noise, so picking one word beats retyping the field.
- * Punctuation never helps the lookup, so chips carry the bare words while the
- * field itself keeps whatever the user or the import wrote. A single-word
- * value has nothing to narrow down.
- */
-export function searchWordChips(value: string): string[] {
-  const words = value
-    .replaceAll(WORD_INNER_MARKS, '')
-    .replaceAll(WORD_SEPARATOR_MARKS, ' ')
-    .split(/\s+/)
-    .filter((word) => word.length > 0);
-
-  const unique = Array.from(new Set(words));
-  return unique.length > 1 ? unique : [];
-}

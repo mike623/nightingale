@@ -311,6 +311,19 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
                     .map_err(serde_err)?,
             )
         }
+        "rename_song" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                file_hash: String,
+                title: Option<String>,
+                artist: Option<String>,
+            }
+            let args: Args = deserialize(payload)?;
+            let song = app_core::rename_song(&args.file_hash, args.title, args.artist)
+                .map_err(ApiError::bad_request)?;
+            Ok(serde_json::to_value(song).map_err(serde_err)?)
+        }
         "load_songs_meta" => Ok(serde_json::to_value(SongsStore::load_meta()).map_err(serde_err)?),
         "load_analysis_queue" => {
             Ok(serde_json::to_value(AnalysisQueue::load()).map_err(serde_err)?)

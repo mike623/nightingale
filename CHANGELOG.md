@@ -23,6 +23,7 @@ below.
 - Copying lyrics while that Lyricsify window is open closes it and drops the text straight into the Edit tab, leaving unsaved edits untouched.
 - The lyrics editor's LRCLIB tab lists the words of the Track and Artist boxes as chips under each field, so a noisy imported title can be narrowed to one word with a click instead of retyping. Chips drop punctuation, so `Title (Official Video)` offers plain words; the field itself keeps the original text.
 - The Track and Artist boxes on the lyrics editor's LRCLIB tab each have a clear button, so a wrong imported term can be emptied in one click.
+- The song details panel lists the words of a local song's title and artist as chips. Clicking one stores that word as the song's title or artist in the library database; the media file's own tags are left untouched. Songs from a media server and UltraStar songs keep the name their source declares.
 
 ### Improvements
 

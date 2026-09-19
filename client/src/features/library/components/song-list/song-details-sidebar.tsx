@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ListPlusIcon, PlayIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { useRenameSong } from '@/features/library/hooks/use-rename-song';
 import { useAddPlaybackQueueEntry } from '@/features/playback-queue/use-playback-queue';
 import { usePlaybackLauncher } from '@/features/playback/hooks/use-playback-launcher';
 import { usePreparePlaybackMutation } from '@/features/playback/mutations/use-prepare-playback-mutation';
@@ -53,6 +54,7 @@ function AddToQueueButton({ song, tempo, keyOffset, ready, preparing }: AddToQue
 export const SongDetailsSidebar = ({ song, queueStatus, onClose }: SongDetailsSidebarProps) => {
   const queryClient = useQueryClient();
   const bestScores = useBestScoresBySongForActiveProfile();
+  const renameSong = useRenameSong();
   const { detailsRef, closeDetails } = useSongDetailsNav(onClose);
   const { mutate: preparePlayback, isLoading: preparingPlayback } = usePreparePlaybackMutation();
   const { launch, reserveTarget } = usePlaybackLauncher();
@@ -115,6 +117,7 @@ export const SongDetailsSidebar = ({ song, queueStatus, onClose }: SongDetailsSi
         queueStatus={queueStatus}
         bestScore={bestScores.get(song.file_hash)}
         onClose={closeDetails}
+        onRename={(fields) => void renameSong(song, fields)}
       />
 
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
