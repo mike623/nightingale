@@ -1,4 +1,4 @@
-import { RotateCcwIcon } from 'lucide-react';
+import { RotateCcwIcon, YoutubeIcon } from 'lucide-react';
 
 import type { LastPlaylist } from '@/features/import/lib/last-playlist';
 import { Button } from '@/shared/components/ui/button';
@@ -11,6 +11,7 @@ type ImportUrlFormProps = {
   lastPlaylist: LastPlaylist | null;
   onUrlChange: (value: string) => void;
   onFetch: (url?: string) => void;
+  onBrowse: () => void;
 };
 
 export const ImportUrlForm = ({
@@ -19,28 +20,36 @@ export const ImportUrlForm = ({
   lastPlaylist,
   onUrlChange,
   onFetch,
+  onBrowse,
 }: ImportUrlFormProps) => (
   <div className="flex min-h-0 flex-1 flex-col gap-2" data-nav-group="url">
     <Label htmlFor="import-url">YouTube URLs</Label>
-    <Textarea
-      id="import-url"
-      value={url}
-      rows={4}
-      className="min-h-0 flex-1 overflow-y-auto"
-      placeholder={
-        'https://www.youtube.com/watch?v=…\nhttps://youtu.be/…\nhttps://music.youtube.com/playlist?list=…'
-      }
-      onChange={(e) => onUrlChange(e.target.value)}
-      onKeyDown={(e) => {
-        // Enter types a newline here, so submitting takes the modifier.
-        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-          onFetch();
+    <div className="flex min-h-0 flex-1 gap-2">
+      <Textarea
+        id="import-url"
+        value={url}
+        rows={4}
+        className="min-h-0 flex-1 overflow-y-auto"
+        placeholder={
+          'https://www.youtube.com/watch?v=…\nhttps://youtu.be/…\nhttps://music.youtube.com/playlist?list=…'
         }
-      }}
-    />
+        onChange={(e) => onUrlChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Enter types a newline here, so submitting takes the modifier.
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            onFetch();
+          }
+        }}
+      />
+      <Button variant="outline" size="sm" className="shrink-0 self-start" onClick={onBrowse}>
+        <YoutubeIcon className="size-4 shrink-0" />
+        Browse
+      </Button>
+    </div>
     <p className="text-xs text-muted-foreground">
       One link per line. A single playlist link keeps its playlist; several links import as
-      individual videos.
+      individual videos. Browse opens YouTube in its own window: copy a video or playlist link there
+      and it lands here.
     </p>
     {lastPlaylist && (
       <Button

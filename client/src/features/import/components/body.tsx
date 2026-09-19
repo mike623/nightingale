@@ -29,6 +29,7 @@ type ImportBodyProps = {
   onFilterChange: (value: string) => void;
   onUrlChange: (value: string) => void;
   onFetch: (url?: string) => void;
+  onBrowse: () => void;
   onEditSingle: (patch: Partial<{ title: string; artist: string }>) => void;
   onToggle: (id: string) => void;
   onSelectAll: () => void;
@@ -56,6 +57,7 @@ export const ImportBody = ({
   onFilterChange,
   onUrlChange,
   onFetch,
+  onBrowse,
   onEditSingle,
   onToggle,
   onSelectAll,
@@ -91,6 +93,7 @@ export const ImportBody = ({
         lastPlaylist={lastPlaylist}
         onUrlChange={onUrlChange}
         onFetch={onFetch}
+        onBrowse={onBrowse}
       />
     );
   }

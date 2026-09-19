@@ -12,6 +12,7 @@ import {
   useImportState,
 } from '@/features/import/hooks/use-import-state';
 import { useNavStops } from '@/features/import/hooks/use-nav-stops';
+import { useYoutubeWindow } from '@/features/import/hooks/use-youtube-window';
 import { readLastPlaylist, saveLastPlaylist } from '@/features/import/lib/last-playlist';
 import { useImportAvailable } from '@/features/import/queries/use-import-available';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
@@ -188,6 +189,16 @@ export const ImportPage = () => {
     }
   };
 
+  // A link copied in the YouTube window joins the box as another line; the
+  // window stays open so more can follow.
+  const appendUrl = (link: string) =>
+    setUrl((prev) => {
+      const lines = parseUrls(prev);
+      return lines.includes(link) ? prev : [...lines, link].join('\n');
+    });
+
+  const { openYoutube } = useYoutubeWindow({ active: preview === null, onUrl: appendUrl });
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -290,6 +301,7 @@ export const ImportPage = () => {
           onFilterChange={onFilterChange}
           onUrlChange={setUrl}
           onFetch={(urlArg) => void fetchPreview(urlArg)}
+          onBrowse={openYoutube}
           onEditSingle={editSingle}
           onToggle={toggle}
           onSelectAll={selectAll}
