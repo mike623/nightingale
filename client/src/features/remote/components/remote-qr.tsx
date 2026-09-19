@@ -13,7 +13,7 @@ const QR_PIXELS = 192;
  * address is repeated as selectable text for anyone typing it in by hand.
  */
 export const RemoteQr = ({ className }: { className?: string }) => {
-  const { data, isLoading, isError } = useRemoteShareUrl();
+  const { data, isLoading, isError, error } = useRemoteShareUrl();
   const lanUrl = data ?? null;
 
   if (isLoading) {
@@ -25,7 +25,11 @@ export const RemoteQr = ({ className }: { className?: string }) => {
       <Empty className={className}>
         <EmptyHeader>
           <EmptyTitle>Remote control unavailable</EmptyTitle>
-          <EmptyDescription>This host could not start remote control.</EmptyDescription>
+          <EmptyDescription>
+            {/* The usual cause is another process already holding the port, so
+                the host's own reason is more use here than a generic line. */}
+            {error instanceof Error ? error.message : 'This host could not start remote control.'}
+          </EmptyDescription>
         </EmptyHeader>
       </Empty>
     );

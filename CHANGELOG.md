@@ -35,6 +35,7 @@ below.
 
 ### Improvements
 
+- Remote control now listens on a fixed port (51737) instead of one the OS picks per launch, so an address a phone bookmarked keeps working after a restart. Only the machine's network address can still change it. If something else on the machine already holds the port, the Settings panel now shows the host's own reason for failing rather than a generic line.
 - Fetching an import preview is no longer held up by a yt-dlp self-update. The updater runs at most once a day instead of before every fetch and every download, so pasting several links no longer starts one update per link. A freshly downloaded yt-dlp skips the update entirely, and the "yt-dlp may be outdated" download error still appears when an update was actually attempted and failed.
 - Next Song and auto-play now favour songs the room has sung least instead of drawing uniformly, so an evening works through the library rather than circling the same few tracks. Every song keeps a chance of being drawn; a song nobody has sung is twice as likely as one sung once. A run counts as sung only when it scored, and a skip counts half as much as a sing. The history is shared by everyone rather than kept per profile, and it survives a library rescan.
 - Desktop updates are now signed with this fork's own key and fetched from this fork's releases.

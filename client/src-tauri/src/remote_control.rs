@@ -6,6 +6,13 @@
 
 use std::net::{Ipv4Addr, SocketAddr};
 
+/// The port the listener binds. Fixed rather than ephemeral so the address a
+/// phone bookmarked keeps working across restarts; an OS-assigned port changed
+/// every launch and silently invalidated it. Chosen from the dynamic range to
+/// stay clear of registered services. A clash with something else on this
+/// machine surfaces as a bind error when remote control is switched on.
+const REMOTE_PORT: u16 = 51737;
+
 use remote::listener::RemoteListener;
 use serde::Serialize;
 use tokio::sync::Mutex;
@@ -57,8 +64,7 @@ pub(crate) async fn remote_start(
         return Ok(RemoteStatus::running(listener.port()));
     }
 
-    // Port 0: the OS picks a free port, and phones learn it from the QR code.
-    let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0));
+    let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, REMOTE_PORT));
     let listener = remote::listener::serve(addr).await?;
     let status = RemoteStatus::running(listener.port());
     *guard = Some(listener);
