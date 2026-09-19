@@ -565,6 +565,11 @@ fn download_entry(
             .args([
                 "-f",
                 "bv*+ba/b",
+                // Prefer H.264 video and AAC audio. A codec-blind pick lands
+                // AV1 or Opus inside the MP4, neither of which the playback
+                // webview can decode.
+                "-S",
+                "vcodec:h264,lang,quality,res,fps,hdr:12,acodec:aac",
                 "--merge-output-format",
                 "mp4",
                 "--no-playlist",
