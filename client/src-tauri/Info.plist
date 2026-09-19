@@ -4,7 +4,5 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Nightingale uses your microphone for real-time pitch detection during karaoke scoring.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Nightingale lets a phone on your network control playback. Access is only used while Remote control is switched on in Settings.</string>
 </dict>
 </plist>
