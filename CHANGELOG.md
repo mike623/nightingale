@@ -36,6 +36,7 @@ below.
 
 ### Fixes
 
+- Restart, and any other seek, now clears the pitch graph and the score instead of leaving both frozen. Their positions were tracked as the song advanced and never moved back, so after a restart the graph kept the previous pass's points and stopped taking new ones, and the score stayed at its old value until playback passed the point it was interrupted at.
 - A song's own video now plays letterboxed inside the playback stage, so a video whose aspect ratio differs from the window keeps its full frame instead of being cropped. Pixabay ambient backgrounds still fill the stage.
 - About now reports the version of the running build, read from the bundle. It read the manifest at compile time, so a dev build claimed to be the last released version.
 - Saving lyrics while a song is playing now updates the running playback. The transcript was loaded once per song, so new timing only appeared after a restart.

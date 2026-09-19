@@ -122,6 +122,15 @@ export class PitchScoring {
   score(): number {
     return Math.round(Math.min(1000, Math.max(0, (this.earned / this.totalSingable) * 1000)));
   }
+
+  /**
+   * Starts a fresh pass over the same song, keeping the singable total the
+   * reference vocals already established.
+   */
+  reset(): void {
+    this.earned = 0;
+    this.lastTime = 0;
+  }
 }
 
 export function computeSingableTime(vocals: AudioBuffer): number {

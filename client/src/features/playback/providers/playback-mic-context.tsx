@@ -98,7 +98,7 @@ const scoringTolerance = (config: AppConfig | null): number =>
 
 export function PlaybackMicProvider({ config, children }: PlaybackMicProviderProps) {
   const { isReady, isPlaying, paused, duration } = usePlaybackTransportState();
-  const { subscribe, getScoringBuffer } = usePlaybackTransportActions();
+  const { subscribe, getScoringBuffer, getSeekEpoch } = usePlaybackTransportActions();
 
   const persistConfig = usePlaybackConfigPersist(config);
 
@@ -133,7 +133,7 @@ export function PlaybackMicProvider({ config, children }: PlaybackMicProviderPro
   const reactiveRef = useMicReactive(micPitchEnabled);
 
   const { series, score } = usePitchScoring(
-    { isReady, duration, getReferenceBuffer: getScoringBuffer, subscribe },
+    { isReady, duration, getReferenceBuffer: getScoringBuffer, subscribe, getSeekEpoch },
     latestPitch,
     latencyCompensation(config),
     scoringTolerance(config),

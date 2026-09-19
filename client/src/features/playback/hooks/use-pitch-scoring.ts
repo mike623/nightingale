@@ -27,10 +27,12 @@ export type PitchScoringSource = {
   duration: number;
   getReferenceBuffer: () => AudioBuffer | null;
   subscribe: (fn: TimeSubscriber) => () => void;
+  /** Seeks taken so far; a change means the current pass over the song ended. */
+  getSeekEpoch: () => number;
 };
 
 export function usePitchScoring(
-  { isReady, duration, getReferenceBuffer, subscribe }: PitchScoringSource,
+  { isReady, duration, getReferenceBuffer, subscribe, getSeekEpoch }: PitchScoringSource,
   micPitch: number | null,
   latencyCompensationSec = DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   toleranceSemitones: number = SEMITONE_TOLERANCE,
@@ -48,6 +50,8 @@ export function usePitchScoring(
     ),
   );
   const singableRef = useRef<number | null>(null);
+  /** The pass the current history and score belong to. */
+  const appliedEpochRef = useRef(0);
   const [series, setSeries] = useState<PitchSeries>({
     refPitches: [],
     userPitches: [],
@@ -76,6 +80,20 @@ export function usePitchScoring(
     }
 
     const run = (t: number) => {
+      // A seek ends the pass: the graph's history belongs to a stretch of the
+      // song that is no longer playing, and the score measured it. Both start
+      // over from the new position, while the singable total established from
+      // the reference vocals survives. A seek notifies subscribers even while
+      // paused, so the readouts clear at the seek rather than on resume.
+      const epoch = getSeekEpoch();
+      if (appliedEpochRef.current !== epoch) {
+        appliedEpochRef.current = epoch;
+        bufferRef.current.reset();
+        scoringRef.current.reset();
+        setSeries(bufferRef.current.snapshot());
+        setScore(0);
+      }
+
       if (t <= 0) {
         return;
       }
@@ -102,7 +120,7 @@ export function usePitchScoring(
     };
 
     return subscribe(run);
-  }, [getReferenceBuffer, isReady, latencyRef, micPitchRef, subscribe, toleranceRef]);
+  }, [getReferenceBuffer, getSeekEpoch, isReady, latencyRef, micPitchRef, subscribe, toleranceRef]);
 
   return { series, score };
 }
