@@ -17,7 +17,6 @@ import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useDonationSeen } from '@/features/menu/hooks/use-donation-seen';
 import { useNavInput } from '@/features/menu/hooks/use-nav-input';
 import { useMenuFocus } from '@/features/menu/providers/menu-focus-context';
-import { useAppVersion } from '@/features/menu/queries/use-app-version';
 import { useCurrentProfile } from '@/features/profiles/hooks/use-current-profile';
 import { useShouldRunSetup } from '@/features/setup/hooks/use-should-run-setup';
 import { useUpdate } from '@/features/updates/queries/use-update';
@@ -74,7 +73,6 @@ export const Actions = ({ registerCallback, focusedSidebarIndex }: ActionsProps)
   const { setOpen } = useSidebar();
   const navigate = useNavigate();
   const profile = useCurrentProfile();
-  const version = useAppVersion();
   const { focus, actionsRef } = useMenuFocus();
   const { setShouldRunSetup } = useShouldRunSetup();
 
@@ -249,10 +247,6 @@ export const Actions = ({ registerCallback, focusedSidebarIndex }: ActionsProps)
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <div className="text-muted-foreground px-2 py-1.5 text-xs tabular-nums">
-              Version {version ?? '\u2026'}
-            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

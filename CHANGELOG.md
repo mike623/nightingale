@@ -15,7 +15,6 @@ below.
 
 ### Features
 
-- The profile menu now shows the running build's version, read from the bundle so a dev build reports its own version rather than the last released one. The About dialog uses the same source.
 - The playback bar has a Restart button beside pause and next, which sends the song back to its start without changing whether it is playing.
 - The playback pause overlay now offers Edit Lyrics, opening the lyrics editor for the playing song without leaving playback.
 - The lyrics editor now opens an analyzed song on its transcript rendered as Enhanced LRC, so the timing a song plays with is visible and editable instead of being replaced by plain lines. Songs with no transcript yet still open on their saved lyrics.
@@ -32,6 +31,7 @@ below.
 
 ### Fixes
 
+- About now reports the version of the running build, read from the bundle. It read the manifest at compile time, so a dev build claimed to be the last released version.
 - Saving lyrics while a song is playing now updates the running playback. The transcript was loaded once per song, so new timing only appeared after a restart.
 - A cached playable copy of a video is now used ahead of the original, so an MP4 holding codecs the webview cannot decode no longer plays as a black or silent screen.
 - Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
