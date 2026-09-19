@@ -1,6 +1,6 @@
 /**
  * Playback bar: elapsed/remaining time, a click-to-seek progress track, and
- * pause/next buttons. Auto-hides after a few idle seconds so it never competes
+ * restart/pause/next buttons. Auto-hides after a few idle seconds so it never competes
  * with the lyrics for the bottom of the screen, and comes back on any pointer
  * or key activity (the same reveal behaviour as a video player's chrome).
  *
@@ -9,7 +9,7 @@
  * would re-render this component on top of a WebGL background for no reason.
  */
 
-import { PauseIcon, SkipForwardIcon } from 'lucide-react';
+import { PauseIcon, RotateCcwIcon, SkipForwardIcon } from 'lucide-react';
 import { memo, useEffect, useRef, useState, type MouseEvent } from 'react';
 
 import {
@@ -115,6 +115,16 @@ function PlaybackBarImpl({ onNext }: PlaybackBarProps) {
         visible ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
     >
+      {/* Restart is the progress track's leftmost seek, as a button. */}
+      <button
+        type="button"
+        className={BUTTON_CLASS}
+        onClick={() => seek(0)}
+        aria-label="Restart song"
+      >
+        <RotateCcwIcon className="size-4" />
+      </button>
+
       {/* Pause only: pausing opens the PauseOverlay on top of this bar, and
           resuming is that overlay's Continue action. */}
       <button type="button" className={BUTTON_CLASS} onClick={handlePause} aria-label="Pause">
