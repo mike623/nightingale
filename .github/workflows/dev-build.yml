@@ -29,7 +29,9 @@ jobs:
       - id: meta
         name: Derive the dev version
         shell: bash
-        run: bash .github/scripts/dev-version.sh "${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        run: |
+          bash .github/scripts/dev-version.sh \
+            "${{ github.run_number }}" "${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - id: draft
         name: Create draft release
