@@ -157,3 +157,14 @@ export function shiftLrcTimestamps(text: string, deltaSeconds: number): string {
 
   return rewrite(WORD_TS_PARTS, '<', '>', rewrite(LINE_TS_PARTS, '[', ']', text));
 }
+
+/**
+ * Words of an LRCLIB search field, offered as one-click replacements. A
+ * derived title such as a raw YouTube video name usually carries the real
+ * track or artist plus noise, so picking one word beats retyping the field.
+ * A single-word value has nothing to narrow down.
+ */
+export function searchWordChips(value: string): string[] {
+  const words = Array.from(new Set(value.split(/\s+/).filter((word) => word.length > 0)));
+  return words.length > 1 ? words : [];
+}

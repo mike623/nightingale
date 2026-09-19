@@ -16,6 +16,7 @@ import { useLrclibCandidates } from '@/features/lyrics/queries/use-lyrics';
 import {
   detectLrcLevel,
   isEditLyricsDialogMode,
+  searchWordChips,
   shiftLrcTimestamps,
   stripLrcToPlainLines,
 } from '@/features/lyrics/utils/edit-lyrics';
@@ -39,7 +40,7 @@ import { EditLyricsFooter } from './edit-lyrics-footer';
 import { LrcOptions, type TimingChoice } from './lrc-options';
 import { LrcShift } from './lrc-shift';
 import { LrclibMatches } from './lrclib-matches';
-import { LRCLIB_SEARCH_SLOTS, LrclibSearch } from './lrclib-search';
+import { LRCLIB_SEARCH_SLOTS, LrclibSearch, type SearchField } from './lrclib-search';
 import { LyricsEditor } from './lyrics-editor';
 import { LyricsifyWeb } from './lyricsify-web';
 import { ringFor } from './parts';
@@ -201,6 +202,10 @@ type NavLayout = {
   arrowSlotStart: number | null;
   // Track / artist inputs plus the search button on the LRCLIB pane.
   searchSegment: number | null;
+  // One-click word chips under each search input, present only while the
+  // matching field holds more than one word.
+  trackChipsSegment: number | null;
+  artistChipsSegment: number | null;
   // "Open in browser" on the Lyricsify pane.
   webSegment: number | null;
   // Timestamp offset buttons on the edit pane, present only while the text
@@ -223,7 +228,35 @@ type NavLayoutInput = {
   useSlots: number;
   timingNav: boolean;
   audioNav: boolean;
+  trackChipCount: number;
+  artistChipCount: number;
 };
+
+type NavSegment = { key: string; width: number };
+
+type LrclibSegmentsInput = {
+  hasCandidates: boolean;
+  useSlots: number;
+  trackChipCount: number;
+  artistChipCount: number;
+};
+
+/** Rows under the LRCLIB tab header, in DOM order. */
+function lrclibSegments(input: LrclibSegmentsInput): NavSegment[] {
+  const segments: NavSegment[] = [{ key: 'search', width: LRCLIB_SEARCH_SLOTS }];
+
+  if (input.trackChipCount > 0) {
+    segments.push({ key: 'trackChips', width: input.trackChipCount });
+  }
+  if (input.artistChipCount > 0) {
+    segments.push({ key: 'artistChips', width: input.artistChipCount });
+  }
+  if (input.hasCandidates) {
+    segments.push({ key: 'use', width: Math.max(1, input.useSlots) });
+  }
+
+  return segments;
+}
 
 function navLayout({
   activeTab,
@@ -232,10 +265,12 @@ function navLayout({
   shiftNav,
   timingNav,
   audioNav,
+  trackChipCount,
+  artistChipCount,
 }: NavLayoutInput): NavLayout {
   const onLrclib = activeTab === 'lrclib';
   const tabCount = EDIT_LYRICS_TABS.length;
-  const segments: { key: string; width: number }[] = [];
+  const segments: NavSegment[] = [];
   let arrowSlotStart: number | null = null;
 
   if (onLrclib && hasCandidates) {
@@ -246,10 +281,7 @@ function navLayout({
   }
 
   if (onLrclib) {
-    segments.push({ key: 'search', width: LRCLIB_SEARCH_SLOTS });
-    if (hasCandidates) {
-      segments.push({ key: 'use', width: Math.max(1, useSlots) });
-    }
+    segments.push(...lrclibSegments({ hasCandidates, useSlots, trackChipCount, artistChipCount }));
   } else if (activeTab === 'web') {
     segments.push({ key: 'web', width: 1 });
   } else {
@@ -277,6 +309,8 @@ function navLayout({
     headerSegment: indexOf('header'),
     arrowSlotStart,
     searchSegment: indexOf('search'),
+    trackChipsSegment: indexOf('trackChips'),
+    artistChipsSegment: indexOf('artistChips'),
     webSegment: indexOf('web'),
     editorSegment: indexOf('editor'),
     shiftSegment: indexOf('shift'),
@@ -398,6 +432,8 @@ export const EditLyricsDialog = () => {
   const [manualLoading, setManualLoading] = useState(false);
   const [searchTrack, setSearchTrack] = useState(() => defaultSearchTerms(song).track);
   const [searchArtist, setSearchArtist] = useState(() => defaultSearchTerms(song).artist);
+  const trackChips = useMemo(() => searchWordChips(searchTrack), [searchTrack]);
+  const artistChips = useMemo(() => searchWordChips(searchArtist), [searchArtist]);
   const candidates = resolveCandidates(manualResults, candidatesQuery.data);
   const candidateCount = candidates.length;
   const matchesLoading = [candidatesQuery.isLoading, manualLoading].some(Boolean);
@@ -563,7 +599,12 @@ export const EditLyricsDialog = () => {
     saving,
   });
 
-  const layout = navLayout({ activeTab, ...nav });
+  const layout = navLayout({
+    activeTab,
+    ...nav,
+    trackChipCount: trackChips.length,
+    artistChipCount: artistChips.length,
+  });
 
   const { isFocused, focusSegment } = useDialogNav({
     open,
@@ -602,6 +643,24 @@ export const EditLyricsDialog = () => {
           void runManualSearch();
         }
         return true;
+      };
+
+      const handleChips = (): boolean => {
+        if (layout.trackChipsSegment !== null && segment === layout.trackChipsSegment) {
+          const word = trackChips.at(slot);
+          if (word !== undefined) {
+            setSearchTrack(word);
+          }
+          return true;
+        }
+        if (layout.artistChipsSegment !== null && segment === layout.artistChipsSegment) {
+          const word = artistChips.at(slot);
+          if (word !== undefined) {
+            setSearchArtist(word);
+          }
+          return true;
+        }
+        return false;
       };
 
       const handleWeb = (): boolean => {
@@ -678,6 +737,7 @@ export const EditLyricsDialog = () => {
       for (const handler of [
         handleHeader,
         handleSearch,
+        handleChips,
         handleWeb,
         handleOption,
         handleCandidate,
@@ -717,11 +777,16 @@ export const EditLyricsDialog = () => {
   const carouselHeaderSegment = layout.headerSegment;
   const carouselArrowSlotStart = layout.arrowSlotStart;
 
+  const chipSegment = (field: SearchField): number | null =>
+    field === 'track' ? layout.trackChipsSegment : layout.artistChipsSegment;
+
   const searchPane = (
     <LrclibSearch
       durationSecs={song.duration_secs}
       track={searchTrack}
       artist={searchArtist}
+      trackChips={trackChips}
+      artistChips={artistChips}
       onTrackChange={setSearchTrack}
       onArtistChange={setSearchArtist}
       onSearch={() => {
@@ -734,6 +799,16 @@ export const EditLyricsDialog = () => {
       onFocusSlot={(slot) => {
         if (layout.searchSegment !== null) {
           focusSegment(layout.searchSegment, slot);
+        }
+      }}
+      isChipFocused={(field, index) => {
+        const segment = chipSegment(field);
+        return segment !== null && isFocused(segment, index);
+      }}
+      onFocusChip={(field, index) => {
+        const segment = chipSegment(field);
+        if (segment !== null) {
+          focusSegment(segment, index);
         }
       }}
     />

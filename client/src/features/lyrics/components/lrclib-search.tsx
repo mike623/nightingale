@@ -11,10 +11,14 @@ import { ARIA_DISABLED_CLASS, ringFor } from './parts';
 /** Focusables this panel contributes, in DOM order: track, artist, search. */
 export const LRCLIB_SEARCH_SLOTS = 3;
 
+export type SearchField = 'track' | 'artist';
+
 type LrclibSearchProps = {
   durationSecs: number;
   track: string;
   artist: string;
+  trackChips: readonly string[];
+  artistChips: readonly string[];
   onTrackChange: (value: string) => void;
   onArtistChange: (value: string) => void;
   onSearch: () => void;
@@ -23,12 +27,16 @@ type LrclibSearchProps = {
   artistRef: Ref<HTMLInputElement>;
   isFocused: (slot: number) => boolean;
   onFocusSlot: (slot: number) => void;
+  isChipFocused: (field: SearchField, index: number) => boolean;
+  onFocusChip: (field: SearchField, index: number) => void;
 };
 
 export const LrclibSearch = ({
   durationSecs,
   track,
   artist,
+  trackChips,
+  artistChips,
   onTrackChange,
   onArtistChange,
   onSearch,
@@ -37,6 +45,8 @@ export const LrclibSearch = ({
   artistRef,
   isFocused,
   onFocusSlot,
+  isChipFocused,
+  onFocusChip,
 }: LrclibSearchProps) => {
   const canSearch = track.trim().length > 0 && !loading;
 
@@ -45,6 +55,27 @@ export const LrclibSearch = ({
       onSearch();
     }
   };
+
+  const chipRow = (field: SearchField, words: readonly string[], onPick: (word: string) => void) =>
+    words.length === 0 ? null : (
+      <div className="flex flex-wrap gap-1">
+        {words.map((word, index) => (
+          <Button
+            key={word}
+            type="button"
+            size="sm"
+            variant="secondary"
+            aria-label={`Use "${word}" as ${field}`}
+            onClick={() => onPick(word)}
+            onFocus={() => onFocusChip(field, index)}
+            onPointerDown={() => onFocusChip(field, index)}
+            className={cn('h-6 px-2 text-xs font-normal', ringFor(isChipFocused(field, index)))}
+          >
+            {word}
+          </Button>
+        ))}
+      </div>
+    );
 
   return (
     <>
@@ -89,6 +120,8 @@ export const LrclibSearch = ({
           {loading ? <Loader2Icon className="animate-spin" /> : <SearchIcon />}
         </Button>
       </div>
+      {chipRow('track', trackChips, onTrackChange)}
+      {chipRow('artist', artistChips, onArtistChange)}
     </>
   );
 };
