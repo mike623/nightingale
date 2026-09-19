@@ -22,6 +22,7 @@ below.
 - The lyrics editor has a third tab that opens Lyricsify in its own application window, already searched for the song's artist and title.
 - Copying lyrics while that Lyricsify window is open closes it and drops the text straight into the Edit tab, leaving unsaved edits untouched.
 - The lyrics editor's LRCLIB tab lists the words of the Track and Artist boxes as chips under each field, so a noisy imported title can be narrowed to one word with a click instead of retyping. Chips drop punctuation, so `Title (Official Video)` offers plain words; the field itself keeps the original text.
+- The Track and Artist boxes on the lyrics editor's LRCLIB tab each have a clear button, so a wrong imported term can be emptied in one click.
 
 ### Improvements
 

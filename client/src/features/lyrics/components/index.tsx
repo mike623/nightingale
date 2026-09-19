@@ -638,7 +638,11 @@ export const EditLyricsDialog = () => {
         if (slot === 0) {
           trackRef.current?.focus();
         } else if (slot === 1) {
+          setSearchTrack('');
+        } else if (slot === 2) {
           artistRef.current?.focus();
+        } else if (slot === 3) {
+          setSearchArtist('');
         } else {
           void runManualSearch();
         }

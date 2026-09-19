@@ -1,4 +1,4 @@
-import { Loader2Icon, SearchIcon } from 'lucide-react';
+import { Loader2Icon, SearchIcon, XIcon } from 'lucide-react';
 import { type KeyboardEvent, type Ref } from 'react';
 
 import { formatSeconds } from '@/features/lyrics/utils/edit-lyrics';
@@ -8,8 +8,11 @@ import { cn } from '@/shared/utils/cn';
 
 import { ARIA_DISABLED_CLASS, ringFor } from './parts';
 
-/** Focusables this panel contributes, in DOM order: track, artist, search. */
-export const LRCLIB_SEARCH_SLOTS = 3;
+/**
+ * Focusables this panel contributes, in DOM order: track, clear track, artist,
+ * clear artist, search.
+ */
+export const LRCLIB_SEARCH_SLOTS = 5;
 
 export type SearchField = 'track' | 'artist';
 
@@ -56,6 +59,28 @@ export const LrclibSearch = ({
     }
   };
 
+  // Kept mounted while the field is empty so the nav slots below stay put.
+  const clearButton = (
+    field: SearchField,
+    slot: number,
+    value: string,
+    onChange: (next: string) => void,
+  ) => (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      onClick={() => onChange('')}
+      onFocus={() => onFocusSlot(slot)}
+      onPointerDown={() => onFocusSlot(slot)}
+      aria-disabled={value.length === 0}
+      aria-label={`Clear ${field}`}
+      className={cn('shrink-0', ARIA_DISABLED_CLASS, ringFor(isFocused(slot)))}
+    >
+      <XIcon />
+    </Button>
+  );
+
   const chipRow = (field: SearchField, words: readonly string[], onPick: (word: string) => void) =>
     words.length === 0 ? null : (
       <div className="flex flex-wrap gap-1">
@@ -96,6 +121,7 @@ export const LrclibSearch = ({
           onFocus={() => onFocusSlot(0)}
           className={cn('flex-1', ringFor(isFocused(0)))}
         />
+        {clearButton('track', 1, track, onTrackChange)}
         <Input
           ref={artistRef}
           value={artist}
@@ -103,19 +129,20 @@ export const LrclibSearch = ({
           aria-label="Artist"
           onChange={(event) => onArtistChange(event.target.value)}
           onKeyDown={searchOnEnter}
-          onFocus={() => onFocusSlot(1)}
-          className={cn('flex-1', ringFor(isFocused(1)))}
+          onFocus={() => onFocusSlot(2)}
+          className={cn('flex-1', ringFor(isFocused(2)))}
         />
+        {clearButton('artist', 3, artist, onArtistChange)}
         <Button
           type="button"
           size="icon"
           variant="outline"
           onClick={onSearch}
-          onFocus={() => onFocusSlot(2)}
-          onPointerDown={() => onFocusSlot(2)}
+          onFocus={() => onFocusSlot(4)}
+          onPointerDown={() => onFocusSlot(4)}
           aria-disabled={!canSearch}
           aria-label="Search LRCLIB"
-          className={cn(ARIA_DISABLED_CLASS, ringFor(isFocused(2)))}
+          className={cn(ARIA_DISABLED_CLASS, ringFor(isFocused(4)))}
         >
           {loading ? <Loader2Icon className="animate-spin" /> : <SearchIcon />}
         </Button>
