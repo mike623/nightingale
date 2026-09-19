@@ -60,3 +60,6 @@ replit.md
 .windsurf/
 .github/copilot-instructions.md
 .github/instructions/
+
+# Local agent/tool state
+.omc/

@@ -1,0 +1,120 @@
+name: Dev build
+
+on:
+  push:
+    branches:
+      - dev-port
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Every push publishes a release, so a run is never cancelled part-way: that
+# would leave a draft release behind with only some of its bundles attached.
+concurrency:
+  group: dev-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare dev release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      release_id: ${{ steps.draft.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Derive the dev version
+        shell: bash
+        run: |
+          bash .github/scripts/dev-version.sh \
+            "${{ github.run_number }}" "${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - id: draft
+        name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body: |
+            Automated build of `${{ github.ref_name }}` at ${{ github.sha }}.
+
+            Unreleased work in progress, published so the desktop updater can
+            pick it up. For stable builds see the `v*` releases.
+          draft: true
+          prerelease: false
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+          - target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.2.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: dev-${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        working-directory: client
+        run: pnpm install --frozen-lockfile
+
+      # The version comes from `--config` rather than the manifests, which stay
+      # on the last released version until a real release bumps them.
+      - name: Build, bundle, and upload artifacts
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        with:
+          projectPath: ./client
+          releaseId: ${{ needs.prepare.outputs.release_id }}
+          includeUpdaterJson: true
+          args: >-
+            --target ${{ matrix.target }}
+            --bundles app,dmg
+            --config '{"version":"${{ needs.prepare.outputs.version }}"}'
+
+  publish:
+    name: Publish dev release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      # The updater reads `releases/latest/download/latest.json`, and GitHub
+      # resolves that to the newest release that is neither draft nor
+      # prerelease, so the release only reaches clients once it is published
+      # with every bundle attached.
+      - name: Publish the draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ needs.prepare.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --draft=false \
+            --latest

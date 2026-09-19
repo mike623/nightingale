@@ -1,6 +1,8 @@
 import { useCallback, useEffect } from 'react';
 
+import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useNavInput } from '@/features/menu/hooks/use-nav-input';
+import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
 import { usePlaybackConfigPersist } from '@/features/playback/hooks/use-playback-config-persist';
 import {
   usePlaybackMicActions,
@@ -15,6 +17,9 @@ import type { AppConfig } from '@/types/AppConfig';
 
 type KeyboardActions = {
   paused: boolean;
+  /** True once the result dialog owns the arrow keys; see `handleKeyboardShortcut`. */
+  nextBlocked: boolean;
+  playNext: () => void;
   guideVolume: number;
   guideAvailable: boolean;
   setGuideVolume: (volume: number) => void;
@@ -23,6 +28,7 @@ type KeyboardActions = {
   handleContinue: () => void;
   cycleTheme: () => void;
   cycleFlavor: () => void;
+  toggleLyricsHidden: () => void;
   handleToggleMic: () => void;
   handleCycleMic: () => void;
   handleToggleMicMonitor: () => void;
@@ -61,38 +67,67 @@ function handleKeyboardShortcut(event: KeyboardEvent, actions: KeyboardActions):
     return;
   }
 
+  // Once the result dialog is up it owns the arrow keys (and has its own Next
+  // Song button), so skipping from here would double up. Skip Outro opens it
+  // via `skipOutroPending` without ever setting `isFinished`.
+  if (event.key === 'ArrowRight') {
+    if (!actions.nextBlocked) {
+      event.preventDefault();
+      actions.playNext();
+    }
+    return;
+  }
+
   const shortcuts: Readonly<Record<string, () => void>> = {
     t: actions.cycleTheme,
     f: actions.cycleFlavor,
     m: actions.handleToggleMic,
     n: actions.handleCycleMic,
     r: actions.handleToggleMicMonitor,
+    l: actions.toggleLyricsHidden,
   };
   shortcuts[event.key.toLowerCase()]?.();
 }
 
 /**
  * Wires keyboard + gamepad input for the playback session. Reads everything it
- * needs from the playback contexts; only the app config is passed in so we can
- * persist guide-volume changes without coupling this hook to the config query.
+ * needs from the playback contexts; the app config is passed in so we can
+ * persist guide-volume changes without coupling this hook to the config query,
+ * and `playNext` because song selection belongs to the route, not the session.
  */
-export function usePlaybackInput(config: AppConfig | null) {
-  const { paused, isReady, guideVolume, guideAvailable } = usePlaybackTransportState();
+export function usePlaybackInput(config: AppConfig | null, playNext: () => void) {
+  const { paused, isReady, isFinished, guideVolume, guideAvailable } = usePlaybackTransportState();
   const { getCurrentTime, setGuideVolume, handlePause, handleContinue } =
     usePlaybackTransportActions();
   const { cycleTheme, cycleFlavor } = usePlaybackThemeActions();
-  const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec } = usePlaybackTranscriptState();
+  const [, setLyricsHidden] = useLyricsHidden();
+  const toggleLyricsHidden = useCallback(() => {
+    setLyricsHidden((hidden) => !hidden);
+  }, [setLyricsHidden]);
+  const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, skipOutroPending } =
+    usePlaybackTranscriptState();
   const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
   const { handleToggleMic, handleCycleMic, handleToggleMicMonitor } = usePlaybackMicActions();
 
   const persistConfig = usePlaybackConfigPersist(config);
 
+  // A dialog opened from the pause overlay (lyrics editor) owns input while it
+  // is up: its own controls handle confirm/back, and typing must not reach the
+  // playback shortcuts.
+  const { mode } = useDialog();
+  const dialogOpen = mode !== null;
+
   const pausedRef = useLatestRef(paused);
+  const dialogOpenRef = useLatestRef(dialogOpen);
 
   // Gamepad: nav.back = pause/resume, nav.confirm = skip intro/outro
   useNavInput(
     useCallback(
       (action) => {
+        if (dialogOpenRef.current) {
+          return;
+        }
+
         if (action.back) {
           if (pausedRef.current) {
             handleContinue();
@@ -129,14 +164,17 @@ export function usePlaybackInput(config: AppConfig | null) {
         introSkipLeadSec,
         handleSkipIntro,
         handleSkipOutro,
+        dialogOpenRef,
       ],
     ),
   );
 
-  // Keyboard-only shortcuts (G, T, F, M, N, R, +/-, Space)
+  // Keyboard-only shortcuts (G, T, F, M, N, R, +/-, Space, ArrowRight)
   useEffect(() => {
     const actions: KeyboardActions = {
       paused,
+      nextBlocked: isFinished || skipOutroPending,
+      playNext,
       guideVolume,
       guideAvailable,
       setGuideVolume,
@@ -148,13 +186,23 @@ export function usePlaybackInput(config: AppConfig | null) {
       handleToggleMic,
       handleCycleMic,
       handleToggleMicMonitor,
+      toggleLyricsHidden,
     };
-    const onKeyDown = (event: KeyboardEvent) => handleKeyboardShortcut(event, actions);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (dialogOpen) {
+        return;
+      }
+      handleKeyboardShortcut(event, actions);
+    };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
+    dialogOpen,
     paused,
+    isFinished,
+    skipOutroPending,
+    playNext,
     guideVolume,
     guideAvailable,
     setGuideVolume,
@@ -166,5 +214,6 @@ export function usePlaybackInput(config: AppConfig | null) {
     handleToggleMic,
     handleCycleMic,
     handleToggleMicMonitor,
+    toggleLyricsHidden,
   ]);
 }

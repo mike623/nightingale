@@ -1,5 +1,6 @@
 import { memo, useLayoutEffect, useRef, useState } from 'react';
 
+import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
 import { clampPlaybackScale } from '@/features/playback/lib/display-scale';
 import {
   usePlaybackTransportActions,
@@ -244,6 +245,7 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
   const nextFontSize = `clamp(${0.9 * scale}rem, ${4.5 * scale}svh, ${1.5 * scale}rem)`;
   const { isPlaying, paused } = usePlaybackTransportState();
   const { subscribe, getCurrentTime } = usePlaybackTransportActions();
+  const [lyricsHidden] = useLyricsHidden();
   const animate = isPlaying && !paused;
 
   const [segIdx, setSegIdx] = useState(() =>
@@ -341,12 +343,17 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
     }
   }, [segIdx, getCurrentTime]);
 
-  if (segments.length === 0) {
+  if (segments.length === 0 || lyricsHidden) {
     return null;
   }
 
-  const seg = segments[segIdx];
-  const nextSeg = segIdx + 1 < segments.length ? segments[segIdx + 1] : null;
+  // Saving lyrics mid-song swaps in a new transcript, which can be shorter
+  // than the one the retained index was found in. That renders once before the
+  // layout effect below re-runs and resolves the index against the new
+  // segments, so clamp rather than index out of bounds.
+  const safeIdx = Math.min(segIdx, segments.length - 1);
+  const seg = segments[safeIdx];
+  const nextSeg = safeIdx + 1 < segments.length ? segments[safeIdx + 1] : null;
 
   const segHasReading = seg.words.some(hasReading);
   const nextHasReading = nextSeg?.words.some(hasReading) ?? false;

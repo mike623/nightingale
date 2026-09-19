@@ -2,12 +2,14 @@ import { useCallback } from 'react';
 import { Outlet, useLocation } from 'react-router';
 
 import { EXIT_SUPPORTED } from '@/bridge/exit';
+import { useImportNotifications } from '@/features/import/hooks/use-import-notifications';
 import { EmptySongList } from '@/features/library/components/song-list/empty-song-list';
 import { SongList } from '@/features/library/components/song-list/song-list';
 import { useSongsMeta } from '@/features/library/queries/use-songs';
 import { EditLyricsDialog } from '@/features/lyrics/components';
 import { SelectLanguageDialog } from '@/features/lyrics/components/language';
 import { ClearCacheDialog } from '@/features/menu/components/clear-cache';
+import { DeleteSongDialog } from '@/features/menu/components/delete-song';
 import { DonateDialog } from '@/features/menu/components/donate';
 import { ExitDialog } from '@/features/menu/components/exit';
 import { InfoDialog } from '@/features/menu/components/info';
@@ -54,6 +56,10 @@ export const MenuLayout = () => {
   const { shouldRunSetup } = useShouldRunSetup();
   const location = useLocation();
 
+  // Mounted at the layout so an import keeps streaming progress (and lands its
+  // toast) after the user navigates away from the Import page.
+  useImportNotifications();
+
   const isContentPage = location.pathname !== '/';
   const overlayOpen = isContentPage || mode !== null || shouldRunSetup;
 
@@ -87,6 +93,7 @@ export const MenuLayout = () => {
       <SelectLanguageDialog />
       <EditLyricsDialog />
       <ClearCacheDialog />
+      <DeleteSongDialog />
       <SourceDialogs mode={mode} />
       <Setup />
       <SidebarInset>

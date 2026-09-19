@@ -15,13 +15,8 @@ import {
 import { computeLyricGapCaption, findCurrentSegment } from '@/features/playback/utils/lyrics-gap';
 import type { AppConfig } from '@/types/AppConfig';
 
+import { ABOVE_PLAYBACK_BAR_CLASS } from './playback-bar';
 import { isPixabayTheme, themeName } from './theme';
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds) % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
 
 function formatGuideText(volume: number): string {
   const pct = Math.round(volume * 100);
@@ -138,6 +133,7 @@ function SettingsInfo({
           ? formatThemeText(themeIndex, videoFlavor)
           : `Theme: ${themeName(themeIndex, videoFlavor)}`}
       </HintText>
+      {showShortcuts && <HintText>[&rarr;] Next song</HintText>}
       {showShortcuts && <HintText>[ESC] Back</HintText>}
     </div>
   );
@@ -292,9 +288,10 @@ function notePositionClass(hudPosition: PlaybackHudPosition): string {
   return hudPosition === 'bottom' ? 'top-2' : 'bottom-2';
 }
 
+// The playback bar owns the bottom strip, so a bottom HUD clears its height.
 function hudPositionClass(position: PlaybackHudPosition): string {
   return position === 'bottom'
-    ? 'bottom-[calc(2rem+env(safe-area-inset-bottom))] items-end md:bottom-3'
+    ? `${ABOVE_PLAYBACK_BAR_CLASS} items-end`
     : 'top-[4.25rem] items-start md:top-3';
 }
 
@@ -321,7 +318,7 @@ function PlaybackHudImpl({
   position = 'top',
   windowControls = false,
 }: PlaybackHudProps) {
-  const { duration, guideVolume, guideAvailable } = usePlaybackTransportState();
+  const { guideVolume, guideAvailable } = usePlaybackTransportState();
   const { subscribe, getCurrentTime } = usePlaybackTransportActions();
   const { themeIndex, videoFlavor } = usePlaybackThemeState();
   const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, segments, transcriptSource } =
@@ -329,8 +326,6 @@ function PlaybackHudImpl({
   const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
   const { pitchScore, micUserEnabled, micName, micMonitorUserEnabled } = usePlaybackMicState();
 
-  const lastSecondRef = useRef(-1);
-  const timerRef = useRef<HTMLParagraphElement>(null);
   const skipIntroRef = useRef<HTMLButtonElement>(null);
   const skipOutroRef = useRef<HTMLButtonElement>(null);
   const gapCaptionRef = useRef<HTMLOutputElement>(null);
@@ -362,20 +357,9 @@ function PlaybackHudImpl({
     };
 
     gapHintRef.current = 0;
-    if (timerRef.current) {
-      timerRef.current.textContent = `${formatTime(getCurrentTime())} / ${formatTime(duration)}`;
-    }
     updateGapCaption(getCurrentTime());
 
     return subscribe((time) => {
-      const sec = Math.floor(time);
-      if (sec !== lastSecondRef.current) {
-        lastSecondRef.current = sec;
-        if (timerRef.current) {
-          timerRef.current.textContent = `${formatTime(time)} / ${formatTime(duration)}`;
-        }
-      }
-
       if (skipIntroRef.current) {
         skipIntroRef.current.style.display =
           time < firstSegmentStart - introSkipLeadSec ? '' : 'none';
@@ -385,15 +369,7 @@ function PlaybackHudImpl({
       }
       updateGapCaption(time);
     });
-  }, [
-    subscribe,
-    getCurrentTime,
-    duration,
-    firstSegmentStart,
-    introSkipLeadSec,
-    lastSegmentEnd,
-    segments,
-  ]);
+  }, [subscribe, getCurrentTime, firstSegmentStart, introSkipLeadSec, lastSegmentEnd, segments]);
 
   const hudPosition = hudPositionClass(position);
   const rightHudOffset = windowControlsOffsetClass(position, windowControls);
@@ -413,9 +389,6 @@ function PlaybackHudImpl({
           </h1>
           <p className="line-clamp-1 [overflow-wrap:anywhere] text-sm text-white/70 md:text-base">
             {artist}
-          </p>
-          <p ref={timerRef} className="text-sm text-white/70 md:text-base">
-            0:00 / {formatTime(duration)}
           </p>
           <output
             ref={gapCaptionRef}

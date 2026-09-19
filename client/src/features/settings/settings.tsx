@@ -4,6 +4,11 @@ import { useNavigate } from 'react-router';
 import { setFullScreen, isFullScreen as tauriIsFullScreen } from '@/bridge/fullScreen';
 import { clampPlaybackScale } from '@/features/playback/lib/display-scale';
 import {
+  MAX_SEMITONE_TOLERANCE,
+  MIN_SEMITONE_TOLERANCE,
+  SEMITONE_TOLERANCE,
+} from '@/features/playback/lib/pitch/constants';
+import {
   ALIGN_BACKENDS,
   ASR_ENGINES,
   DEFAULTS,
@@ -26,6 +31,7 @@ import { PlaybackPreview } from '@/features/settings/components/playback-preview
 import {
   Hint,
   NumberButtonGroup,
+  OnOffButtonGroup,
   PageHeader,
   SettingsSelect,
 } from '@/features/settings/components/settings-controls';
@@ -58,12 +64,24 @@ const generalSettings = (config: AppConfig | undefined) => {
   };
 };
 
-const playbackSettings = (config: AppConfig | undefined) => ({
-  mode: config?.playback_mode ?? DEFAULTS.playback_mode,
+const clampScoringTolerance = (semitones: number | null | undefined): number =>
+  Math.min(
+    MAX_SEMITONE_TOLERANCE,
+    Math.max(MIN_SEMITONE_TOLERANCE, semitones ?? SEMITONE_TOLERANCE),
+  );
+
+const lyricsLayoutSettings = (config: AppConfig | undefined) => ({
   lyricsVertical: config?.lyrics_vertical_position ?? DEFAULTS.lyrics_vertical_position,
   lyricsHorizontal: config?.lyrics_horizontal_position ?? DEFAULTS.lyrics_horizontal_position,
   lyricsScale: clampPlaybackScale(config?.lyrics_scale),
+});
+
+const playbackSettings = (config: AppConfig | undefined) => ({
+  mode: config?.playback_mode ?? DEFAULTS.playback_mode,
+  ...lyricsLayoutSettings(config),
   pitchGraphScale: clampPlaybackScale(config?.pitch_graph_scale),
+  scoringTolerance: clampScoringTolerance(config?.pitch_tolerance_semitones),
+  autoPlayNext: config?.auto_play_next === true,
 });
 
 const pendingValue = <T,>(input: T | null, saved: T): T => input ?? saved;
@@ -77,6 +95,8 @@ const analysisSettings = (config: AppConfig | undefined) => {
       beamSize: DEFAULTS.beam_size,
       alignBackend: DEFAULTS.align_backend,
       autoAnalyze: DEFAULTS.auto_analyze,
+      wordLevelLyrics: false,
+      lyricsLookup: false,
       batchSize: DEFAULTS.batch_size,
       vocalThreshold: DEFAULTS.vocal_detection_threshold_pct,
     };
@@ -89,6 +109,8 @@ const analysisSettings = (config: AppConfig | undefined) => {
     beamSize: config.beam_size ?? DEFAULTS.beam_size,
     alignBackend: config.align_backend ?? DEFAULTS.align_backend,
     autoAnalyze: config.auto_analyze === true,
+    wordLevelLyrics: config.word_level_lyrics === true,
+    lyricsLookup: config.lyrics_lookup === true,
     batchSize: config.batch_size ?? DEFAULTS.batch_size,
     vocalThreshold: config.vocal_detection_threshold_pct ?? DEFAULTS.vocal_detection_threshold_pct,
   };
@@ -120,6 +142,8 @@ export const SettingsPage = () => {
   const lyricsScale = pendingValue(lyricsScaleInput, playback.lyricsScale);
   const [pitchGraphScaleInput, setPitchGraphScale] = useState<number | null>(null);
   const pitchGraphScale = pendingValue(pitchGraphScaleInput, playback.pitchGraphScale);
+  const [scoringToleranceInput, setScoringTolerance] = useState<number | null>(null);
+  const scoringTolerance = pendingValue(scoringToleranceInput, playback.scoringTolerance);
   const [vocalThresholdPctInput, setVocalThresholdPct] = useState<number | null>(null);
   const vocalThresholdPct = vocalThresholdPctInput ?? analysis.vocalThreshold;
 
@@ -165,6 +189,11 @@ export const SettingsPage = () => {
     mutate({ pitch_graph_scale: scale });
   };
 
+  const updateScoringTolerance = (semitones: number) => {
+    setScoringTolerance(semitones);
+    mutate({ pitch_tolerance_semitones: semitones });
+  };
+
   const updateVocalThreshold = (pct: number) => {
     setVocalThresholdPct(pct);
     mutate({ vocal_detection_threshold_pct: pct });
@@ -195,6 +224,7 @@ export const SettingsPage = () => {
     micLatencySec,
     lyricsScale,
     pitchGraphScale,
+    scoringTolerance,
     vocalThresholdPct,
     onBack: close,
     onTabChange: setTab,
@@ -202,6 +232,7 @@ export const SettingsPage = () => {
     onMicLatencyChange: updateMicLatency,
     onLyricsScaleChange: updateLyricsScale,
     onPitchGraphScaleChange: updatePitchGraphScale,
+    onScoringToleranceChange: updateScoringTolerance,
     onVocalThresholdChange: updateVocalThreshold,
   });
 
@@ -358,6 +389,37 @@ export const SettingsPage = () => {
                     className={getFocusClassName(NAV.playback.pitchGraphScale)}
                   />
                 </Field>
+
+                <Field>
+                  <Label>Scoring tolerance</Label>
+                  <Hint>
+                    How far off-pitch a note can be before it scores zero. Lower is stricter, higher
+                    is more forgiving ({scoringTolerance} semitone
+                    {scoringTolerance === 1 ? '' : 's'})
+                  </Hint>
+                  <Slider
+                    min={MIN_SEMITONE_TOLERANCE}
+                    max={MAX_SEMITONE_TOLERANCE}
+                    step={1}
+                    value={[scoringTolerance]}
+                    onValueChange={([semitones]) => updateScoringTolerance(semitones)}
+                    className={getFocusClassName(NAV.playback.scoringTolerance)}
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Auto-play next</Label>
+                  <Hint>
+                    When a song ends, start another random analyzed song instead of returning to the
+                    menu
+                  </Hint>
+                  <OnOffButtonGroup
+                    value={playback.autoPlayNext}
+                    segment={NAV.playback.autoPlayNext}
+                    getFocusClassName={getFocusClassName}
+                    onChange={(auto_play_next) => mutate({ auto_play_next })}
+                  />
+                </Field>
               </FieldGroup>
             </div>
           </TabsContent>
@@ -439,22 +501,40 @@ export const SettingsPage = () => {
               <Field>
                 <Label>Auto-analyze</Label>
                 <Hint>Automatically queue every unanalyzed song after scans finish</Hint>
-                <ButtonGroup>
-                  <Button
-                    variant={analysis.autoAnalyze ? 'outline' : 'default'}
-                    onClick={() => mutate({ auto_analyze: false })}
-                    className={getFocusClassName(analysisNav.autoAnalyze, 0)}
-                  >
-                    Off
-                  </Button>
-                  <Button
-                    variant={analysis.autoAnalyze ? 'default' : 'outline'}
-                    onClick={() => mutate({ auto_analyze: true })}
-                    className={getFocusClassName(analysisNav.autoAnalyze, 1)}
-                  >
-                    On
-                  </Button>
-                </ButtonGroup>
+                <OnOffButtonGroup
+                  value={analysis.autoAnalyze}
+                  segment={analysisNav.autoAnalyze}
+                  getFocusClassName={getFocusClassName}
+                  onChange={(auto_analyze) => mutate({ auto_analyze })}
+                />
+              </Field>
+
+              <Field>
+                <Label>Lyric lookup</Label>
+                <Hint>
+                  Search LRCLIB during analysis and use its line-level synced lyrics. Off analyzes
+                  faster and leaves songs lyric-less until you provide lyrics yourself
+                </Hint>
+                <OnOffButtonGroup
+                  value={analysis.lyricsLookup}
+                  segment={analysisNav.lyricsLookup}
+                  getFocusClassName={getFocusClassName}
+                  onChange={(lyrics_lookup) => mutate({ lyrics_lookup })}
+                />
+              </Field>
+
+              <Field>
+                <Label>Word-level lyric timing</Label>
+                <Hint>
+                  Run WhisperX to time every word for karaoke highlighting. Much slower than
+                  line-level lyrics from LRCLIB
+                </Hint>
+                <OnOffButtonGroup
+                  value={analysis.wordLevelLyrics}
+                  segment={analysisNav.wordLevelLyrics}
+                  getFocusClassName={getFocusClassName}
+                  onChange={(word_level_lyrics) => mutate({ word_level_lyrics })}
+                />
               </Field>
 
               <Field>

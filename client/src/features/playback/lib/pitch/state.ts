@@ -17,14 +17,18 @@ export function freqToSemitone(hz: number): number {
   return 12 * Math.log2(hz / 440) + 69;
 }
 
-export function pitchSimilarity(refHz: number, userHz: number): number {
+export function pitchSimilarity(
+  refHz: number,
+  userHz: number,
+  toleranceSemitones: number = SEMITONE_TOLERANCE,
+): number {
   const refSemi = freqToSemitone(refHz);
   const userSemi = freqToSemitone(userHz);
   let diff = Math.abs(refSemi - userSemi) % 12;
   if (diff > 6) {
     diff = 12 - diff;
   }
-  return Math.max(0, 1 - diff / SEMITONE_TOLERANCE);
+  return Math.max(0, 1 - diff / toleranceSemitones);
 }
 
 function ema(prev: number | null | undefined, current: number | null | undefined): number | null {

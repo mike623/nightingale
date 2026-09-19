@@ -1,6 +1,7 @@
 mod analyzer;
 mod cache;
 mod config;
+mod import;
 mod logging;
 mod lyrics;
 mod microphones;
@@ -12,14 +13,21 @@ mod scanner;
 mod vendor;
 
 use analyzer::{
-    cancel_analysis, delete_song_cache, enqueue, realign, reanalyze_force_transcribe,
+    cancel_analysis, delete_song, delete_song_cache, enqueue, realign, reanalyze_force_transcribe,
     reanalyze_full, reanalyze_transcript, refresh_metadata, shift_key, shift_tempo,
 };
 use app_core::{AppConfig, PlaybackQueue, PlaybackSessionStore, SongsStore};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-use cache::{calculate_cache_stats, clear_all, clear_models_command, clear_videos_command};
+use cache::{
+    calculate_cache_stats, clear_all, clear_models_command, clear_songs_command,
+    clear_videos_command, sweep_orphan_cache_command,
+};
 use config::{load_config, save_config};
-use lyrics::{apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics};
+use import::{import_available, imported_video_ids, probe_import, start_import};
+use lyrics::{
+    apply_timed_lyrics, clear_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
+    search_lrclib_terms,
+};
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
 use playback::{
     ensure_mp3_stems, ensure_playable_source_video, fetch_pixabay_videos, get_audio_paths,
@@ -89,6 +97,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(PlaybackQueue::default())
         .manage(PlaybackSessionStore::default())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
@@ -105,6 +114,8 @@ pub fn run() {
             calculate_cache_stats,
             clear_videos_command,
             clear_models_command,
+            clear_songs_command,
+            sweep_orphan_cache_command,
             clear_all,
             // Profile
             load_profiles,
@@ -137,10 +148,16 @@ pub fn run() {
             load_songs_meta,
             load_analysis_queue,
             load_library_menu_items,
+            // Import
+            import_available,
+            imported_video_ids,
+            probe_import,
+            start_import,
             // Analyzer
             enqueue,
             cancel_analysis,
             delete_song_cache,
+            delete_song,
             reanalyze_transcript,
             reanalyze_full,
             realign,
@@ -151,9 +168,11 @@ pub fn run() {
             // Lyrics
             load_lyrics,
             search_lrclib_lyrics,
+            search_lrclib_terms,
             save_lyrics,
             provide_lrc,
             apply_timed_lyrics,
+            clear_lyrics,
             // Playback
             load_transcript,
             get_audio_paths,

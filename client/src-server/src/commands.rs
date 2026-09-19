@@ -71,9 +71,18 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
             app_core::clear_models();
             Ok(Value::Null)
         }
+        "clear_songs_command" => {
+            app_core::clear_songs();
+            Ok(Value::Null)
+        }
+        "sweep_orphan_cache_command" => {
+            let report = app_core::sweep_orphan_cache().map_err(ApiError::bad_request)?;
+            Ok(serde_json::to_value(report).map_err(serde_err)?)
+        }
         "clear_all" => {
             app_core::clear_models();
             app_core::clear_videos();
+            app_core::clear_songs();
             Ok(Value::Null)
         }
 
@@ -329,6 +338,12 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
             let args: SongTargetArgs = deserialize(payload)?;
             Ok(Value::from(
                 app_core::delete_cache(args.target).map_err(ApiError::internal)?,
+            ))
+        }
+        "delete_song" => {
+            let args: SongTargetArgs = deserialize(payload)?;
+            Ok(Value::from(
+                app_core::delete_song(args.target).map_err(ApiError::bad_request)?,
             ))
         }
         "reanalyze_transcript" => {

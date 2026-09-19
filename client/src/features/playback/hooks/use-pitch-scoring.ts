@@ -6,6 +6,7 @@ import {
   MAX_MIC_LATENCY_COMPENSATION_SEC,
   MIN_MIC_LATENCY_COMPENSATION_SEC,
   PITCH_WINDOW_SAMPLES,
+  SEMITONE_TOLERANCE,
 } from '@/features/playback/lib/pitch/constants';
 import {
   createPitchDetector,
@@ -32,12 +33,14 @@ export function usePitchScoring(
   { isReady, duration, getReferenceBuffer, subscribe }: PitchScoringSource,
   micPitch: number | null,
   latencyCompensationSec = DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
+  toleranceSemitones: number = SEMITONE_TOLERANCE,
 ) {
   const refDetector = useRef(createPitchDetector());
   const scratchRef = useRef(new Float32Array(PITCH_WINDOW_SAMPLES));
   const bufferRef = useRef(new PitchStateBuffer());
   const scoringRef = useRef(new PitchScoring(1));
   const micPitchRef = useLatestRef(micPitch);
+  const toleranceRef = useLatestRef(toleranceSemitones);
   const latencyRef = useLatestRef(
     Math.min(
       MAX_MIC_LATENCY_COMPENSATION_SEC,
@@ -88,7 +91,8 @@ export function usePitchScoring(
           scratchRef.current,
           reference.sampleRate,
         );
-        const sim = refHz !== null && mp !== null ? pitchSimilarity(refHz, mp) : 0;
+        const sim =
+          refHz !== null && mp !== null ? pitchSimilarity(refHz, mp, toleranceRef.current) : 0;
         bufferRef.current.tryPush(refHz, mp, sim, t);
         scoringRef.current.accumulate(t, refHz, mp, sim);
       }
@@ -98,7 +102,7 @@ export function usePitchScoring(
     };
 
     return subscribe(run);
-  }, [getReferenceBuffer, isReady, latencyRef, micPitchRef, subscribe]);
+  }, [getReferenceBuffer, isReady, latencyRef, micPitchRef, subscribe, toleranceRef]);
 
   return { series, score };
 }

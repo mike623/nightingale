@@ -76,6 +76,11 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   align_backend: nullableString,
   vocal_detection_threshold_pct: nullableNumber,
   auto_analyze: nullableBoolean,
+  word_level_lyrics: nullableBoolean,
+  lyrics_lookup: nullableBoolean,
+  analysis_workers: nullableNumber,
+  pitch_tolerance_semitones: nullableNumber,
+  auto_play_next: nullableBoolean,
   song_list_view: nullableString,
   song_list_sort: z
     .array(

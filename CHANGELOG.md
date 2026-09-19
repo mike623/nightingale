@@ -13,8 +13,27 @@ below.
 
 ## [Unreleased]
 
+### Features
+
+- The playback bar has a Restart button beside pause and next, which sends the song back to its start without changing whether it is playing.
+- The playback pause overlay now offers Edit Lyrics, opening the lyrics editor for the playing song without leaving playback.
+- The lyrics editor now opens an analyzed song on its transcript rendered as Enhanced LRC, so the timing a song plays with is visible and editable instead of being replaced by plain lines. Songs with no transcript yet still open on their saved lyrics.
+- The lyrics editor's Edit tab offers ±0.1s, ±0.5s, and ±1s shift buttons that move every LRC line and word timestamp at once, keeping each tag's own precision.
+- The lyrics editor has a third tab that opens Lyricsify in its own application window, already searched for the song's artist and title.
+- Copying lyrics while that Lyricsify window is open closes it and drops the text straight into the Edit tab, leaving unsaved edits untouched.
+
+### Improvements
+
+- Desktop updates are now signed with this fork's own key and fetched from this fork's releases.
+- Pushes to `dev-port` now publish a signed release the desktop updater picks up, versioned `<next-minor>-mike.<run>` so each dev build supersedes the last without outranking a real release of that version.
+- YouTube imports now prefer H.264 video and AAC audio, so downloaded videos play in the desktop webview without conversion.
+- Added `scripts/repair-videos.sh`, which converts already-imported videos the webview cannot decode into cached playable copies. Source files, song identity, and existing analysis are left untouched.
+
 ### Fixes
 
+- Saving lyrics while a song is playing now updates the running playback. The transcript was loaded once per song, so new timing only appeared after a restart.
+- A cached playable copy of a video is now used ahead of the original, so an MP4 holding codecs the webview cannot decode no longer plays as a black or silent screen.
+- Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
 - Analysis status sorting now orders ready songs by the transcript source shown in their status badge.
 
 ## [1.2.0] - 2026-09-02
