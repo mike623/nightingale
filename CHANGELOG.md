@@ -16,6 +16,7 @@ below.
 ### Features
 
 - The playback pause overlay now offers Edit Lyrics, opening the lyrics editor for the playing song without leaving playback.
+- The lyrics editor has a third tab that opens Lyricsify in an embedded, sandboxed frame, already searched for the song's artist and title, with a button to open the same page in the system browser.
 
 ### Improvements
 

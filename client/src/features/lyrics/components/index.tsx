@@ -17,6 +17,7 @@ import {
   isEditLyricsDialogMode,
   stripLrcToPlainLines,
 } from '@/features/lyrics/utils/edit-lyrics';
+import { lyricsifySearchUrl } from '@/features/lyrics/utils/lyricsify';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
 import {
@@ -36,6 +37,7 @@ import { LrcOptions, type TimingChoice } from './lrc-options';
 import { LrclibMatches } from './lrclib-matches';
 import { LRCLIB_SEARCH_SLOTS, LrclibSearch } from './lrclib-search';
 import { LyricsEditor } from './lyrics-editor';
+import { LyricsifyWeb } from './lyricsify-web';
 import { ringFor } from './parts';
 
 export { isEditLyricsDialogMode } from '@/features/lyrics/utils/edit-lyrics';
@@ -45,8 +47,17 @@ const LRC_SPEC_URL = 'https://en.wikipedia.org/wiki/LRC_(file_format)';
 /** Placeholder the library writes when a song carries no artist metadata. */
 const UNKNOWN_ARTIST = 'Unknown Artist';
 
-type EditLyricsTab = 'edit' | 'lrclib';
-const EDIT_LYRICS_TABS = ['edit', 'lrclib'] satisfies readonly EditLyricsTab[];
+type EditLyricsTab = 'edit' | 'lrclib' | 'web';
+const EDIT_LYRICS_TABS = ['edit', 'lrclib', 'web'] satisfies readonly EditLyricsTab[];
+
+const TAB_LABELS: Readonly<Record<EditLyricsTab, string>> = {
+  edit: 'Edit',
+  lrclib: 'LRCLIB matches',
+  web: 'Lyricsify',
+};
+
+const isEditLyricsTab = (value: string): value is EditLyricsTab =>
+  EDIT_LYRICS_TABS.some((tab) => tab === value);
 
 const editSongState = (song: Song | null) => ({
   fileHash: song?.file_hash ?? null,
@@ -176,8 +187,8 @@ const getSaveLabel = (
 type NavLayout = {
   stops: number[];
   editorSegment: number | null;
-  // Top "header row" containing tabs (slots 0..1) and, on the LRCLIB tab, the
-  // carousel arrows (slots 2..3) — all in the same segment so left/right walks
+  // Top "header row" containing the tab triggers and, on the LRCLIB tab, the
+  // carousel arrows after them — all in the same segment so left/right walks
   // across them.
   headerSegment: number | null;
   // Slot offset where the carousel arrows start inside `headerSegment`; null
@@ -185,6 +196,8 @@ type NavLayout = {
   arrowSlotStart: number | null;
   // Track / artist inputs plus the search button on the LRCLIB pane.
   searchSegment: number | null;
+  // "Open in browser" on the Lyricsify pane.
+  webSegment: number | null;
   // Timing / audio radio rows (each 2 slots) on the edit pane, present only
   // when their controls are enabled.
   timingSegment: number | null;
@@ -211,14 +224,15 @@ function navLayout({
   audioNav,
 }: NavLayoutInput): NavLayout {
   const onLrclib = activeTab === 'lrclib';
+  const tabCount = EDIT_LYRICS_TABS.length;
   const segments: { key: string; width: number }[] = [];
   let arrowSlotStart: number | null = null;
 
   if (onLrclib && hasCandidates) {
-    segments.push({ key: 'header', width: 4 });
-    arrowSlotStart = 2;
+    segments.push({ key: 'header', width: tabCount + 2 });
+    arrowSlotStart = tabCount;
   } else {
-    segments.push({ key: 'header', width: 2 });
+    segments.push({ key: 'header', width: tabCount });
   }
 
   if (onLrclib) {
@@ -226,6 +240,8 @@ function navLayout({
     if (hasCandidates) {
       segments.push({ key: 'use', width: Math.max(1, useSlots) });
     }
+  } else if (activeTab === 'web') {
+    segments.push({ key: 'web', width: 1 });
   } else {
     segments.push({ key: 'editor', width: 1 });
     if (timingNav) {
@@ -248,6 +264,7 @@ function navLayout({
     headerSegment: indexOf('header'),
     arrowSlotStart,
     searchSegment: indexOf('search'),
+    webSegment: indexOf('web'),
     editorSegment: indexOf('editor'),
     timingSegment: indexOf('timing'),
     audioSegment: indexOf('audio'),
@@ -269,6 +286,7 @@ type EditLyricsWorkspaceProps = {
   setCarouselIndex: (index: number) => void;
   editorPane: ReactNode;
   searchPane: ReactNode;
+  webPane: ReactNode;
   candidates: LrclibCandidate[];
   matchesError: Error | null;
   useThisSegment: number | null;
@@ -281,7 +299,7 @@ const EditLyricsWorkspace = (props: EditLyricsWorkspaceProps) => {
     <Tabs
       value={props.activeTab}
       onValueChange={(value) => {
-        if (value === 'edit' || value === 'lrclib') {
+        if (isEditLyricsTab(value)) {
           props.setActiveTab(value);
         }
       }}
@@ -300,7 +318,7 @@ const EditLyricsWorkspace = (props: EditLyricsWorkspaceProps) => {
                 props.headerSegment !== null && props.isFocused(props.headerSegment, slot),
               )}
             >
-              {tab === 'edit' ? 'Edit' : 'LRCLIB matches'}
+              {TAB_LABELS[tab]}
               {tab === 'lrclib' &&
                 (props.matchesLoading ? (
                   <Loader2Icon className="size-3 animate-spin" />
@@ -325,6 +343,9 @@ const EditLyricsWorkspace = (props: EditLyricsWorkspaceProps) => {
       </div>
       <TabsContent value="edit" className="mt-3 flex min-h-0 flex-1 flex-col">
         {props.editorPane}
+      </TabsContent>
+      <TabsContent value="web" className="mt-3 flex min-h-0 flex-1 flex-col">
+        {props.webPane}
       </TabsContent>
       <TabsContent value="lrclib" className="mt-3 flex min-h-0 flex-1 flex-col gap-2">
         {props.searchPane}
@@ -496,6 +517,9 @@ export const EditLyricsDialog = () => {
     setActiveTab('edit');
   };
 
+  // The Lyricsify tab opens straight on this song's search results.
+  const lyricsifyUrl = lyricsifySearchUrl(searchTrack, searchArtist);
+
   const currentCandidate = selectedCandidate(candidates, carouselIndex);
   const nav = navigationState({
     candidateCount,
@@ -520,8 +544,9 @@ export const EditLyricsDialog = () => {
         if (layout.headerSegment === null || segment !== layout.headerSegment) {
           return false;
         }
-        if (slot < 2) {
-          setActiveTab(slot === 0 ? 'edit' : 'lrclib');
+        const tab = slot < EDIT_LYRICS_TABS.length ? EDIT_LYRICS_TABS.at(slot) : undefined;
+        if (tab !== undefined) {
+          setActiveTab(tab);
           return true;
         }
         if (layout.arrowSlotStart !== null && slot >= layout.arrowSlotStart) {
@@ -544,6 +569,14 @@ export const EditLyricsDialog = () => {
         } else {
           void runManualSearch();
         }
+        return true;
+      };
+
+      const handleWeb = (): boolean => {
+        if (layout.webSegment === null || segment !== layout.webSegment) {
+          return false;
+        }
+        void openUrl(lyricsifyUrl);
         return true;
       };
 
@@ -605,6 +638,7 @@ export const EditLyricsDialog = () => {
       for (const handler of [
         handleHeader,
         handleSearch,
+        handleWeb,
         handleOption,
         handleCandidate,
         handleFooter,
@@ -663,6 +697,13 @@ export const EditLyricsDialog = () => {
           focusSegment(layout.searchSegment, slot);
         }
       }}
+    />
+  );
+
+  const webPane = (
+    <LyricsifyWeb
+      url={lyricsifyUrl}
+      focused={layout.webSegment !== null && isFocused(layout.webSegment)}
     />
   );
 
@@ -741,6 +782,7 @@ export const EditLyricsDialog = () => {
             setCarouselIndex={setCarouselIndex}
             editorPane={editorPane}
             searchPane={searchPane}
+            webPane={webPane}
             candidates={candidates}
             matchesError={autoQueryError(manualResults, candidatesQuery.error)}
             useThisSegment={layout.useThisSegment}
