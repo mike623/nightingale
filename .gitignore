@@ -63,3 +63,4 @@ replit.md
 
 # Local agent/tool state
 .omc/
+.gstack/
