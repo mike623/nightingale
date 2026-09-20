@@ -10,7 +10,11 @@ edition = "2021"
 # The standalone listener (its own axum router plus the embedded SPA). The
 # self-hosted server already owns a router and a static handler, so it depends
 # on this crate without the feature and reuses only the relay.
-listener = ["dep:rust-embed", "dep:mime_guess", "tokio/net"]
+listener = ["party", "dep:rust-embed", "dep:mime_guess", "tokio/net"]
+
+# The library and queue surface the phone page calls. Both targets serve it,
+# so it lives here rather than in either binary.
+party = ["dep:app-core"]
 
 [dependencies]
 axum = { version = "0.7", features = ["ws"] }
@@ -21,6 +25,7 @@ futures-util = "0.3"
 tracing = "0.1"
 rust-embed = { version = "8", features = ["compression"], optional = true }
 mime_guess = { version = "2", optional = true }
+app-core = { path = "../../app-core", optional = true }
 
 [lints]
 workspace = true

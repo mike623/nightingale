@@ -1,5 +1,8 @@
-//! The relay itself: a fan-out table plus the arbitration rules that decide
-//! which connection may steer playback.
+//! The relay itself: a fan-out table between the host page and the phones.
+//!
+//! Every phone may steer playback. A karaoke room is a group of people around
+//! one screen, so the relay does not decide whose turn it is; the only thing
+//! it refuses is a command with no host to perform it.
 //!
 //! The relay is deliberately dumb. It never touches the library, the player,
 //! or any `app-core` operation — it moves frames between the host page and
@@ -36,7 +39,6 @@ pub struct RemoteClient {
 struct RelayState {
     clients: HashMap<ClientId, mpsc::UnboundedSender<String>>,
     host: Option<ClientId>,
-    controller: Option<ClientId>,
     snapshot: Option<RemoteSnapshot>,
 }
 
@@ -75,16 +77,9 @@ impl Relay {
         let mut state = self.state.lock().await;
         state.clients.remove(&id);
 
-        let was_host = state.host == Some(id);
-        if was_host {
+        if state.host == Some(id) {
             state.host = None;
             state.snapshot = None;
-        }
-        if state.controller == Some(id) {
-            state.controller = None;
-        }
-
-        if was_host {
             broadcast_state(&state);
         }
         broadcast_session(&state);
@@ -100,7 +95,6 @@ impl Relay {
         let mut state = self.state.lock().await;
         state.clients.clear();
         state.host = None;
-        state.controller = None;
         state.snapshot = None;
     }
 
@@ -122,23 +116,18 @@ impl Relay {
             ClientFrame::Hello { role } => self.on_hello(id, role).await,
             ClientFrame::State(snapshot) => self.on_state(id, snapshot).await,
             ClientFrame::Command(command) => self.on_command(id, command).await,
-            ClientFrame::Claim { force } => self.on_claim(id, force).await,
-            ClientFrame::Release => self.on_release(id).await,
         }
     }
 
+    /// Only a host announcement changes anything a client renders: a phone
+    /// saying hello is already registered and has had its session frame.
     async fn on_hello(&self, id: ClientId, role: Role) {
-        let mut state = self.state.lock().await;
-        match role {
-            Role::Host => {
-                state.host = Some(id);
-            }
-            Role::Remote => {
-                if state.controller.is_none() {
-                    state.controller = Some(id);
-                }
-            }
+        if matches!(role, Role::Remote) {
+            return;
         }
+
+        let mut state = self.state.lock().await;
+        state.host = Some(id);
         broadcast_session(&state);
     }
 
@@ -167,27 +156,7 @@ impl Relay {
             send(&state, id, "remote.deny", &deny(DenyReason::NoHost));
             return;
         };
-        if state.controller != Some(id) && host != id {
-            send(&state, id, "remote.deny", &deny(DenyReason::NotController));
-            return;
-        }
         send(&state, host, "remote.command", &command);
-    }
-
-    async fn on_claim(&self, id: ClientId, force: bool) {
-        let mut state = self.state.lock().await;
-        if force || state.controller.is_none() {
-            state.controller = Some(id);
-        }
-        broadcast_session(&state);
-    }
-
-    async fn on_release(&self, id: ClientId) {
-        let mut state = self.state.lock().await;
-        if state.controller == Some(id) {
-            state.controller = None;
-        }
-        broadcast_session(&state);
     }
 }
 
@@ -229,7 +198,6 @@ fn send_session(state: &RelayState, id: ClientId) {
         "remote.session",
         &SessionFrame {
             you: id,
-            controller: state.controller,
             host_connected: state.host.is_some(),
         },
     );

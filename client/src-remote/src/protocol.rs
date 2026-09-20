@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Which side of the relay a connection is. The host plays the audio; remotes
-/// only send commands.
+/// only send commands. Every remote may send them.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
@@ -77,27 +77,18 @@ pub enum ClientFrame {
     State(RemoteSnapshot),
     #[serde(rename = "remote.command")]
     Command(RemoteCommand),
-    #[serde(rename = "remote.claim")]
-    Claim {
-        #[serde(default)]
-        force: bool,
-    },
-    #[serde(rename = "remote.release")]
-    Release,
 }
 
 /// Why a command was dropped. Closed set: the phone UI branches on it.
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DenyReason {
-    NotController,
     NoHost,
 }
 
 #[derive(Debug, Serialize)]
 pub(crate) struct SessionFrame {
     pub you: u64,
-    pub controller: Option<u64>,
     pub host_connected: bool,
 }
 

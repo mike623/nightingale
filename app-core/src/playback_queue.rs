@@ -55,6 +55,29 @@ impl PlaybackQueue {
         Ok(entries.iter().cloned().collect())
     }
 
+    /// Move the entry named by `id` to `to_index`, clamping the target to the
+    /// queue's current bounds. Position is the queue's whole meaning, so a
+    /// reorder changes nothing else about the entry it moves.
+    pub fn reorder(&self, id: &str, to_index: usize) -> Result<Vec<PlaybackQueueEntry>, String> {
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| "playback queue lock poisoned".to_string())?;
+
+        let from = entries
+            .iter()
+            .position(|entry| entry.id == id)
+            .ok_or_else(|| "queue entry not found".to_string())?;
+        let entry = entries
+            .remove(from)
+            .ok_or_else(|| "queue entry not found".to_string())?;
+
+        let target = to_index.min(entries.len());
+        entries.insert(target, entry);
+
+        Ok(entries.iter().cloned().collect())
+    }
+
     pub fn remove(&self, id: &str) -> Result<Vec<PlaybackQueueEntry>, String> {
         let mut entries = self
             .entries

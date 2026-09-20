@@ -41,12 +41,11 @@ export const remoteStateSchema = remoteSnapshotSchema.nullable();
 
 export const remoteSessionSchema = z.object({
   you: z.number(),
-  controller: z.number().nullable(),
   host_connected: z.boolean(),
 });
 
 export const remoteDenySchema = z.object({
-  reason: z.enum(['not-controller', 'no-host']),
+  reason: z.enum(['no-host']),
 });
 
 /**

@@ -24,6 +24,7 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use rust_embed::RustEmbed;
 use tokio::sync::oneshot;
 
+use crate::party::PartyState;
 use crate::relay::Relay;
 
 /// The same frontend build the self-hosted server embeds. The phone loads
@@ -56,17 +57,19 @@ impl Drop for RemoteListener {
     }
 }
 
-/// Routes for the relay listener: the WebSocket and the embedded bundle.
-pub fn router(relay: Arc<Relay>) -> Router {
+/// Routes for the relay listener: the WebSocket, the library and queue
+/// surface, and the embedded bundle.
+pub fn router(relay: Arc<Relay>, party: PartyState) -> Router {
     Router::new()
         .route("/ws", any(handle_upgrade))
         .fallback(handle_static)
         .with_state(relay)
+        .merge(crate::party::router(party))
 }
 
 /// Bind `addr` and start serving. Pass port 0 for an ephemeral port and read
 /// the chosen one back from the returned handle.
-pub async fn serve(addr: SocketAddr) -> Result<RemoteListener, String> {
+pub async fn serve(addr: SocketAddr, party: PartyState) -> Result<RemoteListener, String> {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| format!("failed to bind remote listener on {addr}: {e}"))?;
@@ -76,7 +79,7 @@ pub async fn serve(addr: SocketAddr) -> Result<RemoteListener, String> {
         .port();
 
     let relay = Arc::new(Relay::new());
-    let app = router(relay.clone());
+    let app = router(relay.clone(), party);
     let (tx, rx) = oneshot::channel();
 
     tokio::spawn(async move {

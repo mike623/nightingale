@@ -1,0 +1,94 @@
+import { z } from 'zod';
+
+/**
+ * The library and queue surface the phone page talks to.
+ *
+ * Unlike the rest of the bridge this has one implementation: the page always
+ * runs in a browser served by the host — the desktop listener or the
+ * self-hosted server — so it is always plain HTTP against its own origin.
+ *
+ * Everything here crosses the network, so every response is parsed before the
+ * UI sees it.
+ */
+
+const partySongSchema = z.object({
+  file_hash: z.string(),
+  title: z.string(),
+  artist: z.string(),
+  album: z.string(),
+  duration_secs: z.number(),
+  is_analyzed: z.boolean(),
+});
+
+const partySongsPageSchema = z.object({
+  songs: z.array(partySongSchema),
+  total: z.number(),
+});
+
+const partyEntrySchema = z.object({
+  id: z.string(),
+  song: partySongSchema,
+});
+
+const partyQueueSchema = z.array(partyEntrySchema);
+
+export type PartySong = z.infer<typeof partySongSchema>;
+export type PartyEntry = z.infer<typeof partyEntrySchema>;
+export type PartySongsPage = z.infer<typeof partySongsPageSchema>;
+
+const request = async (path: string, init?: RequestInit): Promise<unknown> => {
+  const response = await fetch(path, {
+    headers: init?.body === undefined ? undefined : { 'content-type': 'application/json' },
+    ...init,
+  });
+
+  if (!response.ok) {
+    throw new Error((await response.text()) || `request failed with ${response.status}`);
+  }
+
+  return await response.json();
+};
+
+export type PartySongsQuery = {
+  search: string;
+  skip: number;
+  take: number;
+};
+
+export const fetchPartySongs = async ({
+  search,
+  skip,
+  take,
+}: PartySongsQuery): Promise<PartySongsPage> => {
+  const params = new URLSearchParams({ skip: String(skip), take: String(take) });
+
+  if (search.length > 0) {
+    params.set('search', search);
+  }
+
+  return partySongsPageSchema.parse(await request(`/party/songs?${params.toString()}`));
+};
+
+export const fetchPartyQueue = async (): Promise<PartyEntry[]> =>
+  partyQueueSchema.parse(await request('/party/queue'));
+
+export const addPartyQueueEntry = async (fileHash: string): Promise<PartyEntry[]> =>
+  partyQueueSchema.parse(
+    await request('/party/queue', {
+      method: 'POST',
+      body: JSON.stringify({ file_hash: fileHash }),
+    }),
+  );
+
+export const reorderPartyQueue = async (id: string, toIndex: number): Promise<PartyEntry[]> =>
+  partyQueueSchema.parse(
+    await request('/party/queue/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ id, to_index: toIndex }),
+    }),
+  );
+
+export const removePartyQueueEntry = async (id: string): Promise<PartyEntry[]> =>
+  partyQueueSchema.parse(
+    await request(`/party/queue/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  );

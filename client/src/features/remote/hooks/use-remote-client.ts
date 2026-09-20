@@ -16,13 +16,10 @@ const DENIAL_VISIBLE_MS = 4000;
 export type RemoteClient = {
   snapshot: RemoteSnapshot | null;
   session: RemoteSession | null;
-  isController: boolean;
   connection: RemoteConnectionState;
   /** Last refusal from the relay, cleared shortly after it arrives. */
   denial: RemoteDeny | null;
   send: (command: RemoteCommand) => void;
-  claim: (force?: boolean) => void;
-  release: () => void;
 };
 
 /**
@@ -67,18 +64,8 @@ export function useRemoteClient(): RemoteClient {
     linkRef.current?.send(command);
   }, []);
 
-  const claim = useCallback((force = false) => {
-    linkRef.current?.claim(force);
-  }, []);
-
-  const release = useCallback(() => {
-    linkRef.current?.release();
-  }, []);
-
-  const isController = session !== null && session.controller === session.you;
-
   return useMemo(
-    () => ({ snapshot, session, isController, connection, denial, send, claim, release }),
-    [snapshot, session, isController, connection, denial, send, claim, release],
+    () => ({ snapshot, session, connection, denial, send }),
+    [snapshot, session, connection, denial, send],
   );
 }

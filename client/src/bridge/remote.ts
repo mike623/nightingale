@@ -57,13 +57,13 @@ export type RemoteHandlers = {
   onSession(session: RemoteSession): void;
   onSnapshot(snapshot: RemoteSnapshot | null): void;
   onDeny(deny: RemoteDeny): void;
-  /** Host role only: a command relayed from the phone in control. */
+  /** Host role only: a command relayed from one of the phones. */
   onCommand?(command: RemoteCommand): void;
 };
 
 /**
  * Which end of the relay this socket is. The host publishes snapshots and
- * answers commands; a remote sends commands and renders what it is told.
+ * answers commands; every remote sends commands and renders what it is told.
  */
 export type RemoteRole = 'host' | 'remote';
 
@@ -71,8 +71,6 @@ export type RemoteLink = {
   send(command: RemoteCommand): void;
   /** Host role only: publishes the current playback state to every phone. */
   publish(snapshot: RemoteSnapshot): void;
-  claim(force: boolean): void;
-  release(): void;
   close(): void;
 };
 
@@ -237,8 +235,6 @@ export const connectRemote = (
   return {
     send: (command) => post({ type: 'remote.command', ...command }),
     publish: (snapshot) => post({ type: 'remote.state', ...snapshot }),
-    claim: (force) => post({ type: 'remote.claim', force }),
-    release: () => post({ type: 'remote.release' }),
     close: () => {
       disposed = true;
 

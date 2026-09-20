@@ -90,6 +90,13 @@ async fn main() -> Result<(), String> {
 
     let state = AppState::new(data.is_some(), library.is_some(), bind_port);
 
+    let party = {
+        let events = state.events.clone();
+        remote::party::PartyState::new(state.playback_queue.clone(), move |entries| {
+            events.emit("playback-queue-changed", &entries);
+        })
+    };
+
     let app = Router::new()
         .route("/api/bootstrap", get(bootstrap::handle))
         .route("/api/cmd/:name", post(commands::handle_cmd))
@@ -97,7 +104,8 @@ async fn main() -> Result<(), String> {
         .route("/media/:hash/:kind", get(media::handle_hashed))
         .route("/ws", any(ws::handle_upgrade))
         .fallback(static_files::handle)
-        .with_state(state.clone());
+        .with_state(state.clone())
+        .merge(remote::party::router(party));
 
     tracing::info!(addr = %args.bind, "Nightingale self-hosted server listening");
 

@@ -5,6 +5,7 @@
 //! when the user turns the feature on, and `remote_stop` releases the port.
 
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 /// The port the listener binds. Fixed rather than ephemeral so the address a
 /// phone bookmarked keeps working across restarts; an OS-assigned port changed
@@ -13,8 +14,11 @@ use std::net::{Ipv4Addr, SocketAddr};
 /// machine surfaces as a bind error when remote control is switched on.
 const REMOTE_PORT: u16 = 51737;
 
+use app_core::{PlaybackQueue, PlaybackQueueEntry};
 use remote::listener::RemoteListener;
+use remote::party::PartyState;
 use serde::Serialize;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 use ts_rs::TS;
 
@@ -55,8 +59,23 @@ pub(crate) struct RemoteControl {
     listener: Mutex<Option<RemoteListener>>,
 }
 
+/// The listener shares the queue the desktop already owns, and announces a
+/// phone's change on the same event the desktop's own queue calls emit, so
+/// the library screen and the phones never disagree about what is queued.
+fn party_state(app: &AppHandle, queue: Arc<PlaybackQueue>) -> PartyState {
+    let app = app.clone();
+
+    PartyState::new(queue, move |entries: &[PlaybackQueueEntry]| {
+        if let Err(error) = app.emit("playback-queue-changed", entries) {
+            tracing::warn!("failed to announce a queue change from the remote: {error}");
+        }
+    })
+}
+
 #[tauri::command]
 pub(crate) async fn remote_start(
+    app: AppHandle,
+    queue: tauri::State<'_, Arc<PlaybackQueue>>,
     control: tauri::State<'_, RemoteControl>,
 ) -> Result<RemoteStatus, String> {
     let mut guard = control.listener.lock().await;
@@ -65,7 +84,7 @@ pub(crate) async fn remote_start(
     }
 
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, REMOTE_PORT));
-    let listener = remote::listener::serve(addr).await?;
+    let listener = remote::listener::serve(addr, party_state(&app, queue.inner().clone())).await?;
     let status = RemoteStatus::running(listener.port());
     *guard = Some(listener);
     Ok(status)

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use app_core::{PlaybackQueue, PlaybackQueueEntry};
 use tauri::{AppHandle, Emitter, State};
 
@@ -10,7 +12,7 @@ fn emit_queue(app: &AppHandle, entries: &[PlaybackQueueEntry]) -> Result<(), Str
 
 #[tauri::command]
 pub(crate) fn load_playback_queue(
-    queue: State<'_, PlaybackQueue>,
+    queue: State<'_, Arc<PlaybackQueue>>,
 ) -> Result<Vec<PlaybackQueueEntry>, String> {
     queue.entries()
 }
@@ -18,7 +20,7 @@ pub(crate) fn load_playback_queue(
 #[tauri::command]
 pub(crate) fn add_playback_queue_entry(
     app: AppHandle,
-    queue: State<'_, PlaybackQueue>,
+    queue: State<'_, Arc<PlaybackQueue>>,
     file_hash: String,
     tempo: f64,
     key_offset: i32,
@@ -31,7 +33,7 @@ pub(crate) fn add_playback_queue_entry(
 #[tauri::command]
 pub(crate) fn remove_playback_queue_entry(
     app: AppHandle,
-    queue: State<'_, PlaybackQueue>,
+    queue: State<'_, Arc<PlaybackQueue>>,
     id: String,
 ) -> Result<Vec<PlaybackQueueEntry>, String> {
     let entries = queue.remove(&id)?;
@@ -42,7 +44,7 @@ pub(crate) fn remove_playback_queue_entry(
 #[tauri::command]
 pub(crate) fn clear_playback_queue(
     app: AppHandle,
-    queue: State<'_, PlaybackQueue>,
+    queue: State<'_, Arc<PlaybackQueue>>,
 ) -> Result<Vec<PlaybackQueueEntry>, String> {
     let entries = queue.clear()?;
     emit_queue(&app, &entries)?;

@@ -102,7 +102,7 @@ pub fn run() {
     logging::init();
 
     tauri::Builder::default()
-        .manage(PlaybackQueue::default())
+        .manage(std::sync::Arc::new(PlaybackQueue::default()))
         .manage(PlaybackSessionStore::default())
         .manage(RemoteControl::default())
         .plugin(tauri_plugin_clipboard_manager::init())
