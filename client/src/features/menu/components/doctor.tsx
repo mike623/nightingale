@@ -65,6 +65,23 @@ const logText = (tail: LogTail | undefined): string => {
 const probeDetail = (probe: RemoteProbe): string =>
   probe.address === null ? probe.detail : `${probe.address} — ${probe.detail}`;
 
+/**
+ * A connection to this machine's own network address never leaves it, so a
+ * listener that answers over loopback but not there is being held back on
+ * this Mac rather than out on the network.
+ */
+const LocalBlockHint = () => (
+  <li className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+    <p className="font-medium text-foreground">This machine is blocking its own address</p>
+    <p className="mt-1">
+      A request to this machine's network address never reaches the network, so a phone will not get
+      through either. On macOS, check both: System Settings → Network → Firewall → Options, where
+      Nightingale must be allowed to receive incoming connections, and System Settings → Privacy
+      &amp; Security → Local Network, where Nightingale must be switched on.
+    </p>
+  </li>
+);
+
 const RemoteChecks = ({ diagnostics }: { diagnostics: RemoteDiagnostics }) => (
   <ul className="space-y-2">
     <Check
@@ -82,6 +99,9 @@ const RemoteChecks = ({ diagnostics }: { diagnostics: RemoteDiagnostics }) => (
       ok={diagnostics.loopback.ok}
     />
     <Check detail={probeDetail(diagnostics.lan)} label="Network address" ok={diagnostics.lan.ok} />
+    {diagnostics.loopback.ok && !diagnostics.lan.ok && diagnostics.lan.address !== null && (
+      <LocalBlockHint />
+    )}
     <li className="text-xs text-muted-foreground">
       {diagnostics.status.lan_url === null
         ? 'No address to hand a phone: this machine is not on a local network.'

@@ -156,8 +156,13 @@ fn missing_probe(reason: &str) -> RemoteProbe {
     }
 }
 
-/// Ask the listener for the queue over a plain socket and keep its status
-/// line. The request is fixed text, so a failure is the transport's.
+/// Ask the listener for the queue over a plain socket and report what came
+/// back. Each stage is reported separately: a refused connection, a
+/// connection that answers nothing, and an answer that is not a listener of
+/// ours are three different faults with three different fixes.
+///
+/// The request is fixed text, so anything that goes wrong here is the
+/// transport's.
 async fn probe(address: SocketAddr) -> RemoteProbe {
     let attempt = timeout(PROBE_TIMEOUT, async {
         let mut stream = TcpStream::connect(address).await?;
@@ -177,6 +182,10 @@ async fn probe(address: SocketAddr) -> RemoteProbe {
     .await;
 
     let (ok, detail) = match attempt {
+        Ok(Ok(response)) if response.is_empty() => (
+            false,
+            "connected, then the connection closed without an answer".to_string(),
+        ),
         Ok(Ok(response)) => {
             let status = response
                 .lines()
@@ -184,10 +193,15 @@ async fn probe(address: SocketAddr) -> RemoteProbe {
                 .unwrap_or_default()
                 .trim()
                 .to_string();
-            (status.contains("200"), status)
+
+            if status.contains("200") {
+                (true, status)
+            } else {
+                (false, format!("answered {status}"))
+            }
         }
         Ok(Err(error)) => (false, error.to_string()),
-        Err(_) => (false, "timed out".to_string()),
+        Err(_) => (false, "no answer within two seconds".to_string()),
     };
 
     RemoteProbe {
