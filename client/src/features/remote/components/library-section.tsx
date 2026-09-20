@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import type { PartySong } from '@/bridge/party';
 import { errorMessage } from '@/features/remote/lib/error-message';
-import { TOUCH_TARGET } from '@/features/remote/lib/touch-target';
+import { TOUCH_FIELD, TOUCH_TARGET } from '@/features/remote/lib/touch-target';
 import { useAddToPartyQueue, usePartySongs } from '@/features/remote/queries/use-party';
 import { Button } from '@/shared/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/components/ui/empty';
@@ -14,7 +14,7 @@ import { formatSeconds } from '@/shared/utils/format-duration';
 
 type SongRowProps = {
   song: PartySong;
-  onAdd: (fileHash: string) => void;
+  onAdd: (song: PartySong) => void;
   adding: boolean;
 };
 
@@ -32,7 +32,7 @@ const SongRow = ({ song, onAdd, adding }: SongRowProps) => (
       aria-label={`Add ${song.title} to the queue`}
       className={cn(TOUCH_TARGET, 'shrink-0 px-3')}
       disabled={adding}
-      onClick={() => onAdd(song.file_hash)}
+      onClick={() => onAdd(song)}
       type="button"
       variant="outline"
     >
@@ -117,7 +117,7 @@ export const LibrarySection = () => {
         <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           aria-label="Search the library"
-          className="h-12 pl-9"
+          className={cn(TOUCH_FIELD, 'pl-9')}
           enterKeyHint="search"
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search songs"

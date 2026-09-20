@@ -37,6 +37,7 @@ below.
 
 ### Improvements
 
+- Adding a song from the phone now confirms it by name. The queue can be on another tab and the host screen is across the room, so a tap that changed nothing visible looked like a tap that did nothing.
 - The phone remote page now scrolls when its controls are taller than the screen. The page previously relied on the window scrolling, which the application window deliberately does not do, so anything below the fold was unreachable on a short phone screen.
 - macOS builds are now ad-hoc signed, which is what lets remote control work at all on an Intel Mac. macOS attributes a privacy grant to an application's code signature; an unsigned application cannot hold one, cannot appear in the Local Network list, and is never prompted, so the system completed each phone's handshake and then cut the connection before a byte moved. Apple Silicon builds were unaffected because the linker always signs an arm64 binary, which is why the same release worked on one Mac and not the other.
 - Remote control now asks for macOS Local Network permission instead of silently refusing phones. macOS 15 and later complete the TCP handshake for an application that has not been granted local network access and then drop the request without sending a byte, so the listener looked healthy and reported its port while every phone — and any request to the machine's own network address — got an empty reply. Loopback is exempt from the check, which is why the host's own connection kept working and hid the failure. If access was denied earlier, re-allow Nightingale under System Settings → Privacy & Security → Local Network.
@@ -50,6 +51,7 @@ below.
 
 ### Fixes
 
+- The phone remote's search box no longer zooms the page in on iOS. Mobile Safari zooms when a focused field's text is under 16px and does not zoom back out, which left the rest of the page off-screen after one tap on search.
 - Advancing to the next song now plays the queue. The Next button, the keyboard and remote next command, and the end of a song took a random analyzed song even when songs were lined up, so a queue built from the phone or the library sidebar was only ever reachable by starting an entry by hand. Advancing now starts the queue's head and removes it from the queue; the weighted random draw stays as the fallback for an empty queue.
 - Restart, and any other seek, now clears the pitch graph and the score instead of leaving both frozen. Their positions were tracked as the song advanced and never moved back, so after a restart the graph kept the previous pass's points and stopped taking new ones, and the score stayed at its old value until playback passed the point it was interrupted at.
 - A song's own video now plays letterboxed inside the playback stage, so a video whose aspect ratio differs from the window keeps its full frame instead of being cropped. Pixabay ambient backgrounds still fill the stage.

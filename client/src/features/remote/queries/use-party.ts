@@ -9,6 +9,7 @@ import {
   removePartyQueueEntry,
   reorderPartyQueue,
   type PartyEntry,
+  type PartySong,
 } from '@/bridge/party';
 
 const PARTY_SONGS = ['party-songs'];
@@ -43,21 +44,37 @@ export const usePartyQueue = () =>
     refetchInterval: QUEUE_POLL_MS,
   });
 
+/**
+ * A phone hears nothing and feels nothing when the host accepts a change, and
+ * the queue it changed may be on another tab, so a mutation that leaves this
+ * screen looking the same says so with a toast.
+ */
 const useQueueMutation = <TInput>(
   mutationFn: (input: TInput) => Promise<PartyEntry[]>,
   failure: string,
+  success?: (input: TInput) => string,
 ) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn,
-    onSuccess: (entries) => queryClient.setQueryData(PARTY_QUEUE, entries),
+    onSuccess: (entries, input) => {
+      queryClient.setQueryData(PARTY_QUEUE, entries);
+
+      if (success !== undefined) {
+        toast.success(success(input));
+      }
+    },
     onError: (error: Error) => toast.error(`${failure}: ${error.message}`),
   });
 };
 
 export const useAddToPartyQueue = () =>
-  useQueueMutation(addPartyQueueEntry, 'Could not add that song');
+  useQueueMutation(
+    (song: PartySong) => addPartyQueueEntry(song.file_hash),
+    'Could not add that song',
+    (song) => `Added ${song.title} to the queue`,
+  );
 
 export const useRemoveFromPartyQueue = () =>
   useQueueMutation(removePartyQueueEntry, 'Could not remove that song');
