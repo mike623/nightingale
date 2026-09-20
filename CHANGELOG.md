@@ -50,6 +50,7 @@ below.
 
 ### Fixes
 
+- Advancing to the next song now plays the queue. The Next button, the keyboard and remote next command, and the end of a song took a random analyzed song even when songs were lined up, so a queue built from the phone or the library sidebar was only ever reachable by starting an entry by hand. Advancing now starts the queue's head and removes it from the queue; the weighted random draw stays as the fallback for an empty queue.
 - Restart, and any other seek, now clears the pitch graph and the score instead of leaving both frozen. Their positions were tracked as the song advanced and never moved back, so after a restart the graph kept the previous pass's points and stopped taking new ones, and the score stayed at its old value until playback passed the point it was interrupted at.
 - A song's own video now plays letterboxed inside the playback stage, so a video whose aspect ratio differs from the window keeps its full frame instead of being cropped. Pixabay ambient backgrounds still fill the stage.
 - About now reports the version of the running build, read from the bundle. It read the manifest at compile time, so a dev build claimed to be the last released version.

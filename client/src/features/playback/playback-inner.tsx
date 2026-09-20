@@ -57,7 +57,8 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
   const hudPosition = lyricsVerticalPosition === 'top' ? 'bottom' : 'top';
   const sessionWindowControls = sessionPlayback && isTauri;
 
-  const playNext = usePlaybackNext(song.file_hash);
+  const next = usePlaybackNext(song.file_hash);
+  const { playNext } = next;
 
   const { mode, setMode } = useDialog();
   const editingLyrics = isEditLyricsDialogMode(mode);
@@ -69,7 +70,7 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
   const result = usePlaybackResult(song, {
     queuePlayback,
     autoPlayNext: config?.auto_play_next === true,
-    playNext,
+    next,
   });
 
   return (

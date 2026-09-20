@@ -14,10 +14,7 @@ import { toast } from 'sonner';
 
 import successSoundUrl from '@/assets/sounds/success.mp3';
 import { addScore } from '@/bridge/profile';
-import {
-  usePlaybackQueueQuery,
-  useStartNextPlaybackQueueSong,
-} from '@/features/playback-queue/use-playback-queue';
+import type { PlaybackNext } from '@/features/playback/hooks/use-playback-next';
 import {
   usePlaybackMicState,
   usePlaybackTranscriptActions,
@@ -49,20 +46,17 @@ export type PlaybackResult = {
 export type PlaybackResultOptions = {
   queuePlayback: boolean;
   autoPlayNext: boolean;
-  /** Draws and starts a random analyzed song; used when the queue is empty. */
-  playNext: () => void;
+  /** Starts the next song: the queue's head, or a random draw. */
+  next: PlaybackNext;
 };
 
 export function usePlaybackResult(
   song: Song,
-  { queuePlayback, autoPlayNext, playNext }: PlaybackResultOptions,
+  { queuePlayback, autoPlayNext, next }: PlaybackResultOptions,
 ): PlaybackResult {
   const fileHash = song.file_hash;
   const queryClient = useQueryClient();
   const { data: profileData, isLoading: profilesLoading } = useProfiles();
-  const { data: entries = [] } = usePlaybackQueueQuery();
-  const { isPreparing, playNext: playQueueNext } = useStartNextPlaybackQueueSong(entries);
-
   const { isFinished } = usePlaybackTransportState();
   const { handleExit } = usePlaybackTransportActions();
   const { rawScore } = usePlaybackMicState();
@@ -76,7 +70,7 @@ export function usePlaybackResult(
   const scoreRef = useLatestRef(rawScore);
   const finishHandledRef = useRef(false);
   // The finish effect must not re-run when these change identity mid-song.
-  const autoNextRef = useLatestRef({ autoPlayNext, playNext });
+  const autoNextRef = useLatestRef({ autoPlayNext, next });
 
   useEffect(() => {
     if (!isFinished && !skipOutroPending) {
@@ -101,7 +95,7 @@ export function usePlaybackResult(
     // Leaving without a result: continue into another song, or exit.
     const leaveSession = () => {
       if (autoNextRef.current.autoPlayNext) {
-        autoNextRef.current.playNext();
+        autoNextRef.current.next.playNext();
       } else {
         handleExit();
       }
@@ -155,19 +149,15 @@ export function usePlaybackResult(
     };
   }, [showResult]);
 
-  const hasQueueNext = queuePlayback && entries.length > 0;
-
   const onNext = useCallback(() => {
     setAutoNextIn(null);
     // The queued start keeps the dialog up behind its "Preparing…" spinner; a
     // random draw unmounts this session, so hiding it first avoids a flash.
-    if (hasQueueNext) {
-      playQueueNext();
-      return;
+    if (!next.hasQueueNext) {
+      setShowResult(false);
     }
-    setShowResult(false);
-    playNext();
-  }, [hasQueueNext, playQueueNext, playNext]);
+    next.playNext();
+  }, [next]);
 
   useEffect(() => {
     if (autoNextIn === null) {
@@ -199,7 +189,7 @@ export function usePlaybackResult(
     score: resultScore,
     scores: profileData?.scores ?? [],
     activeProfile: profileData?.active ?? null,
-    nextPending: isPreparing,
+    nextPending: next.isPreparing,
     autoNextIn,
     onBack,
     onNext,
