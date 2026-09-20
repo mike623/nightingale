@@ -19,8 +19,8 @@ type SongRowProps = {
 };
 
 const SongRow = ({ song, onAdd, adding }: SongRowProps) => (
-  <li className="flex items-center justify-between gap-3 border-b py-2 last:border-b-0">
-    <div className="min-w-0">
+  <li className="flex min-w-0 items-center justify-between gap-3 border-b py-2 last:border-b-0">
+    <div className="min-w-0 flex-1">
       <p className="truncate text-sm font-medium">{song.title}</p>
       <p className="truncate text-xs text-muted-foreground">
         {song.artist} · {formatSeconds(song.duration_secs)}
@@ -30,14 +30,14 @@ const SongRow = ({ song, onAdd, adding }: SongRowProps) => (
 
     <Button
       aria-label={`Add ${song.title} to the queue`}
-      className={cn(TOUCH_TARGET, 'shrink-0')}
+      className={cn(TOUCH_TARGET, 'shrink-0 px-3')}
       disabled={adding}
       onClick={() => onAdd(song.file_hash)}
       type="button"
       variant="outline"
     >
       <ListPlusIcon />
-      Add
+      <span className="sr-only sm:not-sr-only">Add</span>
     </Button>
   </li>
 );
@@ -112,7 +112,7 @@ export const LibrarySection = () => {
   const [search, setSearch] = useState('');
 
   return (
-    <section aria-label="Library" className="space-y-3">
+    <section aria-label="Library" className="min-w-0 space-y-3">
       <div className="relative">
         <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input

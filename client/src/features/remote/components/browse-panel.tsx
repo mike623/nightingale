@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
  * one thing — putting songs in the queue — from either side of it.
  */
 export const BrowsePanel = () => (
-  <Tabs className="h-full" defaultValue="library">
+  <Tabs className="h-full min-w-0" defaultValue="library">
     <TabsList className="h-12 w-full">
       <TabsTrigger className="text-sm" value="library">
         Library
@@ -18,11 +18,11 @@ export const BrowsePanel = () => (
       </TabsTrigger>
     </TabsList>
 
-    <TabsContent className="text-sm" value="library">
+    <TabsContent className="min-w-0 text-sm" value="library">
       <LibrarySection />
     </TabsContent>
 
-    <TabsContent className="text-sm" value="queue">
+    <TabsContent className="min-w-0 text-sm" value="queue">
       <QueueSection />
     </TabsContent>
   </Tabs>

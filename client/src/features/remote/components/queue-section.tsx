@@ -148,7 +148,7 @@ export const QueueSection = () => {
   }
 
   return (
-    <section aria-label="Queue">
+    <section aria-label="Queue" className="min-w-0">
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
         <SortableContext
           items={entries.map((entry) => entry.id)}
