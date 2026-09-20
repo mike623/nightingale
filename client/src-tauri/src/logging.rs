@@ -40,9 +40,10 @@ pub(crate) fn init() {
 
     #[cfg(not(debug_assertions))]
     {
-        let log_dir = app_core::default_nightingale_dir();
-        let _ = std::fs::create_dir_all(&log_dir);
-        let log_path = log_dir.join("nightingale.log");
+        let log_path = app_core::log_path();
+        if let Some(parent) = log_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
 
         let file = match std::fs::File::create(&log_path) {
             Ok(f) => f,

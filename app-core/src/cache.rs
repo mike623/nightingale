@@ -382,8 +382,7 @@ impl CacheStats {
         let models_bytes = dir_size(&models_dir());
         let other_bytes = dir_size(&vendor_dir())
             + dir_size(&base.join("sounds"))
-            + default_nightingale_dir()
-                .join("nightingale.log")
+            + crate::logs::log_path()
                 .metadata()
                 .map(|m| m.len())
                 .unwrap_or(0)

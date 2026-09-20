@@ -3,6 +3,7 @@ mod cache;
 mod config;
 mod import;
 mod logging;
+mod logs;
 mod lyrics;
 mod microphones;
 mod play_history;
@@ -29,6 +30,7 @@ use import::{
     import_available, imported_video_id, imported_video_ids, probe_import, redownload_song,
     start_import,
 };
+use logs::read_log;
 use lyrics::{
     apply_timed_lyrics, clear_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
     search_lrclib_terms,
@@ -45,7 +47,7 @@ use playback_queue::{
 };
 use playback_session::{load_playback_session, save_playback_session};
 use profile::{add_score, create_profile, delete_profile, load_profiles, switch_profile};
-use remote_control::{remote_start, remote_status, remote_stop, RemoteControl};
+use remote_control::{remote_diagnostics, remote_start, remote_status, remote_stop, RemoteControl};
 use scanner::{
     clear_library_source, jellyfin_login, jellyfin_ping, load_analysis_queue,
     load_library_menu_items, load_songs, load_songs_by_hashes, load_songs_meta, navidrome_login,
@@ -118,6 +120,9 @@ pub fn run() {
             // Config
             load_config,
             save_config,
+            // Diagnostics
+            read_log,
+            remote_diagnostics,
             // Cache
             calculate_cache_stats,
             clear_videos_command,

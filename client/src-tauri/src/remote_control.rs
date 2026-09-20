@@ -6,6 +6,7 @@
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// The port the listener binds. Fixed rather than ephemeral so the address a
 /// phone bookmarked keeps working across restarts; an OS-assigned port changed
@@ -19,7 +20,10 @@ use remote::listener::RemoteListener;
 use remote::party::PartyState;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
+use tokio::time::timeout;
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -109,5 +113,119 @@ pub(crate) async fn remote_status(
     Ok(match guard.as_ref() {
         Some(listener) => RemoteStatus::running(listener.port()),
         None => RemoteStatus::stopped(),
+    })
+}
+
+/// How long a self-check waits before calling an address unreachable. The
+/// listener is on this machine, so a healthy answer is immediate; anything
+/// slower is a firewall or a stale address, not a slow server.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// One address the host tried to reach its own listener on.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub(crate) struct RemoteProbe {
+    /// `null` when there was no address to try.
+    pub address: Option<String>,
+    pub ok: bool,
+    /// The answer's status line, or why the attempt failed.
+    pub detail: String,
+}
+
+/// What the desktop can establish about remote control without leaving the
+/// machine: whether the listener is up, what address the QR code hands out,
+/// and whether that address actually answers from here.
+///
+/// A LAN address that fails here is the address itself — a lease that moved,
+/// or an interface that is no longer the route out. A LAN address that
+/// answers here but not from a phone is the network between them: a firewall,
+/// client isolation on the access point, or a different subnet.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub(crate) struct RemoteDiagnostics {
+    pub status: RemoteStatus,
+    pub loopback: RemoteProbe,
+    pub lan: RemoteProbe,
+}
+
+fn missing_probe(reason: &str) -> RemoteProbe {
+    RemoteProbe {
+        address: None,
+        ok: false,
+        detail: reason.to_string(),
+    }
+}
+
+/// Ask the listener for the queue over a plain socket and keep its status
+/// line. The request is fixed text, so a failure is the transport's.
+async fn probe(address: SocketAddr) -> RemoteProbe {
+    let attempt = timeout(PROBE_TIMEOUT, async {
+        let mut stream = TcpStream::connect(address).await?;
+        stream
+            .write_all(
+                format!(
+                    "GET /party/queue HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .await?;
+
+        let mut response = [0_u8; 64];
+        let read = stream.read(&mut response).await?;
+        Ok::<String, std::io::Error>(String::from_utf8_lossy(&response[..read]).to_string())
+    })
+    .await;
+
+    let (ok, detail) = match attempt {
+        Ok(Ok(response)) => {
+            let status = response
+                .lines()
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            (status.contains("200"), status)
+        }
+        Ok(Err(error)) => (false, error.to_string()),
+        Err(_) => (false, "timed out".to_string()),
+    };
+
+    RemoteProbe {
+        address: Some(address.to_string()),
+        ok,
+        detail,
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn remote_diagnostics(
+    control: tauri::State<'_, RemoteControl>,
+) -> Result<RemoteDiagnostics, String> {
+    let status = {
+        let guard = control.listener.lock().await;
+        match guard.as_ref() {
+            Some(listener) => RemoteStatus::running(listener.port()),
+            None => RemoteStatus::stopped(),
+        }
+    };
+
+    let Some(port) = status.port else {
+        return Ok(RemoteDiagnostics {
+            loopback: missing_probe("the listener is not running"),
+            lan: missing_probe("the listener is not running"),
+            status,
+        });
+    };
+
+    let loopback = probe(SocketAddr::from((Ipv4Addr::LOCALHOST, port))).await;
+    let lan = match remote::lan_ip() {
+        Some(ip) => probe(SocketAddr::new(ip, port)).await,
+        None => missing_probe("this machine has no address on a local network"),
+    };
+
+    Ok(RemoteDiagnostics {
+        status,
+        loopback,
+        lan,
     })
 }

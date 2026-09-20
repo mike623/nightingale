@@ -10,6 +10,7 @@ export type DialogMode =
   | 'select-profile'
   | 'leaderboards'
   | 'about'
+  | 'doctor'
   | 'update'
   | 'donate'
   | 'clear-playback-queue'

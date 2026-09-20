@@ -6,6 +6,7 @@ mod import;
 mod library_db;
 mod library_menu;
 mod library_model;
+mod logs;
 mod lrc;
 mod lyrics;
 pub mod media_server;
@@ -44,6 +45,7 @@ pub use library_model::{
     LibraryMenuFilters, LoadSongsParams, SongSort, SongSortColumn, SongTarget, SongsMeta,
     SongsStore, SortDirection,
 };
+pub use logs::{LogTail, log_path, read_log_tail};
 pub use lyrics::{
     LrclibCandidate, LyricsFile, apply_timed_lyrics, clear_lyrics, load_lyrics_file, provide_lrc,
     save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,

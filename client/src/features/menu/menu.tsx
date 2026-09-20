@@ -10,6 +10,7 @@ import { EditLyricsDialog } from '@/features/lyrics/components';
 import { SelectLanguageDialog } from '@/features/lyrics/components/language';
 import { ClearCacheDialog } from '@/features/menu/components/clear-cache';
 import { DeleteSongDialog } from '@/features/menu/components/delete-song';
+import { DoctorDialog } from '@/features/menu/components/doctor';
 import { DonateDialog } from '@/features/menu/components/donate';
 import { ExitDialog } from '@/features/menu/components/exit';
 import { InfoDialog } from '@/features/menu/components/info';
@@ -87,6 +88,7 @@ export const MenuLayout = () => {
       <CreateProfileDialog />
       <SelectProfileDialog />
       <InfoDialog />
+      <DoctorDialog />
       <LeaderboardsDialog />
       <UpdateDialog />
       <DonateDialog />
