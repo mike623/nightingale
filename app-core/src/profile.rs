@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -117,7 +119,7 @@ impl ProfileStore {
             .into_iter()
             .map(|(name, score)| (name.to_string(), score))
             .collect();
-        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.sort_by_key(|(_, score)| Reverse(*score));
         sorted.truncate(limit);
         sorted
     }
