@@ -3,8 +3,13 @@
 //!
 //! Everything here is reachable by anyone who can reach the address, so the
 //! surface is deliberately small: read the library, read the queue, and move
-//! songs within it. It exposes no filesystem path, no configuration, and no
-//! operation that writes to the library or the machine.
+//! songs within it. It exposes no filesystem path and no configuration.
+//!
+//! One route breaks the read-only shape: submitting a YouTube link runs a
+//! yt-dlp process and writes a file into the library folder. It is off unless
+//! the host turns it on, it takes a video id and nothing else from the
+//! submitter, and it is the reason every value that leaves here is built from
+//! the host's own data rather than passed through.
 
 use std::sync::Arc;
 
@@ -103,6 +108,7 @@ pub fn router(state: PartyState) -> Router {
         .route("/party/queue", get(queue).post(enqueue))
         .route("/party/queue/reorder", post(reorder))
         .route("/party/queue/:id", delete(dequeue))
+        .route("/party/import", get(import_queue).post(submit_import))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .with_state(state)
 }
@@ -239,4 +245,154 @@ async fn dequeue(
     (state.on_change)(&entries);
 
     Ok(Json(entries_response(&entries)))
+}
+
+/// A link is a URL. The body limit already bounds the request; this bounds the
+/// one field inside it before it is parsed.
+const MAX_LINK_CHARS: usize = 2048;
+
+/// Why an import failed, as much as a guest is told.
+///
+/// The host's own reason comes from yt-dlp's stderr, which quotes the paths it
+/// was writing to. That belongs on the machine that owns those paths, not on a
+/// phone belonging to whoever is in the room.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum PartyImportProblem {
+    Unavailable,
+    Network,
+    Failed,
+}
+
+fn coarse_problem(reason: &str) -> PartyImportProblem {
+    let lower = reason.to_ascii_lowercase();
+
+    if lower.contains("private")
+        || lower.contains("unavailable")
+        || lower.contains("removed")
+        || lower.contains("age")
+    {
+        return PartyImportProblem::Unavailable;
+    }
+
+    if lower.contains("network") || lower.contains("timed out") || lower.contains("resolve") {
+        return PartyImportProblem::Network;
+    }
+
+    PartyImportProblem::Failed
+}
+
+/// One import as a phone sees it. The stored row also carries the job it
+/// belongs to, who submitted it, and the host's own failure text; none of that
+/// leaves the machine.
+#[derive(Debug, Serialize)]
+pub struct PartyImport {
+    pub id: String,
+    pub title: String,
+    pub artist: String,
+    pub duration_secs: f64,
+    pub status: String,
+    pub pct: f64,
+    problem: Option<PartyImportProblem>,
+}
+
+impl From<&app_core::ImportQueueRow> for PartyImport {
+    fn from(row: &app_core::ImportQueueRow) -> Self {
+        Self {
+            id: row.id.clone(),
+            title: row.title.clone(),
+            artist: row.artist.clone(),
+            duration_secs: row.duration_secs,
+            status: format!("{:?}", row.status).to_lowercase(),
+            pct: row.pct,
+            problem: row.reason.as_deref().map(coarse_problem),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SubmitImportBody {
+    url: String,
+}
+
+/// `None` when the host has not turned phone imports on. Read per request so
+/// switching it off takes effect immediately rather than at the next restart.
+fn import_enabled() -> bool {
+    app_core::AppConfig::load().party_import
+}
+
+fn import_off() -> PartyError {
+    PartyError(
+        StatusCode::NOT_FOUND,
+        "Importing from a phone is turned off".to_string(),
+    )
+}
+
+/// Queue a YouTube video the phone asked for.
+///
+/// Only a video id survives from the request: the link is parsed, its host
+/// checked against the allowlist, and the URL that reaches yt-dlp is rebuilt
+/// from the id. Playlists are refused rather than reduced to one video.
+///
+/// Answers as soon as the row is queued. The title comes from oEmbed, which is
+/// one request, because the alternative is holding this open while yt-dlp is
+/// downloaded and updated.
+async fn submit_import(
+    State(_state): State<PartyState>,
+    Json(body): Json<SubmitImportBody>,
+) -> PartyResult<PartyImport> {
+    if !import_enabled() {
+        return Err(import_off());
+    }
+
+    if body.url.len() > MAX_LINK_CHARS {
+        return Err(bad_request("that link is too long"));
+    }
+
+    let video_id = app_core::video_id_of(&body.url).map_err(|e| bad_request(e.message()))?;
+
+    let (title, artist) = tokio::task::spawn_blocking({
+        let video_id = video_id.clone();
+        move || app_core::oembed_title(&video_id)
+    })
+    .await
+    .ok()
+    .flatten()
+    .unwrap_or_else(|| (video_id.clone(), String::new()));
+
+    let preview = app_core::ImportPreview {
+        is_playlist: false,
+        playlist_id: None,
+        playlist_title: None,
+        entries: vec![app_core::ImportEntry {
+            id: video_id,
+            title,
+            artist,
+            duration_secs: 0.0,
+        }],
+    };
+
+    let rows = app_core::submit_import(&preview, app_core::ImportSubmitter::Phone)
+        .map_err(|error| bad_request(&error))?;
+    let row = rows
+        .first()
+        .ok_or_else(|| bad_request("nothing was queued"))?;
+
+    Ok(Json(PartyImport::from(row)))
+}
+
+/// Every import the host is working through, whoever asked for it. A guest
+/// waiting on one song should see the three ahead of it rather than a queue
+/// that looks stuck.
+async fn import_queue(State(_state): State<PartyState>) -> PartyResult<Vec<PartyImport>> {
+    if !import_enabled() {
+        return Err(import_off());
+    }
+
+    Ok(Json(
+        app_core::import_queue()
+            .iter()
+            .map(PartyImport::from)
+            .collect(),
+    ))
 }

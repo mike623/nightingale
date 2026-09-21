@@ -88,6 +88,45 @@ export const reorderPartyQueue = async (id: string, toIndex: number): Promise<Pa
     }),
   );
 
+/** An import as a phone sees it. The host keeps yt-dlp's own words to itself:
+ * they quote the paths it was writing to. */
+const partyImportSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  artist: z.string(),
+  duration_secs: z.number(),
+  status: z.enum(['draft', 'queued', 'downloading', 'imported', 'skipped', 'failed']),
+  pct: z.number(),
+  problem: z.enum(['unavailable', 'network', 'failed']).nullable(),
+});
+
+const partyImportsSchema = z.array(partyImportSchema);
+
+export type PartyImport = z.infer<typeof partyImportSchema>;
+
+/** `null` when the host has not turned phone imports on. */
+export const fetchPartyImports = async (): Promise<PartyImport[] | null> => {
+  const response = await fetch('/party/import');
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error((await response.text()) || `request failed with ${response.status}`);
+  }
+
+  return partyImportsSchema.parse(await response.json());
+};
+
+export const submitPartyImport = async (url: string): Promise<PartyImport> =>
+  partyImportSchema.parse(
+    await request('/party/import', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
+  );
+
 export const removePartyQueueEntry = async (id: string): Promise<PartyEntry[]> =>
   partyQueueSchema.parse(
     await request(`/party/queue/${encodeURIComponent(id)}`, { method: 'DELETE' }),

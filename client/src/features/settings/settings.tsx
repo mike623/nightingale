@@ -86,6 +86,7 @@ const playbackSettings = (config: AppConfig | undefined) => ({
   scoringTolerance: clampScoringTolerance(config?.pitch_tolerance_semitones),
   autoPlayNext: config?.auto_play_next === true,
   remoteControl: config?.remote_control === true,
+  partyImport: config?.party_import === true,
 });
 
 const pendingValue = <T,>(input: T | null, saved: T): T => input ?? saved;
@@ -451,6 +452,23 @@ export const SettingsPage = () => {
                   />
                   {playback.remoteControl && <RemoteQr className="mt-3" />}
                 </Field>
+
+                {playback.remoteControl && (
+                  <Field>
+                    <Label>Import from a phone</Label>
+                    <Hint>
+                      Let a phone paste a YouTube link to download into your library. Anyone who can
+                      reach the address can add to it and make this machine download, so leave it
+                      off unless you trust the room
+                    </Hint>
+                    <OnOffButtonGroup
+                      value={playback.partyImport}
+                      segment={NAV.playback.partyImport}
+                      getFocusClassName={getFocusClassName}
+                      onChange={(party_import) => mutate({ party_import })}
+                    />
+                  </Field>
+                )}
               </FieldGroup>
             </div>
           </TabsContent>

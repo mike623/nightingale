@@ -232,6 +232,12 @@ pub struct AppConfig {
     /// listener still only starts when the UI asks for it.
     #[serde(default)]
     pub remote_control: bool,
+    /// Opt-in for letting a phone on the remote page submit a YouTube link to
+    /// import. Off by default: the party surface is unauthenticated, and this
+    /// is the one thing on it that runs a subprocess and writes to the library
+    /// folder. Anyone who can reach the address can use it.
+    #[serde(default)]
+    pub party_import: bool,
     pub song_list_view: Option<String>,
     #[serde(default, deserialize_with = "deserialize_song_list_sort")]
     pub song_list_sort: Option<Vec<SongSort>>,
@@ -297,6 +303,7 @@ impl Default for AppConfig {
             pitch_tolerance_semitones: None,
             auto_play_next: None,
             remote_control: false,
+            party_import: false,
             song_list_view: None,
             song_list_sort: None,
             language_overrides: None,

@@ -4,16 +4,19 @@ import { toast } from 'sonner';
 
 import {
   addPartyQueueEntry,
+  fetchPartyImports,
   fetchPartyQueue,
   fetchPartySongs,
   removePartyQueueEntry,
   reorderPartyQueue,
+  submitPartyImport,
   type PartyEntry,
   type PartySong,
 } from '@/bridge/party';
 
 const PARTY_SONGS = ['party-songs'];
 const PARTY_QUEUE = ['party-queue'];
+const PARTY_IMPORTS = ['party-imports'];
 
 const PAGE_SIZE = 25;
 
@@ -75,6 +78,46 @@ export const useAddToPartyQueue = () =>
     'Could not add that song',
     (song) => `Added ${song.title} to the queue`,
   );
+
+/**
+ * The host's import queue. Polled on the same interval as the playback queue
+ * and for the same reason: the relay carries playback state only, and a
+ * download moves without anything telling this page so.
+ *
+ * `null` data means the host has phone imports turned off.
+ */
+export const usePartyImports = () =>
+  useQuery({
+    queryKey: PARTY_IMPORTS,
+    queryFn: fetchPartyImports,
+    // A host with imports turned off answers the same way every time, so the
+    // poll stops rather than asking a closed door every three seconds.
+    refetchInterval: (data) => (data === null ? false : QUEUE_POLL_MS),
+  });
+
+/**
+ * Whether the host accepts links from a phone at all. A 404 is the host saying
+ * the door is shut, which is a different thing from an import having failed, so
+ * the tab is not offered rather than being offered and refusing.
+ */
+export const usePartyImportAllowed = () => {
+  const { data, isLoading } = usePartyImports();
+
+  return !isLoading && data !== null && data !== undefined;
+};
+
+export const useSubmitPartyImport = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: submitPartyImport,
+    onSuccess: (queued) => {
+      void queryClient.invalidateQueries({ queryKey: PARTY_IMPORTS });
+      toast.success(`Queued ${queued.title}`);
+    },
+    onError: (error: Error) => toast.error(`Could not queue that link: ${error.message}`),
+  });
+};
 
 export const useRemoveFromPartyQueue = () =>
   useQueueMutation(removePartyQueueEntry, 'Could not remove that song');

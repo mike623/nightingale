@@ -49,4 +49,11 @@ auto_play_next: boolean | null,
  * Opt-in for the LAN remote-control listener. Defaults to false, and the
  * listener still only starts when the UI asks for it.
  */
-remote_control: boolean, song_list_view: string | null, song_list_sort: Array<SongSort> | null, language_overrides: { [key in string]: string } | null, };
+remote_control: boolean, 
+/**
+ * Opt-in for letting a phone on the remote page submit a YouTube link to
+ * import. Off by default: the party surface is unauthenticated, and this
+ * is the one thing on it that runs a subprocess and writes to the library
+ * folder. Anyone who can reach the address can use it.
+ */
+party_import: boolean, song_list_view: string | null, song_list_sort: Array<SongSort> | null, language_overrides: { [key in string]: string } | null, };

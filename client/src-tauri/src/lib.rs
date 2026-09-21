@@ -217,7 +217,10 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
             app_core::startup()?;
-            spawn_import_worker(app.handle().clone());
+            spawn_import_worker(
+                app.handle().clone(),
+                app.state::<std::sync::Arc<PlaybackQueue>>().inner().clone(),
+            );
             app_core::media_server::start()?;
             let media_endpoint = app_core::media_server::endpoint();
 

@@ -1,4 +1,6 @@
-use app_core::{ImportEvent, ImportPreview, ImportQueueRow, ImportSubmitter, Song};
+use std::sync::Arc;
+
+use app_core::{ImportEvent, ImportPreview, ImportQueueRow, ImportSubmitter, PlaybackQueue, Song};
 use tauri::{AppHandle, Emitter};
 
 /// True only when the active library is a Folder — Import is hidden otherwise.
@@ -66,13 +68,18 @@ pub(crate) fn clear_finished_imports() -> usize {
 
 /// Start the one worker that drains the import queue, announcing what it does
 /// on the events the UI already listens for.
-pub(crate) fn spawn_import_worker(app: AppHandle) {
+pub(crate) fn spawn_import_worker(app: AppHandle, playback_queue: Arc<PlaybackQueue>) {
     std::thread::spawn(move || {
-        app_core::run_import_worker(|event| {
+        app_core::run_import_worker(playback_queue, |event| {
             let _ = match event {
                 ImportEvent::Progress(progress) => app.emit("import-progress", progress),
                 ImportEvent::Done(report) => app.emit("import-done", report),
                 ImportEvent::Error(error) => app.emit("import-error", error),
+                // The same event the desktop's own queue changes announce, so
+                // the library screen and the phones stay in step.
+                ImportEvent::PlaybackQueueChanged(entries) => {
+                    app.emit("playback-queue-changed", entries)
+                }
             };
         });
     });

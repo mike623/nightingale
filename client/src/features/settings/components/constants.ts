@@ -158,6 +158,7 @@ export const NAV = {
     scoringTolerance: 6,
     autoPlayNext: 7,
     remoteControl: 8,
+    partyImport: 9,
   },
 } as const;
 
