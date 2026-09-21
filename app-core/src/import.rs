@@ -262,10 +262,13 @@ pub fn redownload_song(file_hash: &str) -> Result<Song, String> {
 
 /// Resolve a YouTube URL to a preview without downloading media. `--flat-playlist`
 /// lists playlist entries cheaply; a bare video resolves to a single entry.
+///
+/// `--` closes the option list: without it a URL beginning with `-` is read by
+/// yt-dlp as a flag rather than as the thing to fetch.
 pub fn probe(url: &str) -> Result<ImportPreview, String> {
     let (yt, _) = ensure_ytdlp()?;
     let out = silent_command(&yt)
-        .args(["--flat-playlist", "--no-warnings", "-J", url])
+        .args(["--flat-playlist", "--no-warnings", "-J", "--", url])
         .output()
         .map_err(|e| format!("Failed to run yt-dlp: {e}"))?;
     if !out.status.success() {
@@ -691,6 +694,7 @@ fn download_entry(
                 "-o",
             ])
             .arg(&out_tmpl)
+            .arg("--")
             .arg(&url)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
