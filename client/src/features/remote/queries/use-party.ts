@@ -1,5 +1,5 @@
 import { arrayMove } from '@dnd-kit/sortable';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import {
@@ -27,18 +27,51 @@ const PAGE_SIZE = 25;
  */
 const QUEUE_POLL_MS = 3000;
 
-export const usePartySongs = (search: string) =>
-  useInfiniteQuery({
-    queryKey: [...PARTY_SONGS, search],
-    queryFn: ({ pageParam = 0 }: { pageParam?: number }) =>
-      fetchPartySongs({ search, skip: pageParam, take: PAGE_SIZE }),
-    getNextPageParam: (lastPage, pages) => {
-      const loaded = pages.reduce((sum, page) => sum + page.songs.length, 0);
+const pageOf = (index: number) => Math.floor(index / PAGE_SIZE);
 
-      return loaded < lastPage.total ? loaded : undefined;
-    },
-    keepPreviousData: true,
+const songPageQuery = (search: string, page: number) => ({
+  queryKey: [...PARTY_SONGS, search, page],
+  queryFn: () => fetchPartySongs({ search, skip: page * PAGE_SIZE, take: PAGE_SIZE }),
+  // A search is retyped a character at a time, so the list a guest is reading
+  // stays on screen until the results for what they finished typing arrive.
+  keepPreviousData: true,
+});
+
+/**
+ * How many songs match. A list has to know its own length before it can be
+ * scrolled through, and the first page carries the count, so asking is also the
+ * first read of the library.
+ */
+export const usePartyLibrarySize = (search: string) => {
+  const { data, isLoading, error } = useQuery(songPageQuery(search, 0));
+
+  return { total: data?.total ?? 0, isLoading, error };
+};
+
+/**
+ * The songs behind a window of rows, by their position in the whole library.
+ *
+ * Only the pages the window covers are fetched, so scrolling straight to the
+ * end of a long library waits for the page that ends it rather than for every
+ * page in front of it.
+ */
+export const usePartyLibraryWindow = (search: string, start: number, end: number) => {
+  const firstPage = pageOf(start);
+  const lastPage = pageOf(Math.max(end - 1, start));
+  const results = useQueries({
+    queries: Array.from({ length: lastPage - firstPage + 1 }, (_, offset) =>
+      songPageQuery(search, firstPage + offset),
+    ),
   });
+
+  return (index: number) => {
+    const page = pageOf(index) - firstPage;
+
+    return page >= 0 && page < results.length
+      ? results[page].data?.songs.at(index % PAGE_SIZE)
+      : undefined;
+  };
+};
 
 export const usePartyQueue = () =>
   useQuery({

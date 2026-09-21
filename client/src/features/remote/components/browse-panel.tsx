@@ -14,7 +14,7 @@ export const BrowsePanel = () => {
   const canImport = usePartyImportAllowed();
 
   return (
-    <Tabs className="h-full min-w-0" defaultValue="library">
+    <Tabs className="h-full min-h-0 min-w-0" defaultValue="library">
       <TabsList className="h-12 w-full">
         <TabsTrigger className="text-sm" value="library">
           Library
@@ -29,7 +29,7 @@ export const BrowsePanel = () => {
         )}
       </TabsList>
 
-      <TabsContent className="min-w-0 text-sm" value="library">
+      <TabsContent className="min-h-0 min-w-0 text-sm" value="library">
         <LibrarySection />
       </TabsContent>
 

@@ -25,9 +25,10 @@ export const RemoteTabs = ({ snapshot, positionMs, locked, send }: RemoteTabsPro
   const canImport = usePartyImportAllowed();
 
   return (
-    <Tabs className="min-w-0 flex-1" defaultValue="library">
-      {/* The page scrolls as one, so the switcher stays put rather than
-          stranding a reader at the bottom of a long library. */}
+    <Tabs className="min-h-0 min-w-0 flex-1" defaultValue="library">
+      {/* The library owns its own scroll, but the other surfaces run off the
+          bottom of a phone, so the switcher stays put rather than stranding a
+          reader at the end of one. */}
       <TabsList className="sticky top-0 z-10 h-12 w-full">
         <TabsTrigger className="text-sm" value="playing">
           Playing
@@ -49,7 +50,7 @@ export const RemoteTabs = ({ snapshot, positionMs, locked, send }: RemoteTabsPro
         <PlaybackPanel locked={locked} positionMs={positionMs} send={send} snapshot={snapshot} />
       </TabsContent>
 
-      <TabsContent className="min-w-0 text-sm" value="library">
+      <TabsContent className="min-h-0 min-w-0 text-sm" value="library">
         <LibrarySection />
       </TabsContent>
 
