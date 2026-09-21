@@ -95,17 +95,13 @@ async fn main() -> Result<(), String> {
     // blocking thread rather than a task on the async runtime.
     {
         let events = state.events.clone();
-        let playback_queue = state.playback_queue.clone();
         std::thread::spawn(move || {
-            app_core::run_import_worker(playback_queue, |event| match event {
+            app_core::run_import_worker(|event| match event {
                 app_core::ImportEvent::Progress(progress) => {
                     events.emit("import-progress", &progress);
                 }
                 app_core::ImportEvent::Done(report) => events.emit("import-done", &report),
                 app_core::ImportEvent::Error(error) => events.emit("import-error", &error),
-                app_core::ImportEvent::PlaybackQueueChanged(entries) => {
-                    events.emit("playback-queue-changed", &entries);
-                }
             });
         });
     }

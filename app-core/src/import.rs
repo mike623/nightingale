@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -116,9 +116,9 @@ pub struct ImportProgress {
     pub entry: Option<ImportEntryProgress>,
 }
 
-/// Who asked for an import. A phone's submission is acted on more freely than
-/// a desktop one — it has no screen to come back to — so the origin has to
-/// survive in the queue rather than being decided at the call site.
+/// Where a row came from. Recorded rather than acted on: an import does the
+/// same thing whoever asked for it, and the queue is shared, so this is what
+/// lets a row be read back as somebody's rather than nobody's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub enum ImportSubmitter {
@@ -166,9 +166,6 @@ pub enum ImportEvent {
     Progress(ImportProgress),
     Done(ImportReport),
     Error(String),
-    /// A phone's import landed and went on the playback queue. The owner puts
-    /// this on whatever it already uses to tell its screens the queue moved.
-    PlaybackQueueChanged(Vec<crate::PlaybackQueueEntry>),
 }
 
 /// Set when a job is submitted, cleared by the worker once it has looked. The
@@ -265,17 +262,9 @@ fn wake_worker() {
 /// taken before the other's entries existed and the later save would drop them.
 /// Entries within a job still download `DOWNLOAD_CONCURRENCY` at a time.
 ///
-/// A video a phone asked for goes on the playback queue as soon as it lands —
-/// the guest who submitted it has no screen to come back to. A video the
-/// desktop asked for does not: importing fifty tracks is stocking a library,
-/// not lining up fifty songs to sing.
-///
 /// Never returns. The owner spawns it on its own thread at startup and gives it
-/// the playback queue and the way it announces progress.
-pub fn run_import_worker(
-    playback_queue: Arc<crate::PlaybackQueue>,
-    emit: impl Fn(ImportEvent) + Send + Sync,
-) {
+/// the way it announces progress.
+pub fn run_import_worker(emit: impl Fn(ImportEvent) + Send + Sync) {
     if let Err(e) = crate::library_db::import_queue_requeue_stale() {
         warn!("[import] could not requeue interrupted downloads: {e}");
     }
@@ -292,7 +281,7 @@ pub fn run_import_worker(
             let Some(job_id) = next else {
                 break;
             };
-            run_job(&job_id, &playback_queue, &emit);
+            run_job(&job_id, &emit);
         }
 
         let Ok(mut ready) = WAKE.lock() else {
@@ -313,11 +302,7 @@ pub fn run_import_worker(
 /// Every row it picks up must leave `Queued`, whatever happens — the drain loop
 /// selects jobs by the presence of a queued row, so one left behind would be
 /// handed straight back.
-fn run_job(
-    job_id: &str,
-    playback_queue: &Arc<crate::PlaybackQueue>,
-    emit: &(impl Fn(ImportEvent) + Send + Sync),
-) {
+fn run_job(job_id: &str, emit: &(impl Fn(ImportEvent) + Send + Sync)) {
     let rows = match crate::library_db::import_queue_job_rows(job_id) {
         Ok(rows) => rows,
         Err(e) => {
@@ -366,10 +351,7 @@ fn run_job(
     });
 
     match result {
-        Ok(report) => {
-            queue_for_singing(&rows, playback_queue, emit);
-            emit(ImportEvent::Done(report));
-        }
+        Ok(report) => emit(ImportEvent::Done(report)),
         Err(e) => {
             settle_unfinished(job_id, &e);
             emit(ImportEvent::Error(e));
@@ -381,59 +363,6 @@ fn run_job(
     // `run_import`, or a worker that never claimed it — would otherwise leave
     // the row queued and the job would be selected again immediately.
     settle_unfinished(job_id, "The import ended before this video was reached");
-}
-
-/// Put each video a phone asked for on the playback queue.
-///
-/// The song has to be in the library before it can be queued —
-/// `PlaybackQueue::add` resolves the row and keeps a copy of it — and the scan
-/// this import triggered runs on its own thread, so waiting for it would be a
-/// race. The file is read here instead and its row written directly; the scan
-/// skips paths it already holds, so it finds nothing to do for this one.
-fn queue_for_singing(
-    rows: &[ImportQueueRow],
-    playback_queue: &Arc<crate::PlaybackQueue>,
-    emit: &(impl Fn(ImportEvent) + Send + Sync),
-) {
-    let wanted: Vec<&ImportQueueRow> = rows
-        .iter()
-        .filter(|row| row.submitted_by == ImportSubmitter::Phone)
-        .collect();
-    if wanted.is_empty() {
-        return;
-    }
-
-    let Some(root) = import_folder_root() else {
-        return;
-    };
-    let manifest = load_manifest(&root);
-    let cache = crate::cache::CacheDir::new();
-
-    for row in wanted {
-        let Some(name) = manifest.videos.get(&row.id) else {
-            continue;
-        };
-        let path = root.join(name);
-
-        // Imports are written as muxed mp4 (`--merge-output-format mp4`), which
-        // is what the folder scan would classify this path as too.
-        let song = match crate::song::build_song(&path, &cache, true) {
-            Ok(song) => song,
-            Err(e) => {
-                warn!("[import] could not read {} after importing it: {e}", row.id);
-                continue;
-            }
-        };
-
-        // A scan that got there first already wrote this path, and the unique
-        // constraint says so. Either way the row the queue needs now exists.
-        let _ = crate::library_db::append_songs(std::slice::from_ref(&song));
-
-        match playback_queue.add(&song.file_hash, song.tempo, song.key_offset) {
-            Ok(entries) => emit(ImportEvent::PlaybackQueueChanged(entries)),
-            Err(e) => warn!("[import] imported {} but could not queue it: {e}", row.id),
-        }
-    }
 }
 
 /// Fail whatever the run left queued. `import_queue_job_rows` returns only the

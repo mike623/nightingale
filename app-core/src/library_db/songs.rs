@@ -98,7 +98,7 @@ pub(crate) fn load_song_path_strings() -> rusqlite::Result<std::collections::Has
     })
 }
 
-pub(crate) fn append_songs(songs: &[Song]) -> rusqlite::Result<()> {
+pub(super) fn append_songs(songs: &[Song]) -> rusqlite::Result<()> {
     if songs.is_empty() {
         return Ok(());
     }
