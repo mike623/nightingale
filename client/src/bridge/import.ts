@@ -42,6 +42,11 @@ export const startImport = async (preview: ImportPreview): Promise<ImportQueueRo
 export const importQueue = async (): Promise<ImportQueueRow[]> =>
   await invoke<ImportQueueRow[]>('import_queue');
 
+/** Forget the queue rows of runs that have ended, leaving anything still queued
+ * or downloading. Resolves with how many rows went. */
+export const clearFinishedImports = async (): Promise<number> =>
+  await invoke<number>('clear_finished_imports');
+
 export const onImportProgress = async (cb: (p: ImportProgress) => void): Promise<() => void> =>
   await listen<ImportProgress>('import-progress', ({ payload }) => cb(payload));
 

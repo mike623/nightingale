@@ -2,124 +2,83 @@ import { Loader2Icon } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
 
-/** Which set of actions the footer offers; the Close button is always there. */
-type FooterMode = 'fetch' | 'new-import' | 'preview' | 'none';
-
-type ImportFooterProps = {
-  available: boolean | undefined;
-  hasRun: boolean;
-  hasPreview: boolean;
-  hasReport: boolean;
-  isSingle: boolean;
+type ImportActionsProps = {
   busy: boolean;
   url: string;
   probed: { done: number; total: number } | null;
+  draftCount: number;
   selectedCount: number;
   failedCount: number;
+  finishedCount: number;
   onFetch: () => void;
+  onEnqueue: () => void;
   onRetryFailed: () => void;
-  onNewImport: () => void;
-  onImport: () => void;
-  onBack: () => void;
+  onClearFinished: () => void;
+};
+
+type ImportFooterProps = ImportActionsProps & {
+  available: boolean | undefined;
   onClose: () => void;
 };
 
-function footerMode(state: {
-  available: boolean | undefined;
-  hasRun: boolean;
-  hasPreview: boolean;
-  hasReport: boolean;
-}): FooterMode {
-  if (state.available !== true) {
-    return 'none';
-  }
-  if (state.hasPreview) {
-    return 'preview';
-  }
-  if (!state.hasRun) {
-    return 'fetch';
-  }
-  if (state.hasReport) {
-    return 'new-import';
-  }
-  return 'none';
-}
+const Spinner = ({ busy }: { busy: boolean }) =>
+  busy ? <Loader2Icon className="size-4 animate-spin" /> : null;
 
-const FetchButton = ({
+/**
+ * Which actions apply is decided by what the queue holds rather than by a mode
+ * the page is in: drafts can be queued, failed rows can be retried, finished
+ * rows can be forgotten, and any of those can be true at the same time.
+ */
+const ImportActions = ({
   busy,
   url,
   probed,
-  onFetch,
-}: Pick<ImportFooterProps, 'busy' | 'url' | 'probed' | 'onFetch'>) => (
-  <Button onClick={onFetch} disabled={busy || url.trim() === ''}>
-    {busy && <Loader2Icon className="size-4 animate-spin" />}
-    {probed ? `Fetching ${probed.done}/${probed.total}…` : 'Fetch'}
-  </Button>
-);
-
-const PreviewActions = ({
-  busy,
-  isSingle,
+  draftCount,
   selectedCount,
-  onImport,
-  onBack,
-}: Pick<ImportFooterProps, 'busy' | 'isSingle' | 'selectedCount' | 'onImport' | 'onBack'>) => (
+  failedCount,
+  finishedCount,
+  onFetch,
+  onEnqueue,
+  onRetryFailed,
+  onClearFinished,
+}: ImportActionsProps) => (
   <>
-    <Button onClick={onImport} disabled={busy || (!isSingle && selectedCount === 0)}>
-      {busy && <Loader2Icon className="size-4 animate-spin" />}
-      {isSingle ? 'Import' : `Import (${selectedCount})`}
-    </Button>
-    <Button variant="ghost" onClick={onBack} disabled={busy}>
-      Back
-    </Button>
+    {finishedCount > 0 && (
+      <Button onClick={onClearFinished} variant="ghost">
+        Clear {finishedCount} finished
+      </Button>
+    )}
+
+    {failedCount > 0 && (
+      <Button disabled={busy} onClick={onRetryFailed} variant="secondary">
+        <Spinner busy={busy} />
+        Retry {failedCount} failed
+      </Button>
+    )}
+
+    {draftCount > 0 ? (
+      <Button disabled={busy || selectedCount === 0} onClick={onEnqueue}>
+        <Spinner busy={busy} />
+        Add {selectedCount} to the queue
+      </Button>
+    ) : (
+      <Button disabled={busy || url.trim() === ''} onClick={onFetch}>
+        <Spinner busy={busy} />
+        {probed ? `Fetching ${probed.done}/${probed.total}…` : 'Fetch'}
+      </Button>
+    )}
   </>
 );
 
-export const ImportFooter = (props: ImportFooterProps) => {
-  const mode = footerMode(props);
+export const ImportFooter = ({ available, onClose, ...actions }: ImportFooterProps) => (
+  <div
+    className="flex shrink-0 flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"
+    data-nav-group="footer"
+  >
+    {available === true && <ImportActions {...actions} />}
 
-  return (
-    <div
-      className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"
-      data-nav-group="footer"
-    >
-      {mode === 'fetch' && (
-        <FetchButton
-          busy={props.busy}
-          url={props.url}
-          probed={props.probed}
-          onFetch={props.onFetch}
-        />
-      )}
-      {/* The finished run holds the view; this is the way back to the form. */}
-      {mode === 'new-import' && (
-        <>
-          {props.failedCount > 0 && (
-            <Button onClick={props.onRetryFailed} disabled={props.busy}>
-              {props.busy && <Loader2Icon className="size-4 animate-spin" />}
-              Retry {props.failedCount} failed
-            </Button>
-          )}
-          <Button
-            variant={props.failedCount > 0 ? 'secondary' : 'default'}
-            onClick={props.onNewImport}
-          >
-            New import
-          </Button>
-        </>
-      )}
-      {mode === 'preview' && (
-        <PreviewActions
-          busy={props.busy}
-          isSingle={props.isSingle}
-          selectedCount={props.selectedCount}
-          onImport={props.onImport}
-          onBack={props.onBack}
-        />
-      )}
-      <Button variant="outline" onClick={props.onClose}>
-        Close
-      </Button>
-    </div>
-  );
-};
+    <Button onClick={onClose} variant="outline">
+      Close
+    </Button>
+  </div>
+);

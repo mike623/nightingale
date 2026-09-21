@@ -27,8 +27,8 @@ use cache::{
 };
 use config::{load_config, save_config};
 use import::{
-    import_available, import_queue, imported_video_id, imported_video_ids, probe_import,
-    redownload_song, spawn_import_worker, start_import,
+    clear_finished_imports, import_available, import_queue, imported_video_id, imported_video_ids,
+    probe_import, redownload_song, spawn_import_worker, start_import,
 };
 use logs::read_log;
 use lyrics::{
@@ -171,6 +171,7 @@ pub fn run() {
             probe_import,
             start_import,
             import_queue,
+            clear_finished_imports,
             imported_video_id,
             redownload_song,
             // Analyzer

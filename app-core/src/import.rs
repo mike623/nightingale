@@ -198,6 +198,15 @@ pub fn import_queue() -> Vec<ImportQueueRow> {
     })
 }
 
+/// Forget the rows of runs that have ended, keeping anything still queued or
+/// downloading. Answers with how many rows went.
+pub fn clear_finished_imports() -> usize {
+    crate::library_db::import_queue_delete_finished().unwrap_or_else(|e| {
+        warn!("[import] could not clear finished rows: {e}");
+        0
+    })
+}
+
 /// Put a preview's entries in the queue as one job and wake the worker.
 /// Returns the rows as written, so the caller can report what it queued without
 /// reading the queue back.
@@ -320,14 +329,23 @@ fn run_job(job_id: &str, emit: &(impl Fn(ImportEvent) + Send + Sync)) {
             .collect(),
     };
 
+    // Only status changes reach the database. A download reports every whole
+    // percent, and the queue has no use for that: the live figure rides the
+    // progress event, and a row interrupted mid-download is requeued on the
+    // next start rather than resumed from a stored percentage.
+    let mut last_status: BTreeMap<String, ImportEntryStatus> = BTreeMap::new();
     let result = run_import(&preview, |progress| {
         if let Some(entry) = progress.entry.as_ref() {
-            let _ = crate::library_db::import_queue_update_status(
-                &entry.id,
-                entry.status,
-                entry.pct,
-                entry.reason.as_deref(),
-            );
+            let changed = last_status.get(&entry.id) != Some(&entry.status);
+            if changed {
+                last_status.insert(entry.id.clone(), entry.status);
+                let _ = crate::library_db::import_queue_update_status(
+                    &entry.id,
+                    entry.status,
+                    entry.pct,
+                    entry.reason.as_deref(),
+                );
+            }
         }
         emit(ImportEvent::Progress(progress));
     });

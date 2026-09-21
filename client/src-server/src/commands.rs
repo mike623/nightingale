@@ -60,6 +60,9 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
         // it runs the same worker, so the queue is what shows a phone's
         // submission moving.
         "import_queue" => Ok(serde_json::to_value(app_core::import_queue()).map_err(serde_err)?),
+        "clear_finished_imports" => {
+            Ok(serde_json::to_value(app_core::clear_finished_imports()).map_err(serde_err)?)
+        }
 
         // ── Config ───────────────────────────────────────────────────────
         "load_config" => Ok(serde_json::to_value(AppConfig::load()).map_err(serde_err)?),

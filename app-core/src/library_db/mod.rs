@@ -38,8 +38,9 @@ pub(crate) use analysis_queue::{
     analysis_queue_save_rows, analysis_queue_upsert_row,
 };
 pub(crate) use import_queue::{
-    import_queue_insert_rows, import_queue_job_rows, import_queue_load_rows, import_queue_next_job,
-    import_queue_requeue_stale, import_queue_update_status,
+    import_queue_delete_finished, import_queue_insert_rows, import_queue_job_rows,
+    import_queue_load_rows, import_queue_next_job, import_queue_requeue_stale,
+    import_queue_update_status,
 };
 pub(crate) use migrations::rewrite_legacy_jellyfin_paths;
 pub(crate) use play_stats::{

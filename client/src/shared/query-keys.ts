@@ -16,4 +16,5 @@ export const NAVIDROME_HEALTH = ['navidrome-health'];
 export const PLEX_HEALTH = ['plex-health'];
 export const MIC_DEVICES = ['mic-devices'];
 export const IMPORT_AVAILABLE = ['import-available'];
+export const IMPORT_QUEUE = ['import-queue'];
 export const IMPORTED_VIDEO_ID = ['imported-video-id'];

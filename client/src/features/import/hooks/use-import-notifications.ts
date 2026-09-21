@@ -5,21 +5,16 @@ import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { IMPORT_TOAST_ID, onImportDone, onImportError, onImportProgress } from '@/bridge/import';
-import {
-  importAggregateAtom,
-  importErrorAtom,
-  importProgressByIdAtom,
-  importReportAtom,
-} from '@/features/import/hooks/use-import-state';
+import { importProgressByIdAtom } from '@/features/import/hooks/use-import-state';
 import { useLatestRef } from '@/shared/hooks/use-latest-ref';
-import { MENU, SONGS, SONGS_META } from '@/shared/query-keys';
+import { IMPORT_QUEUE, MENU, SONGS, SONGS_META } from '@/shared/query-keys';
 
 export const IMPORT_PATH = '/import';
 
 /**
  * App-level listener for background YouTube imports, and the only writer of the
- * import atoms. Mount once, high in the tree (`MenuLayout`), so it survives the
- * Import page unmounting when the user navigates away mid-import.
+ * import progress atom. Mount once, high in the tree (`MenuLayout`), so it
+ * survives the Import page unmounting when the user navigates away mid-import.
  *
  * The Import page is the real progress surface. This hook only keeps a
  * one-line toast for when the user is somewhere else, so they still learn an
@@ -31,9 +26,6 @@ export function useImportNotifications() {
   const { pathname } = useLocation();
 
   const setProgressById = useSetAtom(importProgressByIdAtom);
-  const setAggregate = useSetAtom(importAggregateAtom);
-  const setReport = useSetAtom(importReportAtom);
-  const setError = useSetAtom(importErrorAtom);
 
   // Read inside the listeners without re-subscribing on every navigation.
   const onImportPageRef = useLatestRef(pathname === IMPORT_PATH);
@@ -53,11 +45,15 @@ export function useImportNotifications() {
     void (async () => {
       unlisteners.push(
         await onImportProgress((p) => {
-          setAggregate(p);
-
           if (p.entry) {
             const next = p.entry;
             setProgressById((prev) => ({ ...prev, [next.id]: next }));
+
+            // A percentage is carried by the atom alone; a status change is
+            // what the stored row records, so that is what needs re-reading.
+            if (next.status !== 'Downloading') {
+              void queryClient.invalidateQueries({ queryKey: IMPORT_QUEUE });
+            }
           }
 
           // The page shows every track; a toast on top of it is just noise.
@@ -77,8 +73,7 @@ export function useImportNotifications() {
 
       unlisteners.push(
         await onImportDone((r) => {
-          setReport(r);
-
+          void queryClient.invalidateQueries({ queryKey: IMPORT_QUEUE });
           void queryClient.invalidateQueries({ queryKey: SONGS });
           void queryClient.invalidateQueries({ queryKey: SONGS_META });
           void queryClient.invalidateQueries({ queryKey: MENU });
@@ -116,7 +111,7 @@ export function useImportNotifications() {
 
       unlisteners.push(
         await onImportError((e) => {
-          setError(e);
+          void queryClient.invalidateQueries({ queryKey: IMPORT_QUEUE });
 
           if (onImportPageRef.current) {
             return;
@@ -128,13 +123,5 @@ export function useImportNotifications() {
     })();
 
     return () => unlisteners.forEach((u) => u());
-  }, [
-    queryClient,
-    setAggregate,
-    setProgressById,
-    setReport,
-    setError,
-    navigateRef,
-    onImportPageRef,
-  ]);
+  }, [queryClient, setProgressById, navigateRef, onImportPageRef]);
 }

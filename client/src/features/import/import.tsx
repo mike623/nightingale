@@ -1,21 +1,22 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { YoutubeIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
-import { importedVideoIds, probeImport, startImport } from '@/bridge/import';
-import { ImportBody } from '@/features/import/components/body';
+import { clearFinishedImports, importedVideoIds, probeImport, startImport } from '@/bridge/import';
 import { ImportFooter } from '@/features/import/components/footer';
-import {
-  useBeginImport,
-  useClearImport,
-  useImportState,
-} from '@/features/import/hooks/use-import-state';
+import { ImportQueueTable } from '@/features/import/components/queue-table';
+import { ImportUnavailable } from '@/features/import/components/unavailable';
+import { ImportUrlForm } from '@/features/import/components/url-form';
+import { useImportProgress, useImportQueue } from '@/features/import/hooks/use-import-state';
 import { useNavStops } from '@/features/import/hooks/use-nav-stops';
 import { useYoutubeWindow } from '@/features/import/hooks/use-youtube-window';
 import { readLastPlaylist, saveLastPlaylist } from '@/features/import/lib/last-playlist';
+import { draftRowsOf, failedRows, finishedRows } from '@/features/import/lib/rows';
 import { useImportAvailable } from '@/features/import/queries/use-import-available';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
+import { IMPORT_QUEUE } from '@/shared/query-keys';
 import type { ImportEntry } from '@/types/ImportEntry';
 import type { ImportPreview } from '@/types/ImportPreview';
 
@@ -44,16 +45,19 @@ function parseUrls(text: string): string[] {
 export const ImportPage = () => {
   const navigate = useNavigate();
   const close = () => navigate('/');
+  const queryClient = useQueryClient();
 
   const { data: available, isLoading: checkingAvailable } = useImportAvailable();
-  const beginImport = useBeginImport();
-  const clearImport = useClearImport();
-  const { preview: runningPreview, progressById, aggregate, running, report } = useImportState();
+  const { data: queue } = useImportQueue();
+  const progressById = useImportProgress();
 
   const [url, setUrl] = useState('');
+  // Probed but not yet submitted: still the user's to edit and to pick from.
+  // Drafts are deliberately local — leaving the page abandons them, where the
+  // queue below is the host's and outlives both the page and the process.
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Video ids already on disk — shown as "Imported" and unchecked by default.
+  // Video ids already on disk — shown as such and unchecked by default.
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   // Probing several links takes a while (a yt-dlp process each), so it reports progress.
@@ -68,26 +72,22 @@ export const ImportPage = () => {
     filterTimer.current = setTimeout(() => setFilter(value), FILTER_DEBOUNCE_MS);
   };
 
-  // A run started earlier (possibly before this page mounted) owns the view:
-  // its entries are what the progress rows belong to.
-  const shown = running || (runningPreview && !preview) ? runningPreview : preview;
-
-  // A lone video is editable; anything longer is a pick-list.
-  const single =
-    preview && !preview.isPlaylist && preview.entries.length === 1 ? preview.entries[0] : null;
-  const selectedCount = selected.size;
-  const allSelected = preview ? selectedCount === preview.entries.length : false;
+  const drafts = useMemo(() => draftRowsOf(preview), [preview]);
+  // A fresh array each render would retrigger every memo below it.
+  const queueRows = useMemo(() => queue ?? [], [queue]);
 
   const rows = useMemo(() => {
-    const entries = shown?.entries ?? [];
+    const all = [...drafts, ...queueRows];
     const needle = filter.trim().toLowerCase();
     if (!needle) {
-      return entries;
+      return all;
     }
-    return entries.filter((e) => `${e.artist} ${e.title}`.toLowerCase().includes(needle));
-  }, [shown, filter]);
+    return all.filter((row) => `${row.artist} ${row.title}`.toLowerCase().includes(needle));
+  }, [drafts, queueRows, filter]);
 
+  const selectedCount = selected.size;
   const lastPlaylist = readLastPlaylist();
+  const refreshQueue = () => queryClient.invalidateQueries({ queryKey: IMPORT_QUEUE });
 
   /**
    * Probes the pasted links, up to `PROBE_CONCURRENCY` at a time, and folds the
@@ -215,28 +215,30 @@ export const ImportPage = () => {
   const selectAll = () => setSelected(new Set(preview?.entries.map((e) => e.id) ?? []));
   const deselectAll = () => setSelected(new Set());
 
-  // Fire-and-forget: kick off the background download. Progress arrives on the
-  // import atoms (see useImportNotifications) and renders in the rows below.
-  const doImport = async () => {
-    if (!preview || busy || (!single && selectedCount === 0)) {
+  const editDraft = (id: string, patch: Partial<{ title: string; artist: string }>) =>
+    setPreview((p) =>
+      p === null
+        ? p
+        : { ...p, entries: p.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)) },
+    );
+
+  /** Hand the ticked drafts to the queue. The worker picks them up in turn. */
+  const enqueueDrafts = async () => {
+    if (preview === null || busy || selectedCount === 0) {
       return;
     }
     setBusy(true);
     try {
-      // A single video imports itself even when it is already on disk (an
-      // explicit re-download); a pick-list imports exactly what is ticked.
-      const entries = single ? preview.entries : preview.entries.filter((e) => selected.has(e.id));
+      const entries = preview.entries.filter((e) => selected.has(e.id));
       // Remember playlists so they can be re-imported (delta) for new tracks.
       if (preview.isPlaylist) {
         saveLastPlaylist({ url: url.trim(), title: preview.playlistTitle ?? '' });
       }
-      const started = { ...preview, entries };
-      beginImport(started);
-      await startImport(started);
-      // Hand the view over to the running import; the local draft is spent.
+      await startImport({ ...preview, entries });
       setPreview(null);
+      setSelected(new Set());
       setUrl('');
-      setFilter('');
+      await refreshQueue();
     } catch (e) {
       toast.error(String(e));
     } finally {
@@ -245,20 +247,29 @@ export const ImportPage = () => {
   };
 
   /**
-   * Run the finished import again. It re-submits the whole batch rather than
-   * only the failures: every entry already on disk is skipped by the manifest
-   * delta without downloading, so the failures are what actually run — and a
-   * playlist still sees its full membership, which is what its `.m3u` is
-   * rewritten from.
+   * Queue the failed rows again. A video already on disk is skipped by the
+   * folder manifest without downloading, so re-submitting costs nothing beyond
+   * the entries that actually need another try.
    */
   const retryFailed = async () => {
-    if (!runningPreview || busy) {
+    const failed = failedRows(queueRows);
+    if (failed.length === 0 || busy) {
       return;
     }
     setBusy(true);
     try {
-      beginImport(runningPreview);
-      await startImport(runningPreview);
+      await startImport({
+        isPlaylist: failed[0].playlistId !== null,
+        playlistId: failed[0].playlistId,
+        playlistTitle: failed[0].playlistTitle,
+        entries: failed.map((row) => ({
+          id: row.id,
+          title: row.title,
+          artist: row.artist,
+          durationSecs: row.durationSecs,
+        })),
+      });
+      await refreshQueue();
     } catch (e) {
       toast.error(String(e));
     } finally {
@@ -266,10 +277,14 @@ export const ImportPage = () => {
     }
   };
 
-  const editSingle = (patch: Partial<{ title: string; artist: string }>) =>
-    setPreview((p) =>
-      p && !p.isPlaylist ? { ...p, entries: [{ ...p.entries[0], ...patch }] } : p,
-    );
+  const clearFinished = async () => {
+    try {
+      await clearFinishedImports();
+      await refreshQueue();
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
 
   // Controller/keyboard ring. `useNavStops` reads the segments back off the DOM
   // rather than counting them here, because half this page's controls disable
@@ -288,10 +303,10 @@ export const ImportPage = () => {
 
   return (
     <div
+      className="flex h-full flex-col overflow-hidden px-4 pb-5 pt-14 sm:px-6 md:pt-5 lg:px-8"
       ref={containerRef}
-      className="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-14 sm:px-6 md:pt-5 lg:px-8"
     >
-      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-5">
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             <YoutubeIcon className="size-5 shrink-0" /> Import
@@ -303,50 +318,49 @@ export const ImportPage = () => {
           </p>
         </div>
 
-        <ImportBody
-          checkingAvailable={checkingAvailable}
-          available={available}
-          shown={shown}
-          preview={preview}
-          single={single}
-          rows={rows}
-          filter={filter}
-          url={url}
-          busy={busy}
-          lastPlaylist={lastPlaylist}
-          aggregate={aggregate}
-          progressById={progressById}
-          imported={imported}
-          selected={selected}
-          allSelected={allSelected}
-          selectedCount={selectedCount}
-          onFilterChange={onFilterChange}
-          onUrlChange={setUrl}
-          onFetch={(urlArg) => void fetchPreview(urlArg)}
-          onBrowse={openYoutube}
-          onEditSingle={editSingle}
-          onToggle={toggle}
-          onSelectAll={selectAll}
-          onDeselectAll={deselectAll}
-        />
+        {!checkingAvailable && available !== true && <ImportUnavailable />}
+
+        {!checkingAvailable && available === true && (
+          <>
+            <ImportUrlForm
+              busy={busy}
+              filter={filter}
+              lastPlaylist={lastPlaylist}
+              onBrowse={openYoutube}
+              onDeselectAll={deselectAll}
+              onFetch={(urlArg) => void fetchPreview(urlArg)}
+              onFilterChange={onFilterChange}
+              onSelectAll={selectAll}
+              onUrlChange={setUrl}
+              selectedCount={selectedCount}
+              url={url}
+            />
+
+            <ImportQueueTable
+              imported={imported}
+              onEdit={editDraft}
+              onToggle={toggle}
+              progressById={progressById}
+              rows={rows}
+              selected={selected}
+            />
+          </>
+        )}
 
         <ImportFooter
           available={available}
-          hasRun={shown !== null}
-          hasPreview={preview !== null}
-          hasReport={report !== null}
-          isSingle={single !== null}
           busy={busy}
-          url={url}
-          probed={probed}
-          selectedCount={selectedCount}
-          failedCount={report?.failed.length ?? 0}
+          draftCount={drafts.length}
+          failedCount={failedRows(queueRows).length}
+          finishedCount={finishedRows(queueRows).length}
+          onClearFinished={() => void clearFinished()}
+          onClose={() => void close()}
+          onEnqueue={() => void enqueueDrafts()}
           onFetch={() => void fetchPreview()}
           onRetryFailed={() => void retryFailed()}
-          onNewImport={clearImport}
-          onImport={() => void doImport()}
-          onBack={() => setPreview(null)}
-          onClose={() => void close()}
+          probed={probed}
+          selectedCount={selectedCount}
+          url={url}
         />
       </div>
     </div>

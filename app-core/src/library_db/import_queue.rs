@@ -181,6 +181,18 @@ pub(crate) fn import_queue_job_rows(job_id: &str) -> rusqlite::Result<Vec<Import
     })
 }
 
+/// Drop every row a run has finished with, leaving what is still to come.
+/// Terminal rows are kept so the import screen can report on a run after it
+/// ends, which means something has to be able to let them go.
+pub(crate) fn import_queue_delete_finished() -> rusqlite::Result<usize> {
+    with_conn_mut(|c| {
+        c.execute(
+            "DELETE FROM import_queue WHERE status IN ('imported', 'skipped', 'failed')",
+            [],
+        )
+    })
+}
+
 /// Put downloads that were in flight when the process ended back in the queue.
 /// The yt-dlp process that owned them is gone and its scratch directory was
 /// removed with it, so the row describes work that is no longer happening. A
