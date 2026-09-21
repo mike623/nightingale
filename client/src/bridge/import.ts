@@ -1,5 +1,6 @@
 import type { ImportPreview } from '@/types/ImportPreview';
 import type { ImportProgress } from '@/types/ImportProgress';
+import type { ImportQueueRow } from '@/types/ImportQueueRow';
 import type { ImportReport } from '@/types/ImportReport';
 import type { Song } from '@/types/Song';
 
@@ -30,10 +31,16 @@ export const importedVideoId = async (fileHash: string): Promise<string | null> 
 export const redownloadSong = async (fileHash: string): Promise<Song> =>
   await invoke<Song>('redownload_song', { fileHash });
 
-/** Kick off a background download of the previewed entries. Returns immediately;
- * progress/completion arrive via the events below. */
-export const startImport = async (preview: ImportPreview): Promise<void> =>
-  await invoke<void>('start_import', { preview });
+/** Put the previewed entries in the import queue as one job, and answer with the
+ * rows as queued. The worker picks the job up in turn; progress and completion
+ * arrive via the events below. */
+export const startImport = async (preview: ImportPreview): Promise<ImportQueueRow[]> =>
+  await invoke<ImportQueueRow[]>('start_import', { preview });
+
+/** The whole import queue, oldest job first, including rows from runs that have
+ * already ended. */
+export const importQueue = async (): Promise<ImportQueueRow[]> =>
+  await invoke<ImportQueueRow[]>('import_queue');
 
 export const onImportProgress = async (cb: (p: ImportProgress) => void): Promise<() => void> =>
   await listen<ImportProgress>('import-progress', ({ payload }) => cb(payload));

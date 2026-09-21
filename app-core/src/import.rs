@@ -63,10 +63,15 @@ pub struct ImportReport {
     pub playlist_name: Option<String>,
 }
 
-/// Where one entry has got to. Terminal for everything but `Downloading`.
+/// Where one entry has got to. Terminal for everything from `Imported` down.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub enum ImportEntryStatus {
+    /// Resolved from a link but not yet submitted: still editable, and nothing
+    /// downloads it. Only the desktop produces drafts.
+    Draft,
+    /// Submitted and waiting for the worker to reach its job.
+    Queued,
     Downloading,
     Imported,
     /// Already on disk from an earlier run, or a repeat of an id this run
@@ -109,6 +114,253 @@ pub struct ImportProgress {
     /// per-entry state without the aggregate carrying the whole list every
     /// tick. `None` on the closing summary tick.
     pub entry: Option<ImportEntryProgress>,
+}
+
+/// Who asked for an import. A phone's submission is acted on more freely than
+/// a desktop one — it has no screen to come back to — so the origin has to
+/// survive in the queue rather than being decided at the call site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum ImportSubmitter {
+    Desktop,
+    Phone,
+}
+
+/// One video in the persistent import queue.
+///
+/// The job columns are repeated on every row of a job because the queue is
+/// always read whole, never joined. `position` is the order within the job,
+/// which for a playlist is its playlist order and so decides the `.m3u`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportQueueRow {
+    /// YouTube video id — the queue's primary key, so one video holds one row
+    /// however many times it is submitted.
+    pub id: String,
+    pub job_id: String,
+    pub title: String,
+    pub artist: String,
+    /// Seconds, `0.0` when the submitter could not supply one.
+    pub duration_secs: f64,
+    pub playlist_id: Option<String>,
+    pub playlist_title: Option<String>,
+    pub status: ImportEntryStatus,
+    /// Download fraction (0.0–1.0).
+    pub pct: f64,
+    /// Failure text, present only on `Failed`.
+    pub reason: Option<String>,
+    pub submitted_by: ImportSubmitter,
+    pub position: usize,
+    /// Unix seconds, and the queue's ordering key across jobs. Exported as a
+    /// number rather than ts-rs's default `bigint`, which is what JSON actually
+    /// delivers and what the page compares against.
+    #[ts(type = "number")]
+    pub created_at: i64,
+}
+
+/// What the worker tells its owner. The desktop turns these into the three
+/// import events the UI already listens on; the server puts them on its bus.
+#[derive(Debug, Clone)]
+pub enum ImportEvent {
+    Progress(ImportProgress),
+    Done(ImportReport),
+    Error(String),
+}
+
+/// Set when a job is submitted, cleared by the worker once it has looked. The
+/// flag rather than a bare notify is what stops a submission that lands while
+/// the worker is mid-drain from being slept through.
+static WAKE: Mutex<bool> = Mutex::new(false);
+static WAKE_SIGNAL: std::sync::Condvar = std::sync::Condvar::new();
+
+/// Distinguishes jobs submitted within the same second. Wall-clock alone is not
+/// enough: two phones can submit inside one tick.
+static JOB_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or_default()
+}
+
+fn next_job_id() -> String {
+    let n = JOB_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("{}-{n}", now_secs())
+}
+
+/// The whole queue, oldest job first.
+pub fn import_queue() -> Vec<ImportQueueRow> {
+    crate::library_db::import_queue_load_rows().unwrap_or_else(|e| {
+        warn!("[import] could not read the queue: {e}");
+        Vec::new()
+    })
+}
+
+/// Put a preview's entries in the queue as one job and wake the worker.
+/// Returns the rows as written, so the caller can report what it queued without
+/// reading the queue back.
+pub fn submit_import(
+    preview: &ImportPreview,
+    submitted_by: ImportSubmitter,
+) -> Result<Vec<ImportQueueRow>, String> {
+    if preview.entries.is_empty() {
+        return Err("Nothing to import".to_string());
+    }
+
+    let job_id = next_job_id();
+    let created_at = now_secs();
+    let rows: Vec<ImportQueueRow> = preview
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(position, entry)| ImportQueueRow {
+            id: entry.id.clone(),
+            job_id: job_id.clone(),
+            title: entry.title.clone(),
+            artist: entry.artist.clone(),
+            duration_secs: entry.duration_secs,
+            playlist_id: preview.playlist_id.clone(),
+            playlist_title: preview.playlist_title.clone(),
+            status: ImportEntryStatus::Queued,
+            pct: 0.0,
+            reason: None,
+            submitted_by,
+            position,
+            created_at,
+        })
+        .collect();
+
+    crate::library_db::import_queue_insert_rows(&rows)
+        .map_err(|e| format!("Could not queue the import: {e}"))?;
+    wake_worker();
+
+    Ok(rows)
+}
+
+fn wake_worker() {
+    if let Ok(mut ready) = WAKE.lock() {
+        *ready = true;
+        WAKE_SIGNAL.notify_all();
+    }
+}
+
+/// Drain the queue forever, one job at a time.
+///
+/// Jobs are serialised deliberately: `run_import` folds its downloads into the
+/// folder manifest at the end, so two runs at once would each save a snapshot
+/// taken before the other's entries existed and the later save would drop them.
+/// Entries within a job still download `DOWNLOAD_CONCURRENCY` at a time.
+///
+/// Never returns. The owner spawns it on its own thread at startup and gives it
+/// the way it announces progress.
+pub fn run_import_worker(emit: impl Fn(ImportEvent) + Send + Sync) {
+    if let Err(e) = crate::library_db::import_queue_requeue_stale() {
+        warn!("[import] could not requeue interrupted downloads: {e}");
+    }
+
+    loop {
+        loop {
+            let next = match crate::library_db::import_queue_next_job() {
+                Ok(next) => next,
+                Err(e) => {
+                    warn!("[import] could not read the queue: {e}");
+                    None
+                }
+            };
+            let Some(job_id) = next else {
+                break;
+            };
+            run_job(&job_id, &emit);
+        }
+
+        let Ok(mut ready) = WAKE.lock() else {
+            return;
+        };
+        while !*ready {
+            match WAKE_SIGNAL.wait(ready) {
+                Ok(next) => ready = next,
+                Err(_) => return,
+            }
+        }
+        *ready = false;
+    }
+}
+
+/// Run one job's queued rows to a terminal status.
+///
+/// Every row it picks up must leave `Queued`, whatever happens — the drain loop
+/// selects jobs by the presence of a queued row, so one left behind would be
+/// handed straight back.
+fn run_job(job_id: &str, emit: &(impl Fn(ImportEvent) + Send + Sync)) {
+    let rows = match crate::library_db::import_queue_job_rows(job_id) {
+        Ok(rows) => rows,
+        Err(e) => {
+            warn!("[import] could not read job {job_id}: {e}");
+            return;
+        }
+    };
+    if rows.is_empty() {
+        return;
+    }
+
+    let preview = ImportPreview {
+        is_playlist: rows[0].playlist_id.is_some(),
+        playlist_id: rows[0].playlist_id.clone(),
+        playlist_title: rows[0].playlist_title.clone(),
+        entries: rows
+            .iter()
+            .map(|row| ImportEntry {
+                id: row.id.clone(),
+                title: row.title.clone(),
+                artist: row.artist.clone(),
+                duration_secs: row.duration_secs,
+            })
+            .collect(),
+    };
+
+    let result = run_import(&preview, |progress| {
+        if let Some(entry) = progress.entry.as_ref() {
+            let _ = crate::library_db::import_queue_update_status(
+                &entry.id,
+                entry.status,
+                entry.pct,
+                entry.reason.as_deref(),
+            );
+        }
+        emit(ImportEvent::Progress(progress));
+    });
+
+    match result {
+        Ok(report) => emit(ImportEvent::Done(report)),
+        Err(e) => {
+            settle_unfinished(job_id, &e);
+            emit(ImportEvent::Error(e));
+            return;
+        }
+    }
+
+    // A run that ended without reporting on an entry — an early return inside
+    // `run_import`, or a worker that never claimed it — would otherwise leave
+    // the row queued and the job would be selected again immediately.
+    settle_unfinished(job_id, "The import ended before this video was reached");
+}
+
+/// Fail whatever the run left queued. `import_queue_job_rows` returns only the
+/// still-queued rows, so what comes back here is exactly what was missed.
+fn settle_unfinished(job_id: &str, reason: &str) {
+    let Ok(pending) = crate::library_db::import_queue_job_rows(job_id) else {
+        return;
+    };
+    for row in pending {
+        let _ = crate::library_db::import_queue_update_status(
+            &row.id,
+            ImportEntryStatus::Failed,
+            1.0,
+            Some(reason),
+        );
+    }
 }
 
 /// Persisted in the watched folder as `.nightingale-imports.json`. Lets a
@@ -321,7 +573,7 @@ const DOWNLOAD_CONCURRENCY: usize = 3;
 /// For a playlist it (re)writes the playlist's `.m3u` — reusing the same file
 /// across re-imports — with the full current membership in playlist order, then
 /// triggers a rescan.
-pub fn run_import(
+pub(crate) fn run_import(
     preview: &ImportPreview,
     on_progress: impl FnMut(ImportProgress) + Send,
 ) -> Result<ImportReport, String> {

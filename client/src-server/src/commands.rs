@@ -55,6 +55,12 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
         // ── Init/window stubs ────────────────────────────────────────────
         "frontend_ready" | "window_immersive" | "minimize_window" => Ok(Value::Null),
 
+        // ── Import ───────────────────────────────────────────────────────
+        // Read-only: the self-hosted build has no import page of its own, but
+        // it runs the same worker, so the queue is what shows a phone's
+        // submission moving.
+        "import_queue" => Ok(serde_json::to_value(app_core::import_queue()).map_err(serde_err)?),
+
         // ── Config ───────────────────────────────────────────────────────
         "load_config" => Ok(serde_json::to_value(AppConfig::load()).map_err(serde_err)?),
         "save_config" => save_config_cmd(payload),

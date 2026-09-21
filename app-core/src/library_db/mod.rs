@@ -5,6 +5,7 @@
 //!  - [`migrations`] — schema migrations, legacy `songs.json` import, and the one-shot
 //!    Jellyfin path rewrite
 //!  - [`analysis_queue`] — CRUD for the analyzer's persistent queue
+//!  - [`import_queue`] — CRUD for the YouTube importer's persistent queue
 //!  - [`songs`] — core song row CRUD, scan-aware inserts, rekey/update helpers
 //!  - [`queries`] — search / pagination / library-menu aggregation queries
 //!  - [`rebase`] — one-shot path rewrite when the data root moves
@@ -23,6 +24,7 @@ use crate::cache::nightingale_dir;
 
 mod analysis_queue;
 mod connection;
+mod import_queue;
 mod migrations;
 mod play_stats;
 mod playlists;
@@ -34,6 +36,10 @@ mod songs;
 pub(crate) use analysis_queue::{
     analysis_queue_clear, analysis_queue_delete, analysis_queue_load_rows,
     analysis_queue_save_rows, analysis_queue_upsert_row,
+};
+pub(crate) use import_queue::{
+    import_queue_insert_rows, import_queue_job_rows, import_queue_load_rows, import_queue_next_job,
+    import_queue_requeue_stale, import_queue_update_status,
 };
 pub(crate) use migrations::rewrite_legacy_jellyfin_paths;
 pub(crate) use play_stats::{

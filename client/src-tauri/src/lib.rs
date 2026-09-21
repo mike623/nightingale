@@ -27,8 +27,8 @@ use cache::{
 };
 use config::{load_config, save_config};
 use import::{
-    import_available, imported_video_id, imported_video_ids, probe_import, redownload_song,
-    start_import,
+    import_available, import_queue, imported_video_id, imported_video_ids, probe_import,
+    redownload_song, spawn_import_worker, start_import,
 };
 use logs::read_log;
 use lyrics::{
@@ -170,6 +170,7 @@ pub fn run() {
             imported_video_ids,
             probe_import,
             start_import,
+            import_queue,
             imported_video_id,
             redownload_song,
             // Analyzer
@@ -215,6 +216,7 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
             app_core::startup()?;
+            spawn_import_worker(app.handle().clone());
             app_core::media_server::start()?;
             let media_endpoint = app_core::media_server::endpoint();
 

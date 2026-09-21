@@ -1,4 +1,4 @@
-use app_core::{ImportPreview, Song};
+use app_core::{ImportEvent, ImportPreview, ImportQueueRow, ImportSubmitter, Song};
 use tauri::{AppHandle, Emitter};
 
 /// True only when the active library is a Folder — Import is hidden otherwise.
@@ -41,23 +41,32 @@ pub(crate) async fn probe_import(url: String) -> Result<ImportPreview, String> {
         .map_err(|e| e.to_string())?
 }
 
-/// Kick off a download of the previewed entries in the background and return
-/// immediately. Progress streams over the `import-progress` event; the final
-/// `ImportReport` arrives on `import-done`, or an error on `import-error`.
+/// Put the previewed entries in the import queue and return immediately. The
+/// worker picks the job up in turn; progress streams over the `import-progress`
+/// event, the closing `ImportReport` over `import-done`, and a run that failed
+/// outright over `import-error`.
 #[tauri::command]
-pub(crate) fn start_import(app: AppHandle, preview: ImportPreview) {
+pub(crate) fn start_import(preview: ImportPreview) -> Result<Vec<ImportQueueRow>, String> {
+    app_core::submit_import(&preview, ImportSubmitter::Desktop)
+}
+
+/// The whole import queue, including rows from runs that have already ended —
+/// what the import screen renders.
+#[tauri::command]
+pub(crate) fn import_queue() -> Vec<ImportQueueRow> {
+    app_core::import_queue()
+}
+
+/// Start the one worker that drains the import queue, announcing what it does
+/// on the events the UI already listens for.
+pub(crate) fn spawn_import_worker(app: AppHandle) {
     std::thread::spawn(move || {
-        let app_for_progress = app.clone();
-        let result = app_core::run_import(&preview, move |progress| {
-            let _ = app_for_progress.emit("import-progress", progress);
+        app_core::run_import_worker(|event| {
+            let _ = match event {
+                ImportEvent::Progress(progress) => app.emit("import-progress", progress),
+                ImportEvent::Done(report) => app.emit("import-done", report),
+                ImportEvent::Error(error) => app.emit("import-error", error),
+            };
         });
-        match result {
-            Ok(report) => {
-                let _ = app.emit("import-done", report);
-            }
-            Err(e) => {
-                let _ = app.emit("import-error", e);
-            }
-        }
     });
 }

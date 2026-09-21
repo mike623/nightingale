@@ -90,6 +90,22 @@ async fn main() -> Result<(), String> {
 
     let state = AppState::new(data.is_some(), library.is_some(), bind_port);
 
+    // The import worker is the same one the desktop runs; only the way it
+    // announces itself differs. `run_import_worker` never returns, so it owns a
+    // blocking thread rather than a task on the async runtime.
+    {
+        let events = state.events.clone();
+        std::thread::spawn(move || {
+            app_core::run_import_worker(|event| match event {
+                app_core::ImportEvent::Progress(progress) => {
+                    events.emit("import-progress", &progress);
+                }
+                app_core::ImportEvent::Done(report) => events.emit("import-done", &report),
+                app_core::ImportEvent::Error(error) => events.emit("import-error", &error),
+            });
+        });
+    }
+
     let party = {
         let events = state.events.clone();
         remote::party::PartyState::new(state.playback_queue.clone(), move |entries| {
