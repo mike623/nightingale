@@ -9,8 +9,8 @@ const clamp = (positionMs: number, durationMs: number): number =>
 /**
  * Playback position in media milliseconds, smoothed between publishes.
  *
- * The host is the only clock that counts, and it publishes about twice a
- * second — too coarse for a moving bar. Between publishes the position is
+ * The host is the only clock that counts, and it publishes ten times a second —
+ * still too coarse for a moving bar. Between publishes the position is
  * extrapolated from the wall clock; every snapshot, not merely every changed
  * value, resets that baseline, so the two can never diverge by more than one
  * publish interval. A paused host is reported exactly as published.

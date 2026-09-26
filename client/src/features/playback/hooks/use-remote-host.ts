@@ -32,8 +32,14 @@ import { useLatestRef } from '@/shared/hooks/use-latest-ref';
 import type { AppConfig } from '@/types/AppConfig';
 import type { Song } from '@/types/Song';
 
-/** Two publishes a second: smooth enough to follow, small enough to ignore. */
-const PUBLISH_INTERVAL_MS = 500;
+/**
+ * Ten publishes a second. The snapshot carries both the position, which
+ * advances every frame, and the discrete state a press changes, so one tick
+ * decides how quickly a phone sees that its press landed. At twice a second a
+ * tap read as ignored; a tenth of a second is under what a hand notices, and a
+ * snapshot is a few hundred bytes, so the cost on a local network is nothing.
+ */
+const PUBLISH_INTERVAL_MS = 100;
 
 const SECONDS_TO_MS = 1000;
 
