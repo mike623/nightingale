@@ -82,6 +82,13 @@ pub(crate) async fn remote_start(
     queue: tauri::State<'_, Arc<PlaybackQueue>>,
     control: tauri::State<'_, RemoteControl>,
 ) -> Result<RemoteStatus, String> {
+    // The setting is the switch, so nothing may bind the network port while it
+    // is off — not a stale page, and not a socket retrying its way back after
+    // the operator turned remote control off.
+    if !app_core::AppConfig::load().remote_control {
+        return Err("Remote control is turned off".to_string());
+    }
+
     let mut guard = control.listener.lock().await;
     if let Some(listener) = guard.as_ref() {
         return Ok(RemoteStatus::running(listener.port()));

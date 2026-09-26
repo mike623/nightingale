@@ -13,17 +13,16 @@
  */
 
 import { useCallback, useRef } from 'react';
-import { useNavigate, type NavigateFunction } from 'react-router';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { pickNextSong } from '@/bridge/play-history';
-import { isSessionPlayback, savePlaybackSession } from '@/bridge/playback-session';
 import {
   usePlaybackQueueQuery,
   useStartNextPlaybackQueueSong,
 } from '@/features/playback-queue/use-playback-queue';
+import { startSong } from '@/features/playback/lib/start-song';
 import { usePlaybackTransportActions } from '@/features/playback/providers';
-import type { Song } from '@/types/Song';
 
 export type PlaybackNext = {
   /** Starts the queue's head, or a random draw when the queue is empty. */
@@ -33,18 +32,6 @@ export type PlaybackNext = {
   /** True while a queued song is being prepared. */
   isPreparing: boolean;
 };
-
-/**
- * Session playback swaps the song in shared state and lets the broadcast
- * remount the playback window; classic playback re-enters the route.
- */
-async function startSong(song: Song, navigate: NavigateFunction): Promise<void> {
-  if (isSessionPlayback()) {
-    await savePlaybackSession({ song, queuePlayback: false });
-    return;
-  }
-  await navigate('/playback', { state: { song }, replace: true });
-}
 
 export function usePlaybackNext(currentFileHash: string): PlaybackNext {
   const navigate = useNavigate();

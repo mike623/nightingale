@@ -71,6 +71,7 @@ export const remoteCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('toggle_mic_monitor') }),
   z.object({ action: z.literal('skip_intro') }),
   z.object({ action: z.literal('skip_outro') }),
+  z.object({ action: z.literal('start_random') }),
   z.object({ action: z.literal('seek'), position_ms: z.number().finite().min(0) }),
   z.object({ action: z.literal('set_guide_volume'), volume: z.number().finite().min(0).max(1) }),
   z.object({

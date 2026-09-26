@@ -1,9 +1,20 @@
+import { ShuffleIcon } from 'lucide-react';
+
 import type { RemoteCommand, RemoteSnapshot } from '@/bridge/remote';
 import { GuideSection } from '@/features/remote/components/guide-section';
 import { NowPlaying } from '@/features/remote/components/now-playing';
 import { OptionsSection } from '@/features/remote/components/options-section';
 import { TransportSection } from '@/features/remote/components/transport-section';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/components/ui/empty';
+import { TOUCH_TARGET } from '@/features/remote/lib/touch-target';
+import { Button } from '@/shared/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from '@/shared/components/ui/empty';
+import { cn } from '@/shared/utils/cn';
 
 type PlaybackPanelProps = {
   snapshot: RemoteSnapshot | null;
@@ -21,9 +32,22 @@ export const PlaybackPanel = ({ snapshot, positionMs, locked, send }: PlaybackPa
         <EmptyHeader>
           <EmptyTitle>Nothing is playing</EmptyTitle>
           <EmptyDescription>
-            Start a song on the host, or queue one from the Library tab.
+            Pick a song from the Library tab, or let the host choose one for the room.
           </EmptyDescription>
         </EmptyHeader>
+
+        <EmptyContent>
+          <Button
+            className={cn(TOUCH_TARGET, 'w-full')}
+            disabled={locked}
+            onClick={() => send({ action: 'start_random' })}
+            type="button"
+            variant="outline"
+          >
+            <ShuffleIcon />
+            Play something
+          </Button>
+        </EmptyContent>
       </Empty>
     );
   }

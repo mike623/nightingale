@@ -77,6 +77,7 @@ pub enum RemoteCommand {
     SkipIntro,
     SkipOutro,
     ShiftLyrics { delta_ms: i64 },
+    StartRandom,
 }
 
 #[derive(Debug, Deserialize)]

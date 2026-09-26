@@ -140,6 +140,12 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
     };
 
     const applyCommand = (command: RemoteCommand): void => {
+      // Drawing a song at random belongs to a host with nothing playing. This
+      // one has a song, and `next` is what asks it for another.
+      if (command.action === 'start_random') {
+        return;
+      }
+
       if (command.action === 'shift_lyrics' && !sourceRef.current.lyricShiftAllowed) {
         return;
       }
