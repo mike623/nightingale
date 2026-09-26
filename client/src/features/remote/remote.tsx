@@ -17,6 +17,10 @@ import { useIsMobile } from '@/shared/hooks/use-is-mobile';
  *
  * A phone shows one surface at a time. From tablet width there is room for
  * the controls to sit beside the list they feed, so they do.
+ *
+ * The page spans the whole viewport at every width: a tablet held in landscape
+ * is all remote and nothing else, so capping the line length would only shrink
+ * the library it exists to browse.
  */
 export const RemotePage = () => {
   const { snapshot, session, connection, denial, send } = useRemoteClient();
@@ -28,7 +32,7 @@ export const RemotePage = () => {
 
   return (
     <div className="h-svh overflow-y-auto overscroll-contain md:overflow-hidden">
-      <main className="mx-auto flex h-full min-w-0 flex-col gap-4 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] md:max-w-5xl">
+      <main className="flex h-full w-full min-w-0 flex-col gap-4 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))]">
         <RemoteStatus connection={connection} denial={denial} session={session} />
 
         {isMobile ? (
