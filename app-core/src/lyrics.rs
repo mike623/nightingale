@@ -165,6 +165,35 @@ pub fn load_lyrics_file(file_hash: &str) -> Option<LyricsFile> {
     serde_json::from_slice::<LyricsFile>(&bytes).ok()
 }
 
+/// The song's lyrics as plain lines, for a surface that reads along rather
+/// than edits: the transcript the song plays with when there is one, and the
+/// plain sidecar otherwise. Timings stay behind; a reader outside the host has
+/// no clock to align them to.
+pub fn lyric_lines(file_hash: &str) -> Vec<String> {
+    let from_transcript = crate::playback::load_transcript(file_hash)
+        .ok()
+        .and_then(|transcript| {
+            let segments = transcript.get("segments")?.as_array()?.clone();
+            Some(
+                segments
+                    .iter()
+                    .filter_map(|segment| segment.get("text")?.as_str())
+                    .map(|text| text.trim().to_string())
+                    .filter(|text| !text.is_empty())
+                    .collect::<Vec<String>>(),
+            )
+        })
+        .unwrap_or_default();
+
+    if !from_transcript.is_empty() {
+        return from_transcript;
+    }
+
+    load_lyrics_file(file_hash)
+        .map(|file| file.lines)
+        .unwrap_or_default()
+}
+
 pub fn save_lyrics_and_realign(file_hash: &str, lines: Vec<String>) -> Result<(), String> {
     if is_usdx_song(file_hash) {
         return Err("Cannot edit lyrics for USDX songs".to_string());

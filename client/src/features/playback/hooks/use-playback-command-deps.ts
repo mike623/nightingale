@@ -34,9 +34,9 @@ export function usePlaybackCommandDeps(
   const toggleLyricsHidden = useCallback(() => {
     setLyricsHidden((hidden) => !hidden);
   }, [setLyricsHidden]);
-  const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, skipOutroPending } =
+  const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, skipOutroPending, lyricOffsetSec } =
     usePlaybackTranscriptState();
-  const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
+  const { handleSkipIntro, handleSkipOutro, setLyricOffsetSec } = usePlaybackTranscriptActions();
   const { handleToggleMic, handleCycleMic, handleToggleMicMonitor } = usePlaybackMicActions();
 
   const persistConfig = usePlaybackConfigPersist(config);
@@ -70,6 +70,8 @@ export function usePlaybackCommandDeps(
       handleToggleMicMonitor,
       handleSkipIntro,
       handleSkipOutro,
+      lyricOffsetSec,
+      setLyricOffsetSec,
     }),
     [
       paused,
@@ -97,6 +99,8 @@ export function usePlaybackCommandDeps(
       handleToggleMicMonitor,
       handleSkipIntro,
       handleSkipOutro,
+      lyricOffsetSec,
+      setLyricOffsetSec,
     ],
   );
 }

@@ -6,6 +6,11 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Largest lyric shift one command may ask for. A phone's buttons step by at
+/// most a second; the bound keeps a hand-written frame from throwing the
+/// lyrics out of the song in a single press.
+const MAX_SHIFT_STEP_MS: i64 = 5_000;
+
 /// Which side of the relay a connection is. The host plays the audio; remotes
 /// only send commands. Every remote may send them.
 #[derive(Debug, Deserialize)]
@@ -35,6 +40,11 @@ pub struct RemoteSnapshot {
     pub mic_name: String,
     pub can_skip_intro: bool,
     pub can_skip_outro: bool,
+    /// How far the host has pushed the lyric display from the song's own
+    /// timing, in milliseconds; positive shows a line later. Session-only, so
+    /// it is published rather than stored.
+    #[serde(default)]
+    pub lyric_offset_ms: i64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -66,6 +76,7 @@ pub enum RemoteCommand {
     ToggleMicMonitor,
     SkipIntro,
     SkipOutro,
+    ShiftLyrics { delta_ms: i64 },
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,6 +134,9 @@ impl RemoteCommand {
             Self::SetGuideVolume { volume } if !volume.is_finite() => None,
             Self::SetGuideVolume { volume } => Some(Self::SetGuideVolume {
                 volume: volume.clamp(0.0, 1.0),
+            }),
+            Self::ShiftLyrics { delta_ms } => Some(Self::ShiftLyrics {
+                delta_ms: delta_ms.clamp(-MAX_SHIFT_STEP_MS, MAX_SHIFT_STEP_MS),
             }),
             other => Some(other),
         }

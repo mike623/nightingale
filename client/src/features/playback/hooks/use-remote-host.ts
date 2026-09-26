@@ -25,6 +25,7 @@ import {
 import {
   usePlaybackMicState,
   usePlaybackThemeState,
+  usePlaybackTranscriptState,
   usePlaybackTransportState,
 } from '@/features/playback/providers';
 import { useLatestRef } from '@/shared/hooks/use-latest-ref';
@@ -44,6 +45,7 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
   const { paused, duration, guideVolume, guideAvailable } = usePlaybackTransportState();
   const { themeIndex, videoFlavor } = usePlaybackThemeState();
   const { micUserEnabled, micMonitorUserEnabled, micName, rawScore } = usePlaybackMicState();
+  const { lyricOffsetSec } = usePlaybackTranscriptState();
   const [lyricsHidden] = useLyricsHidden();
 
   // The desktop listener binds to the local network, so it stays off until the
@@ -51,6 +53,12 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
   // same switch decides whether a phone finds a host to talk to, so one setting
   // governs both targets.
   const enabled = config?.remote_control === true;
+
+  // Shifting the lyrics changes what the whole room reads, so it is the one
+  // command the phone page may send that the host only performs when the
+  // operator has turned it on. The check lives here rather than in the shared
+  // dispatcher: it is a rule about this surface, not about the command.
+  const lyricShiftAllowed = config?.party_lyric_shift === true;
 
   const snapshotSource = useMemo(
     () => ({
@@ -66,6 +74,8 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
       micName,
       rawScore,
       lyricsHidden,
+      lyricOffsetSec,
+      lyricShiftAllowed,
       deps,
     }),
     [
@@ -81,6 +91,8 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
       micName,
       rawScore,
       lyricsHidden,
+      lyricOffsetSec,
+      lyricShiftAllowed,
       deps,
     ],
   );
@@ -117,10 +129,15 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
         mic_name: current.micName,
         can_skip_intro: skip?.action === 'skip_intro',
         can_skip_outro: skip?.action === 'skip_outro',
+        lyric_offset_ms: Math.round(current.lyricOffsetSec * SECONDS_TO_MS),
       };
     };
 
     const applyCommand = (command: RemoteCommand): void => {
+      if (command.action === 'shift_lyrics' && !sourceRef.current.lyricShiftAllowed) {
+        return;
+      }
+
       dispatchPlaybackCommand(command, sourceRef.current.deps);
     };
 

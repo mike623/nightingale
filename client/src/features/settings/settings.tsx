@@ -87,6 +87,7 @@ const playbackSettings = (config: AppConfig | undefined) => ({
   autoPlayNext: config?.auto_play_next === true,
   remoteControl: config?.remote_control === true,
   partyImport: config?.party_import === true,
+  partyLyricShift: config?.party_lyric_shift === true,
 });
 
 const pendingValue = <T,>(input: T | null, saved: T): T => input ?? saved;
@@ -454,20 +455,37 @@ export const SettingsPage = () => {
                 </Field>
 
                 {playback.remoteControl && (
-                  <Field>
-                    <Label>Import from a phone</Label>
-                    <Hint>
-                      Let a phone paste a YouTube link to download into your library. Anyone who can
-                      reach the address can add to it and make this machine download, so leave it
-                      off unless you trust the room
-                    </Hint>
-                    <OnOffButtonGroup
-                      value={playback.partyImport}
-                      segment={NAV.playback.partyImport}
-                      getFocusClassName={getFocusClassName}
-                      onChange={(party_import) => mutate({ party_import })}
-                    />
-                  </Field>
+                  <>
+                    <Field>
+                      <Label>Import from a phone</Label>
+                      <Hint>
+                        Let a phone paste a YouTube link to download into your library. Anyone who
+                        can reach the address can add to it and make this machine download, so leave
+                        it off unless you trust the room
+                      </Hint>
+                      <OnOffButtonGroup
+                        value={playback.partyImport}
+                        segment={NAV.playback.partyImport}
+                        getFocusClassName={getFocusClassName}
+                        onChange={(party_import) => mutate({ party_import })}
+                      />
+                    </Field>
+
+                    <Field>
+                      <Label>Shift lyrics from a phone</Label>
+                      <Hint>
+                        Let a phone move the playing song&apos;s lyrics earlier or later to match
+                        what the room hears. The change lasts for that song only and never reaches
+                        the stored lyrics
+                      </Hint>
+                      <OnOffButtonGroup
+                        value={playback.partyLyricShift}
+                        segment={NAV.playback.partyLyricShift}
+                        getFocusClassName={getFocusClassName}
+                        onChange={(party_lyric_shift) => mutate({ party_lyric_shift })}
+                      />
+                    </Field>
+                  </>
                 )}
               </FieldGroup>
             </div>

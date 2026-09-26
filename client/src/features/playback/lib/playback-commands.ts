@@ -27,7 +27,8 @@ export type PlaybackCommand =
   | { readonly action: 'cycle_mic' }
   | { readonly action: 'toggle_mic_monitor' }
   | { readonly action: 'skip_intro' }
-  | { readonly action: 'skip_outro' };
+  | { readonly action: 'skip_outro' }
+  | { readonly action: 'shift_lyrics'; readonly delta_ms: number };
 
 export type PlaybackCommandAction = PlaybackCommand['action'];
 
@@ -60,6 +61,9 @@ export type PlaybackCommandDeps = {
   readonly handleToggleMicMonitor: () => void;
   readonly handleSkipIntro: () => void;
   readonly handleSkipOutro: () => void;
+  /** Seconds the lyric display currently runs behind the song's own timing. */
+  readonly lyricOffsetSec: number;
+  readonly setLyricOffsetSec: (seconds: number) => void;
 };
 
 const MS_PER_SEC = 1000;
@@ -69,6 +73,13 @@ const GUIDE_TOGGLE_VOLUME = 0.3;
 
 /** How far past the last lyric the outro skip becomes available, in seconds. */
 const OUTRO_SKIP_TAIL_SEC = 1;
+
+/**
+ * Furthest the lyric display may be pushed from the song's own timing, in
+ * seconds either way. Past this the lines on screen belong to another part of
+ * the song, so the offset is a fault rather than a correction.
+ */
+const MAX_LYRIC_OFFSET_SEC = 10;
 
 /**
  * Commands that still run while playback is paused; every other command is
@@ -81,6 +92,9 @@ const PAUSED_ACTIONS: ReadonlySet<PlaybackCommandAction> = new Set<PlaybackComma
   'pause',
   'resume',
   'toggle_pause',
+  // Lining the lyrics up is easiest on a paused song, and moving them changes
+  // nothing behind the pause overlay.
+  'shift_lyrics',
 ]);
 
 function clampVolume(volume: number): number {
@@ -109,6 +123,21 @@ function seekToMs(positionMs: number, deps: PlaybackCommandDeps): boolean {
   }
 
   deps.seek(Math.max(0, positionMs) / MS_PER_SEC);
+  return true;
+}
+
+/**
+ * Move the lyric display relative to the song, in milliseconds; positive shows
+ * each line later. Only the words on screen move: the audio, the scoring, and
+ * the transcript on disk keep the timing they had.
+ */
+function shiftLyrics(deltaMs: number, deps: PlaybackCommandDeps): boolean {
+  if (!Number.isFinite(deltaMs)) {
+    return false;
+  }
+
+  const next = deps.lyricOffsetSec + deltaMs / MS_PER_SEC;
+  deps.setLyricOffsetSec(Math.max(-MAX_LYRIC_OFFSET_SEC, Math.min(MAX_LYRIC_OFFSET_SEC, next)));
   return true;
 }
 
@@ -152,7 +181,7 @@ export function resolveSkipCommand(deps: PlaybackCommandDeps): PlaybackCommand |
   return null;
 }
 
-type NullaryAction = Exclude<PlaybackCommandAction, 'seek' | 'set_guide_volume'>;
+type NullaryAction = Exclude<PlaybackCommandAction, 'seek' | 'set_guide_volume' | 'shift_lyrics'>;
 
 /** Wraps a command that always takes effect once it passes the paused gate. */
 function always(run: (deps: PlaybackCommandDeps) => void): (deps: PlaybackCommandDeps) => boolean {
@@ -215,6 +244,9 @@ export function dispatchPlaybackCommand(
   }
   if (command.action === 'set_guide_volume') {
     return applyGuideVolume(command.volume, deps);
+  }
+  if (command.action === 'shift_lyrics') {
+    return shiftLyrics(command.delta_ms, deps);
   }
 
   return NULLARY_RUNNERS[command.action](deps);

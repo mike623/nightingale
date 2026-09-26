@@ -49,8 +49,8 @@ pub use library_model::{
 };
 pub use logs::{LogTail, log_path, read_log_tail};
 pub use lyrics::{
-    LrclibCandidate, LyricsFile, apply_timed_lyrics, clear_lyrics, load_lyrics_file, provide_lrc,
-    save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,
+    LrclibCandidate, LyricsFile, apply_timed_lyrics, clear_lyrics, load_lyrics_file, lyric_lines,
+    provide_lrc, save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,
 };
 pub use media_server::MediaEndpoint;
 pub use play_history::{pick_next_song, record_song_play};

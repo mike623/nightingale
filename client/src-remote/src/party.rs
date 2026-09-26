@@ -63,6 +63,16 @@ impl From<&Song> for PartySong {
     }
 }
 
+/// The playing song's words, for reading along on a phone.
+#[derive(Debug, Serialize)]
+pub struct PartyLyrics {
+    pub lines: Vec<String>,
+    /// Whether this host accepts a lyric shift from a phone. The host applies
+    /// that rule itself when a command arrives; this only decides whether the
+    /// phone offers the buttons at all.
+    pub shift_allowed: bool,
+}
+
 #[derive(Debug, Serialize)]
 pub struct PartyEntry {
     pub id: String,
@@ -108,6 +118,7 @@ pub fn router(state: PartyState) -> Router {
         .route("/party/queue", get(queue).post(enqueue))
         .route("/party/queue/reorder", post(reorder))
         .route("/party/queue/:id", delete(dequeue))
+        .route("/party/lyrics/:file_hash", get(lyrics))
         .route("/party/import", get(import_queue).post(submit_import))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .with_state(state)
@@ -155,6 +166,17 @@ async fn songs(Query(query): Query<SongsQuery>) -> PartyResult<PartySongsPage> {
     Ok(Json(PartySongsPage {
         songs: store.processed.iter().map(PartySong::from).collect(),
         total: store.processed_count,
+    }))
+}
+
+/// Lyrics for one song. Free of paths and of timing: a phone reads along with
+/// the screen everyone is already watching.
+async fn lyrics(Path(file_hash): Path<String>) -> PartyResult<PartyLyrics> {
+    let file_hash = checked_id(&file_hash)?;
+
+    Ok(Json(PartyLyrics {
+        lines: app_core::lyric_lines(file_hash),
+        shift_allowed: app_core::AppConfig::load().party_lyric_shift,
     }))
 }
 

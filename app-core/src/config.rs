@@ -238,6 +238,12 @@ pub struct AppConfig {
     /// folder. Anyone who can reach the address can use it.
     #[serde(default)]
     pub party_import: bool,
+    /// Opt-in for letting a phone on the remote page shift the playing song's
+    /// lyric timing. Off by default: the party surface is unauthenticated, and
+    /// a shift changes what everyone in the room reads. The shift is a display
+    /// offset on the running song only; nothing on disk changes.
+    #[serde(default)]
+    pub party_lyric_shift: bool,
     pub song_list_view: Option<String>,
     #[serde(default, deserialize_with = "deserialize_song_list_sort")]
     pub song_list_sort: Option<Vec<SongSort>>,
@@ -304,6 +310,7 @@ impl Default for AppConfig {
             auto_play_next: None,
             remote_control: false,
             party_import: false,
+            party_lyric_shift: false,
             song_list_view: None,
             song_list_sort: None,
             language_overrides: None,

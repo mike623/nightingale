@@ -52,7 +52,7 @@ export const RemotePage = () => {
             </section>
 
             <div className="min-h-0 min-w-0 overflow-y-auto md:col-span-3">
-              <BrowsePanel />
+              <BrowsePanel locked={locked} send={send} snapshot={snapshot} />
             </div>
           </div>
         )}

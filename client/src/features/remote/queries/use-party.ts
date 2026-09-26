@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   addPartyQueueEntry,
   fetchPartyImports,
+  fetchPartyLyrics,
   fetchPartyQueue,
   fetchPartySongs,
   removePartyQueueEntry,
@@ -17,6 +18,7 @@ import {
 const PARTY_SONGS = ['party-songs'];
 const PARTY_QUEUE = ['party-queue'];
 const PARTY_IMPORTS = ['party-imports'];
+const PARTY_LYRICS = ['party-lyrics'];
 
 const PAGE_SIZE = 25;
 
@@ -111,6 +113,18 @@ export const useAddToPartyQueue = () =>
     'Could not add that song',
     (song) => `Added ${song.title} to the queue`,
   );
+
+/**
+ * The words of the song named by `fileHash`, or nothing while no song is
+ * playing. Lyrics change only when the host re-times or replaces them, so this
+ * is fetched per song rather than polled.
+ */
+export const usePartyLyrics = (fileHash: string | null) =>
+  useQuery({
+    queryKey: [...PARTY_LYRICS, fileHash],
+    queryFn: () => fetchPartyLyrics(fileHash ?? ''),
+    enabled: fileHash !== null,
+  });
 
 /**
  * The host's import queue. Polled on the same interval as the playback queue

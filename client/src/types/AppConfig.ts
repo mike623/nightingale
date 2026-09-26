@@ -44,7 +44,7 @@ pitch_tolerance_semitones: number | null,
  * library instead of returning to the menu. Default (`None`/false) keeps
  * the exit-to-menu behaviour.
  */
-auto_play_next: boolean | null,
+auto_play_next: boolean | null, 
 /**
  * Opt-in for the LAN remote-control listener. Defaults to false, and the
  * listener still only starts when the UI asks for it.
@@ -56,4 +56,11 @@ remote_control: boolean,
  * is the one thing on it that runs a subprocess and writes to the library
  * folder. Anyone who can reach the address can use it.
  */
-party_import: boolean, song_list_view: string | null, song_list_sort: Array<SongSort> | null, language_overrides: { [key in string]: string } | null, };
+party_import: boolean, 
+/**
+ * Opt-in for letting a phone on the remote page shift the playing song's
+ * lyric timing. Off by default: the party surface is unauthenticated, and
+ * a shift changes what everyone in the room reads. The shift is a display
+ * offset on the running song only; nothing on disk changes.
+ */
+party_lyric_shift: boolean, song_list_view: string | null, song_list_sort: Array<SongSort> | null, language_overrides: { [key in string]: string } | null, };

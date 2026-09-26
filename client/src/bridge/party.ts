@@ -88,6 +88,21 @@ export const reorderPartyQueue = async (id: string, toIndex: number): Promise<Pa
     }),
   );
 
+/**
+ * The playing song's words, with whether this host lets a phone move their
+ * timing. Lines only: the phone reads along with the screen, it does not run
+ * its own clock.
+ */
+const partyLyricsSchema = z.object({
+  lines: z.array(z.string()),
+  shift_allowed: z.boolean(),
+});
+
+export type PartyLyrics = z.infer<typeof partyLyricsSchema>;
+
+export const fetchPartyLyrics = async (fileHash: string): Promise<PartyLyrics> =>
+  partyLyricsSchema.parse(await request(`/party/lyrics/${encodeURIComponent(fileHash)}`));
+
 /** An import as a phone sees it. The host keeps yt-dlp's own words to itself:
  * they quote the paths it was writing to. */
 const partyImportSchema = z.object({

@@ -34,6 +34,8 @@ export const remoteSnapshotSchema = z.object({
   mic_name: z.string().nullable(),
   can_skip_intro: z.boolean(),
   can_skip_outro: z.boolean(),
+  /** Defaulted so a phone left open across a host upgrade still parses. */
+  lyric_offset_ms: z.number().default(0),
 });
 
 /** `null` while the host has nothing playing. */
@@ -71,6 +73,10 @@ export const remoteCommandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('skip_outro') }),
   z.object({ action: z.literal('seek'), position_ms: z.number().finite().min(0) }),
   z.object({ action: z.literal('set_guide_volume'), volume: z.number().finite().min(0).max(1) }),
+  z.object({
+    action: z.literal('shift_lyrics'),
+    delta_ms: z.number().finite().min(-5000).max(5000),
+  }),
 ]);
 
 /** Result of the desktop `remote_status` command. */

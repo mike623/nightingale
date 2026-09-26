@@ -1,6 +1,7 @@
 import type { RemoteCommand, RemoteSnapshot } from '@/bridge/remote';
 import { ImportSection } from '@/features/remote/components/import-section';
 import { LibrarySection } from '@/features/remote/components/library-section';
+import { LyricsSection } from '@/features/remote/components/lyrics-section';
 import { PlaybackPanel } from '@/features/remote/components/playback-panel';
 import { QueueSection } from '@/features/remote/components/queue-section';
 import { usePartyImportAllowed } from '@/features/remote/queries/use-party';
@@ -39,6 +40,9 @@ export const RemoteTabs = ({ snapshot, positionMs, locked, send }: RemoteTabsPro
         <TabsTrigger className="text-sm" value="queue">
           Queue
         </TabsTrigger>
+        <TabsTrigger className="text-sm" value="lyrics">
+          Lyrics
+        </TabsTrigger>
         {canImport && (
           <TabsTrigger className="text-sm" value="import">
             Add
@@ -56,6 +60,10 @@ export const RemoteTabs = ({ snapshot, positionMs, locked, send }: RemoteTabsPro
 
       <TabsContent className="min-w-0 text-sm" value="queue">
         <QueueSection />
+      </TabsContent>
+
+      <TabsContent className="min-w-0 text-sm" value="lyrics">
+        <LyricsSection locked={locked} send={send} snapshot={snapshot} />
       </TabsContent>
 
       {canImport && (

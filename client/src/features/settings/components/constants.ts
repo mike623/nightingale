@@ -159,6 +159,7 @@ export const NAV = {
     autoPlayNext: 7,
     remoteControl: 8,
     partyImport: 9,
+    partyLyricShift: 10,
   },
 } as const;
 

@@ -85,6 +85,7 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   // deserializes to `false` rather than to a missing value.
   remote_control: z.boolean().default(false),
   party_import: z.boolean().default(false),
+  party_lyric_shift: z.boolean().default(false),
   song_list_view: nullableString,
   song_list_sort: z
     .array(
