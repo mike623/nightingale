@@ -23,7 +23,7 @@ impl AppState {
         Self {
             events: Arc::new(EventBus::new()),
             remote: Arc::new(Relay::new()),
-            playback_queue: Arc::new(PlaybackQueue::default()),
+            playback_queue: Arc::new(PlaybackQueue::load()),
             playback_sessions: Arc::new(PlaybackSessionStore::default()),
             data_path_pinned,
             library_pinned,

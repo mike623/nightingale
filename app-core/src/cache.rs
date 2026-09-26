@@ -452,6 +452,10 @@ pub(crate) fn analysis_queue_path() -> PathBuf {
     nightingale_dir().join("analysis_queue.json")
 }
 
+pub(crate) fn playback_queue_path() -> PathBuf {
+    nightingale_dir().join("playback_queue.json")
+}
+
 pub(crate) fn songs_cache_dir() -> PathBuf {
     configured_cache_paths()
         .songs

@@ -104,7 +104,6 @@ pub fn run() {
     logging::init();
 
     tauri::Builder::default()
-        .manage(std::sync::Arc::new(PlaybackQueue::default()))
         .manage(PlaybackSessionStore::default())
         .manage(RemoteControl::default())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -217,6 +216,9 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
             app_core::startup()?;
+            // The saved queue names songs by hash, so the library must be open
+            // before it can be read back.
+            app.manage(std::sync::Arc::new(PlaybackQueue::load()));
             spawn_import_worker(app.handle().clone());
             app_core::media_server::start()?;
             let media_endpoint = app_core::media_server::endpoint();
