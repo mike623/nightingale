@@ -1,7 +1,9 @@
 import { memo, useLayoutEffect, useRef, useState } from 'react';
 
+import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
 import { clampPlaybackScale } from '@/features/playback/lib/display-scale';
 import {
+  usePlaybackTranscriptState,
   usePlaybackTransportActions,
   usePlaybackTransportState,
 } from '@/features/playback/providers';
@@ -244,10 +246,12 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
   const nextFontSize = `clamp(${0.9 * scale}rem, ${4.5 * scale}svh, ${1.5 * scale}rem)`;
   const { isPlaying, paused } = usePlaybackTransportState();
   const { subscribe, getCurrentTime } = usePlaybackTransportActions();
+  const { lyricOffsetSec } = usePlaybackTranscriptState();
+  const [lyricsHidden] = useLyricsHidden();
   const animate = isPlaying && !paused;
 
   const [segIdx, setSegIdx] = useState(() =>
-    segments.length === 0 ? 0 : findCurrentSegment(segments, getCurrentTime(), 0),
+    segments.length === 0 ? 0 : findCurrentSegment(segments, getCurrentTime() - lyricOffsetSec, 0),
   );
 
   const hintRef = useRef(0);
@@ -267,7 +271,10 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
     let raf = 0;
     let cancelled = false;
 
-    const apply = (time: number) => {
+    // A positive offset holds the lyrics back, which is the same as asking the
+    // transcript what was being sung a moment earlier.
+    const apply = (mediaTime: number) => {
+      const time = mediaTime - lyricOffsetSec;
       const idx = findCurrentSegment(segments, time, hintRef.current);
       if (idx !== hintRef.current) {
         hintRef.current = idx;
@@ -331,7 +338,7 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
       cleanup();
       unsubscribe();
     };
-  }, [segments, subscribe, getCurrentTime, animate]);
+  }, [segments, subscribe, getCurrentTime, animate, lyricOffsetSec]);
 
   // Synchronize visibility with the committed segment before paint.
   useLayoutEffect(() => {
@@ -341,12 +348,17 @@ function LyricsDisplayImpl(props: LyricsDisplayProps) {
     }
   }, [segIdx, getCurrentTime]);
 
-  if (segments.length === 0) {
+  if (segments.length === 0 || lyricsHidden) {
     return null;
   }
 
-  const seg = segments[segIdx];
-  const nextSeg = segIdx + 1 < segments.length ? segments[segIdx + 1] : null;
+  // Saving lyrics mid-song swaps in a new transcript, which can be shorter
+  // than the one the retained index was found in. That renders once before the
+  // layout effect below re-runs and resolves the index against the new
+  // segments, so clamp rather than index out of bounds.
+  const safeIdx = Math.min(segIdx, segments.length - 1);
+  const seg = segments[safeIdx];
+  const nextSeg = safeIdx + 1 < segments.length ? segments[safeIdx + 1] : null;
 
   const segHasReading = seg.words.some(hasReading);
   const nextHasReading = nextSeg?.words.some(hasReading) ?? false;

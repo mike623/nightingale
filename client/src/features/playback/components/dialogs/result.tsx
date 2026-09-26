@@ -28,6 +28,17 @@ const TOP_LIMIT = 5;
 const RING = 'ring-2 ring-primary';
 const NO_FOCUS_RING = 'focus-visible:ring-0 focus-visible:border-transparent';
 
+function NextSongLabel({ pending, autoNextIn }: { pending: boolean; autoNextIn: number | null }) {
+  if (pending) {
+    return (
+      <>
+        <Spinner className="size-4" /> Preparing…
+      </>
+    );
+  }
+  return autoNextIn === null ? 'Next Song' : `Next Song (${autoNextIn})`;
+}
+
 type Props = {
   open: boolean;
   score: number;
@@ -35,9 +46,11 @@ type Props = {
   scores: ScoreRecord[];
   activeProfile: string | null;
   nextPending: boolean;
+  /** Seconds left before auto-play starts the next song; null when it is off. */
+  autoNextIn: number | null;
   exitLabel: string;
   onBack: () => void;
-  onNext?: () => void;
+  onNext: () => void;
 };
 
 export const ResultDialog = ({
@@ -47,6 +60,7 @@ export const ResultDialog = ({
   scores,
   activeProfile,
   nextPending,
+  autoNextIn,
   exitLabel,
   onBack,
   onNext,
@@ -55,8 +69,8 @@ export const ResultDialog = ({
 
   const { focusedIndex } = useDialogNav({
     open,
-    itemCount: onNext ? 2 : 1,
-    onConfirm: (index) => (index === 0 ? onBack() : onNext?.()),
+    itemCount: 2,
+    onConfirm: (index) => (index === 0 ? onBack() : onNext()),
     onBack,
   });
 
@@ -136,27 +150,15 @@ export const ResultDialog = ({
             >
               {exitLabel}
             </Button>
-            {onNext ? (
-              <Button
-                type="button"
-                className={cn(
-                  'w-full sm:w-auto',
-                  NO_FOCUS_RING,
-                  open && focusedIndex === 1 && RING,
-                )}
-                disabled={nextPending}
-                aria-busy={nextPending}
-                onClick={onNext}
-              >
-                {nextPending ? (
-                  <>
-                    <Spinner className="size-4" /> Preparing…
-                  </>
-                ) : (
-                  'Next Song'
-                )}
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              className={cn('w-full sm:w-auto', NO_FOCUS_RING, open && focusedIndex === 1 && RING)}
+              disabled={nextPending}
+              aria-busy={nextPending}
+              onClick={onNext}
+            >
+              <NextSongLabel pending={nextPending} autoNextIn={autoNextIn} />
+            </Button>
           </DialogFooter>
         </div>
       </DialogContent>

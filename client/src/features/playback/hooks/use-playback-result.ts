@@ -2,6 +2,10 @@
  * Drives the end-of-song result dialog: watches transport.isFinished + the
  * skip-outro pending flag, persists the run's score to the active profile,
  * plays the success chime, and exposes the props the result dialog needs.
+ *
+ * With auto-play-next on, finishing continues into another song instead of the
+ * menu: a scoreless run rolls straight over, and a scored one holds the result
+ * on screen for a short countdown first.
  */
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -10,10 +14,7 @@ import { toast } from 'sonner';
 
 import successSoundUrl from '@/assets/sounds/success.mp3';
 import { addScore } from '@/bridge/profile';
-import {
-  usePlaybackQueueQuery,
-  useStartNextPlaybackQueueSong,
-} from '@/features/playback-queue/use-playback-queue';
+import type { PlaybackNext } from '@/features/playback/hooks/use-playback-next';
 import {
   usePlaybackMicState,
   usePlaybackTranscriptActions,
@@ -27,23 +28,35 @@ import { PROFILES } from '@/shared/query-keys';
 import type { ScoreRecord } from '@/types/ScoreRecord';
 import type { Song } from '@/types/Song';
 
+/** How long the result stays up before auto-play moves on. */
+const AUTO_NEXT_SECONDS = 8;
+
 export type PlaybackResult = {
   open: boolean;
   score: number;
   scores: ScoreRecord[];
   activeProfile: string | null;
   nextPending: boolean;
+  /** Seconds left on the auto-advance countdown; null when it is off. */
+  autoNextIn: number | null;
   onBack: () => void;
-  onNext?: () => void;
+  onNext: () => void;
 };
 
-export function usePlaybackResult(song: Song, queuePlayback: boolean): PlaybackResult {
+export type PlaybackResultOptions = {
+  queuePlayback: boolean;
+  autoPlayNext: boolean;
+  /** Starts the next song: the queue's head, or a random draw. */
+  next: PlaybackNext;
+};
+
+export function usePlaybackResult(
+  song: Song,
+  { queuePlayback, autoPlayNext, next }: PlaybackResultOptions,
+): PlaybackResult {
   const fileHash = song.file_hash;
   const queryClient = useQueryClient();
   const { data: profileData, isLoading: profilesLoading } = useProfiles();
-  const { data: entries = [] } = usePlaybackQueueQuery();
-  const { isPreparing, playNext } = useStartNextPlaybackQueueSong(entries);
-
   const { isFinished } = usePlaybackTransportState();
   const { handleExit } = usePlaybackTransportActions();
   const { rawScore } = usePlaybackMicState();
@@ -52,9 +65,12 @@ export function usePlaybackResult(song: Song, queuePlayback: boolean): PlaybackR
 
   const [showResult, setShowResult] = useState(false);
   const [resultScore, setResultScore] = useState(0);
+  const [autoNextIn, setAutoNextIn] = useState<number | null>(null);
 
   const scoreRef = useLatestRef(rawScore);
   const finishHandledRef = useRef(false);
+  // The finish effect must not re-run when these change identity mid-song.
+  const autoNextRef = useLatestRef({ autoPlayNext, next });
 
   useEffect(() => {
     if (!isFinished && !skipOutroPending) {
@@ -76,8 +92,17 @@ export function usePlaybackResult(song: Song, queuePlayback: boolean): PlaybackR
     const active = profileData?.active ?? null;
     const shouldShowResult = queuePlayback || finalScore > 0;
 
+    // Leaving without a result: continue into another song, or exit.
+    const leaveSession = () => {
+      if (autoNextRef.current.autoPlayNext) {
+        autoNextRef.current.next.playNext();
+      } else {
+        handleExit();
+      }
+    };
+
     if (!shouldShowResult) {
-      handleExit();
+      leaveSession();
       return;
     }
 
@@ -92,8 +117,12 @@ export function usePlaybackResult(song: Song, queuePlayback: boolean): PlaybackR
       }
       setResultScore(finalScore);
       setShowResult(true);
+      if (autoNextRef.current.autoPlayNext) {
+        setAutoNextIn(AUTO_NEXT_SECONDS);
+      }
     })();
   }, [
+    autoNextRef,
     isFinished,
     skipOutroPending,
     fileHash,
@@ -120,20 +149,49 @@ export function usePlaybackResult(song: Song, queuePlayback: boolean): PlaybackR
     };
   }, [showResult]);
 
+  const onNext = useCallback(() => {
+    setAutoNextIn(null);
+    // The queued start keeps the dialog up behind its "Preparing…" spinner; a
+    // random draw unmounts this session, so hiding it first avoids a flash.
+    if (!next.hasQueueNext) {
+      setShowResult(false);
+    }
+    next.playNext();
+  }, [next]);
+
+  useEffect(() => {
+    if (autoNextIn === null) {
+      return undefined;
+    }
+
+    // The last tick starts the next song from inside the timer rather than
+    // counting down to zero and reacting to it, so the effect never advances
+    // state synchronously as it runs.
+    const timer = setTimeout(() => {
+      if (autoNextIn <= 1) {
+        onNext();
+        return;
+      }
+      setAutoNextIn((left) => (left === null ? null : left - 1));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [autoNextIn, onNext]);
+
   const onBack = useCallback(() => {
+    setAutoNextIn(null);
     setShowResult(false);
     handleExit();
   }, [handleExit]);
-  const onNext = useCallback(() => playNext(), [playNext]);
-  const hasNext = queuePlayback && entries.length > 0;
 
   return {
     open: showResult,
     score: resultScore,
     scores: profileData?.scores ?? [],
     activeProfile: profileData?.active ?? null,
-    nextPending: isPreparing,
+    nextPending: next.isPreparing,
+    autoNextIn,
     onBack,
-    onNext: hasNext ? onNext : undefined,
+    onNext,
   };
 }

@@ -5,6 +5,7 @@ import type { SongsMeta } from '@/types/SongsMeta';
 import type { SongsStore } from '@/types/SongsStore';
 
 import { invoke } from './runtime';
+import { songSchema } from './schemas';
 
 export function getPreloadedSongsMeta(): SongsMeta | undefined {
   if (typeof window === 'undefined') {
@@ -27,4 +28,20 @@ export const loadSongsMeta = async (): Promise<SongsMeta> => {
 
 export const loadAnalysisQueue = async (): Promise<AnalysisQueue> => {
   return await invoke<AnalysisQueue>('load_analysis_queue');
+};
+
+/**
+ * Rewrite a local song's display name in the library database. Returns the
+ * stored row so callers refresh from what was persisted, not what they sent.
+ */
+export const renameSong = async (
+  fileHash: string,
+  fields: { title?: string; artist?: string },
+): Promise<Song> => {
+  const value = await invoke('rename_song', {
+    fileHash,
+    title: fields.title,
+    artist: fields.artist,
+  });
+  return songSchema.parse(value);
 };

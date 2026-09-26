@@ -1,4 +1,6 @@
-use app_core::{clear_models, clear_videos, CacheStats};
+use app_core::{
+    clear_models, clear_songs, clear_videos, sweep_orphan_cache, CacheStats, SweepReport,
+};
 
 #[tauri::command]
 pub(crate) fn calculate_cache_stats() -> CacheStats {
@@ -16,7 +18,18 @@ pub(crate) fn clear_models_command() {
 }
 
 #[tauri::command]
+pub(crate) fn clear_songs_command() {
+    clear_songs();
+}
+
+#[tauri::command]
+pub(crate) fn sweep_orphan_cache_command() -> Result<SweepReport, String> {
+    sweep_orphan_cache()
+}
+
+#[tauri::command]
 pub(crate) fn clear_all() {
     clear_models();
     clear_videos();
+    clear_songs();
 }

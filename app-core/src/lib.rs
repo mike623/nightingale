@@ -2,12 +2,15 @@ mod analyzer;
 mod cache;
 mod config;
 mod error;
+mod import;
 mod library_db;
 mod library_menu;
 mod library_model;
+mod logs;
 mod lrc;
 mod lyrics;
 pub mod media_server;
+mod play_history;
 mod playback;
 mod playback_queue;
 mod playback_session;
@@ -19,28 +22,38 @@ mod source;
 mod usdx;
 mod vendor;
 mod vendor_scripts;
+mod youtube_link;
 
 pub use analyzer::{
-    AnalysisQueue, cancel_analysis, delete_cache, enqueue, realign, reanalyze_force_transcribe,
-    reanalyze_full, reanalyze_transcript, refresh_metadata, shutdown_server,
+    AnalysisQueue, cancel_analysis, delete_cache, delete_song, enqueue, realign,
+    reanalyze_force_transcribe, reanalyze_full, reanalyze_transcript, refresh_metadata,
+    shutdown_server,
 };
 pub use cache::{
-    CacheDir, CachePaths, CacheStats, cache_roots, change_app_data_path, clear_models,
-    clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path, same_path,
-    set_default_data_path,
+    CacheDir, CachePaths, CacheStats, SweepReport, cache_roots, change_app_data_path, clear_models,
+    clear_songs, clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path,
+    same_path, set_default_data_path, sweep_orphan_cache,
 };
 pub use config::{AppConfig, LibrarySource};
+pub use import::{
+    ImportEntry, ImportEntryProgress, ImportEntryStatus, ImportEvent, ImportFailure, ImportPreview,
+    ImportProgress, ImportQueueRow, ImportReport, ImportSubmitter, clear_finished_imports,
+    import_available, import_queue, imported_video_id, imported_video_ids, probe as probe_import,
+    redownload_song, run_import_worker, submit_import,
+};
 pub use library_db::{init_library, library_db_path};
 pub use library_menu::{LibraryMenuItem, LibraryMenuItems, load_library_menu_items};
 pub use library_model::{
     LibraryMenuFilters, LoadSongsParams, SongSort, SongSortColumn, SongTarget, SongsMeta,
     SongsStore, SortDirection,
 };
+pub use logs::{LogTail, log_path, read_log_tail};
 pub use lyrics::{
-    LrclibCandidate, LyricsFile, apply_timed_lyrics, load_lyrics_file, provide_lrc,
-    save_lyrics_and_realign, search_lrclib_for_hash,
+    LrclibCandidate, LyricsFile, apply_timed_lyrics, clear_lyrics, load_lyrics_file, lyric_lines,
+    provide_lrc, save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,
 };
 pub use media_server::MediaEndpoint;
+pub use play_history::{pick_next_song, record_song_play};
 pub use playback::{
     AudioPaths, PixabayVideoDownloaded, ShiftDone, ShiftResult, StemsReady,
     download_pixabay_videos, ensure_mp3_stems, ensure_mp3_stems_ready_payload,
@@ -52,7 +65,7 @@ pub use playback_queue::{PlaybackQueue, PlaybackQueueEntry};
 pub use playback_session::{PlaybackSession, PlaybackSessionStore};
 pub use profile::ProfileStore;
 pub use scanner::start_scan;
-pub use song::{Song, SongOrigin};
+pub use song::{Song, SongOrigin, rename_song};
 pub use source::{
     JellyfinAuth, JellyfinSource, MediaSource, NavidromeAuth, NavidromeSource, PlexAuth,
     PlexSource, SourceKind, active_source,
@@ -76,6 +89,7 @@ pub use vendor::{
     step_download_ffmpeg, step_download_uv, step_extract_scripts, step_install_packages,
     step_install_python,
 };
+pub use youtube_link::{YoutubeLinkError, oembed_title, video_id_of, watch_url};
 
 pub fn startup() -> Result<(), String> {
     init_library().map_err(|e| e.to_string())?;

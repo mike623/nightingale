@@ -44,6 +44,8 @@ export type PlaybackTransportActions = {
   subscribe: (fn: TimeSubscriber) => () => void;
   getCurrentTime: () => number;
   seek: (time: number) => void;
+  /** Seeks taken so far; consumers that accumulate over a pass restart when it moves. */
+  getSeekEpoch: () => number;
   setGuideVolume: (volume: number) => void;
   getVocalsBuffer: AudioPlayer['getVocalsBuffer'];
   getScoringBuffer: AudioPlayer['getScoringBuffer'];
@@ -170,6 +172,7 @@ export function PlaybackTransportProvider({
       subscribe: audio.subscribe,
       getCurrentTime: audio.getCurrentTime,
       seek: audio.seek,
+      getSeekEpoch: audio.getSeekEpoch,
       setGuideVolume: audio.setGuideVolume,
       getVocalsBuffer: audio.getVocalsBuffer,
       getScoringBuffer: audio.getScoringBuffer,
@@ -183,6 +186,7 @@ export function PlaybackTransportProvider({
       audio.subscribe,
       audio.getCurrentTime,
       audio.seek,
+      audio.getSeekEpoch,
       audio.setGuideVolume,
       audio.getVocalsBuffer,
       audio.getScoringBuffer,

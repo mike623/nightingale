@@ -33,21 +33,30 @@ const clearCacheTarget = (mode: DialogMode): ClearCacheTarget | null => {
 const focusClass = (open: boolean, focusedIndex: number, index: number): string =>
   cn(NO_FOCUS_RING, open && focusedIndex === index && RING);
 
-const COPY: Record<ClearCacheTarget, { title: string; description: string }> = {
+const COPY: Record<ClearCacheTarget, { title: string; description: string; confirm: string }> = {
   all: {
     title: 'Clear all cache?',
     description:
-      'This will permanently delete every cached file (songs, videos, models, and anything else). This action cannot be undone.',
+      'This will permanently delete every cached file: the stems, lyrics and timing generated for your songs, plus background videos and analysis models. Your original song files are not touched, but every song will have to be analyzed again.',
+    confirm: 'Clear cache',
   },
   videos: {
     title: 'Clear videos cache?',
     description:
       "This will permanently delete all cached background videos. They will be re-downloaded the next time they're needed.",
+    confirm: 'Clear cache',
   },
   models: {
     title: 'Clear models cache?',
     description:
       'This will permanently delete the cached analysis models. They will be re-downloaded the next time analysis runs.',
+    confirm: 'Clear cache',
+  },
+  orphans: {
+    title: 'Clean orphaned cache?',
+    description:
+      'This will permanently delete generated files left behind by songs that are no longer in your library. Songs still in the library keep everything they have.',
+    confirm: 'Clean up',
   },
 };
 
@@ -102,7 +111,7 @@ export const ClearCacheDialog = () => {
             onClick={runClear}
             className={focusClass(open, focusedIndex, 1)}
           >
-            Clear cache
+            {copy?.confirm ?? 'Clear cache'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

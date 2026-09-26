@@ -208,6 +208,42 @@ pub struct AppConfig {
     pub align_backend: Option<String>,
     pub vocal_detection_threshold_pct: Option<f64>,
     pub auto_analyze: Option<bool>,
+    /// When set, analysis always runs WhisperX to produce word-level lyric
+    /// timing. Default (`None`/false) uses LRCLIB's line-level synced lyrics and
+    /// skips WhisperX entirely — songs with no synced match are left lyric-less
+    /// (stems only) rather than transcribed. See docs/adr/0003.
+    pub word_level_lyrics: Option<bool>,
+    /// When set, analysis looks the song up on LRCLIB and uses any synced
+    /// lyrics it finds. Default (`None`/false) skips the lookup entirely and
+    /// only separates stems — see docs/adr/0003.
+    pub lyrics_lookup: Option<bool>,
+    /// How many songs are analyzed at once (1-2). Each worker runs its own
+    /// analyzer server process, so 2 doubles GPU/RAM use. Default 2.
+    pub analysis_workers: Option<u32>,
+    /// Pitch-scoring tolerance in semitones — the distance at which a sung note
+    /// scores zero (`similarity = max(0, 1 - diff/tolerance)`). Lower is
+    /// stricter, higher is more forgiving. Default 6.
+    pub pitch_tolerance_semitones: Option<f64>,
+    /// When set, finishing a song starts a random analyzed song from the
+    /// library instead of returning to the menu. Default (`None`/false) keeps
+    /// the exit-to-menu behaviour.
+    pub auto_play_next: Option<bool>,
+    /// Opt-in for the LAN remote-control listener. Defaults to false, and the
+    /// listener still only starts when the UI asks for it.
+    #[serde(default)]
+    pub remote_control: bool,
+    /// Opt-in for letting a phone on the remote page submit a YouTube link to
+    /// import. Off by default: the party surface is unauthenticated, and this
+    /// is the one thing on it that runs a subprocess and writes to the library
+    /// folder. Anyone who can reach the address can use it.
+    #[serde(default)]
+    pub party_import: bool,
+    /// Opt-in for letting a phone on the remote page shift the playing song's
+    /// lyric timing. Off by default: the party surface is unauthenticated, and
+    /// a shift changes what everyone in the room reads. The shift is a display
+    /// offset on the running song only; nothing on disk changes.
+    #[serde(default)]
+    pub party_lyric_shift: bool,
     pub song_list_view: Option<String>,
     #[serde(default, deserialize_with = "deserialize_song_list_sort")]
     pub song_list_sort: Option<Vec<SongSort>>,
@@ -267,6 +303,14 @@ impl Default for AppConfig {
             align_backend: None,
             vocal_detection_threshold_pct: None,
             auto_analyze: None,
+            word_level_lyrics: None,
+            lyrics_lookup: None,
+            analysis_workers: None,
+            pitch_tolerance_semitones: None,
+            auto_play_next: None,
+            remote_control: false,
+            party_import: false,
+            party_lyric_shift: false,
             song_list_view: None,
             song_list_sort: None,
             language_overrides: None,
@@ -425,6 +469,22 @@ impl AppConfig {
 
     pub fn auto_analyze(&self) -> bool {
         self.auto_analyze.unwrap_or(false)
+    }
+
+    /// Opt-in word-level lyric timing. Off by default — see `word_level_lyrics`.
+    pub fn word_level_lyrics(&self) -> bool {
+        self.word_level_lyrics.unwrap_or(false)
+    }
+
+    /// Opt-in LRCLIB lookup during analysis. Off by default — see `lyrics_lookup`.
+    pub fn lyrics_lookup(&self) -> bool {
+        self.lyrics_lookup.unwrap_or(false)
+    }
+
+    /// Number of concurrent analysis workers, clamped to the 1-2 the analyzer
+    /// server pool supports.
+    pub fn analysis_workers(&self) -> usize {
+        self.analysis_workers.unwrap_or(2).clamp(1, 2) as usize
     }
 
     pub fn mic_monitor_gain(&self) -> f32 {

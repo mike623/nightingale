@@ -5,6 +5,7 @@
 //!  - [`migrations`] — schema migrations, legacy `songs.json` import, and the one-shot
 //!    Jellyfin path rewrite
 //!  - [`analysis_queue`] — CRUD for the analyzer's persistent queue
+//!  - [`import_queue`] — CRUD for the YouTube importer's persistent queue
 //!  - [`songs`] — core song row CRUD, scan-aware inserts, rekey/update helpers
 //!  - [`queries`] — search / pagination / library-menu aggregation queries
 //!  - [`rebase`] — one-shot path rewrite when the data root moves
@@ -23,7 +24,9 @@ use crate::cache::nightingale_dir;
 
 mod analysis_queue;
 mod connection;
+mod import_queue;
 mod migrations;
+mod play_stats;
 mod playlists;
 mod queries;
 mod rebase;
@@ -34,7 +37,15 @@ pub(crate) use analysis_queue::{
     analysis_queue_clear, analysis_queue_delete, analysis_queue_load_rows,
     analysis_queue_save_rows, analysis_queue_upsert_row,
 };
+pub(crate) use import_queue::{
+    import_queue_delete_finished, import_queue_insert_rows, import_queue_job_rows,
+    import_queue_load_rows, import_queue_next_job, import_queue_requeue_stale,
+    import_queue_update_status,
+};
 pub(crate) use migrations::rewrite_legacy_jellyfin_paths;
+pub(crate) use play_stats::{
+    PlayOutcome, pick_weighted_analyzed_song, record_play, rekey_play_stats,
+};
 pub(crate) use playlists::{PlaylistDefinition, PlaylistSongKeyKind, replace_all_playlists};
 pub(crate) use queries::{
     iter_file_hashes_filtered_analysis_busy, iter_file_hashes_filtered_full_reanalyzable,
@@ -44,9 +55,10 @@ pub(crate) use queries::{
 };
 pub(crate) use rebase::{rebase_song_album_art_cache_paths, rebase_song_album_art_paths};
 pub(crate) use songs::{
-    append_songs_for_scan, delete_songs_not_in_paths, load_all_songs, load_song_by_hash,
-    load_song_path_strings, load_songs_by_hashes, read_library_meta, rekey_song,
-    replace_all_songs_sorted, update_library_meta, update_song_fields,
+    append_songs_for_scan, delete_song_by_hash, delete_songs_not_in_paths, load_all_songs,
+    load_cache_retention_keys, load_song_by_hash, load_song_path_strings, load_songs_by_hashes,
+    mark_all_songs_unanalyzed, read_library_meta, rekey_song, replace_all_songs_sorted,
+    update_library_meta, update_song_fields,
 };
 
 /// Incremented at the start of each `start_scan` so in-flight scan threads stop writing

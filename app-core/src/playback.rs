@@ -277,13 +277,16 @@ pub fn ensure_playable_source_video(file_hash: &str) -> Result<Option<String>, N
         return Ok(None);
     };
 
-    if is_mp4_compatible_source(&source_path) {
-        return Ok(Some(source_path.to_string_lossy().into_owned()));
-    }
-
+    // A converted copy wins over the source even when the source is already an
+    // MP4: `is_mp4_compatible_source` only sees the container, so an MP4 the
+    // webview cannot decode still passes it.
     let target = cache.playable_video_path(file_hash);
     if target.is_file() {
         return Ok(Some(target.to_string_lossy().into_owned()));
+    }
+
+    if is_mp4_compatible_source(&source_path) {
+        return Ok(Some(source_path.to_string_lossy().into_owned()));
     }
 
     loop {

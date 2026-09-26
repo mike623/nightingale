@@ -2,7 +2,12 @@ import { TrophyIcon } from 'lucide-react';
 import { Fragment } from 'react';
 import { toast } from 'sonner';
 
+import { openUrl, revealPath } from '@/bridge/opener';
+import { isTauri } from '@/bridge/runtime';
+import { youtubeWatchUrl } from '@/features/import/lib/youtube-url';
 import { useAnalysis } from '@/features/library/hooks/use-analysis';
+import { useRedownloadSong } from '@/features/library/hooks/use-redownload-song';
+import { useImportedVideoId } from '@/features/library/queries/use-imported-video-id';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useProfiles } from '@/features/profiles/queries/use-profiles';
 import { Separator } from '@/shared/components/ui/separator';
@@ -17,6 +22,7 @@ type ActionsSectionProps = {
   status: SongStatusInfo;
   analysisBusy: boolean;
   supportsAnalysisActions: boolean;
+  onDeleted: () => void;
 };
 
 const run =
@@ -37,9 +43,12 @@ export const ActionsSection = ({
   status,
   analysisBusy,
   supportsAnalysisActions,
+  onDeleted,
 }: ActionsSectionProps) => {
   const { setMode } = useDialog();
   const analysis = useAnalysis();
+  const redownload = useRedownloadSong();
+  const { data: importedVideoId } = useImportedVideoId(song.file_hash);
   const { data: profiles } = useProfiles();
   const hasScores = profiles?.scores.some((score) => score.song_hash === song.file_hash) ?? false;
 
@@ -49,8 +58,32 @@ export const ActionsSection = ({
     analysisBusy,
     supportsAnalysisActions,
     analysis,
+    // Only a song still traceable to a YouTube video has anything to re-fetch
+    // or to link back to.
+    youtube:
+      typeof importedVideoId === 'string' && importedVideoId !== ''
+        ? {
+            onRedownload: () => void redownload(song),
+            onOpen: () => {
+              void openUrl(youtubeWatchUrl(importedVideoId)).catch((error: unknown) => {
+                toast.error(error instanceof Error ? error.message : 'Opening the video failed.');
+              });
+            },
+          }
+        : null,
+    // A remote-origin song's path is a local materialisation of someone
+    // else's file, so there is nothing meaningful to show for it.
+    onRevealFile:
+      isTauri && song.origin.kind === 'local_file'
+        ? () => {
+            void revealPath(song.path).catch((error: unknown) => {
+              toast.error(error instanceof Error ? error.message : 'Opening the folder failed.');
+            });
+          }
+        : null,
     onEditLyrics: () => setMode({ mode: 'edit-lyrics', song }),
     onChangeLanguage: () => setMode({ mode: 'language', song }),
+    onDeleteSong: () => setMode({ mode: 'delete-song', song, onDeleted }),
     run,
   });
 

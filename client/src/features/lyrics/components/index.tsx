@@ -1,19 +1,26 @@
 import { Loader2Icon } from 'lucide-react';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 
+import { searchLrclibTerms } from '@/bridge/lyrics';
 import { openUrl } from '@/bridge/opener';
 import { useLyricsEditor } from '@/features/lyrics/hooks/use-lyrics-editor';
+import { useLyricsifyWindow } from '@/features/lyrics/hooks/use-lyricsify-window';
 import { useSaveLyricsMutation } from '@/features/lyrics/mutations/use-save-lyrics-mutation';
 import {
   useApplyTimedLyricsMutation,
+  useClearLyricsMutation,
   useProvideLrcMutation,
 } from '@/features/lyrics/mutations/use-timed-lyrics-mutation';
 import { useLrclibCandidates } from '@/features/lyrics/queries/use-lyrics';
 import {
   detectLrcLevel,
   isEditLyricsDialogMode,
+  shiftLrcTimestamps,
   stripLrcToPlainLines,
 } from '@/features/lyrics/utils/edit-lyrics';
+import { SHIFT_SLOTS, shiftStepAt } from '@/features/lyrics/utils/lrc-shift';
+import { lyricsifySearchUrl } from '@/features/lyrics/utils/lyricsify';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
 import {
@@ -24,22 +31,38 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { wordChips } from '@/shared/utils/word-chips';
 import type { LrclibCandidate } from '@/types/LrclibCandidate';
 import type { Song } from '@/types/Song';
 
 import { CarouselNav } from './carousel-nav';
 import { EditLyricsFooter } from './edit-lyrics-footer';
 import { LrcOptions, type TimingChoice } from './lrc-options';
+import { LrcShift } from './lrc-shift';
 import { LrclibMatches } from './lrclib-matches';
+import { LRCLIB_SEARCH_SLOTS, LrclibSearch, type SearchField } from './lrclib-search';
 import { LyricsEditor } from './lyrics-editor';
+import { LyricsifyWeb } from './lyricsify-web';
 import { ringFor } from './parts';
 
 export { isEditLyricsDialogMode } from '@/features/lyrics/utils/edit-lyrics';
 
 const LRC_SPEC_URL = 'https://en.wikipedia.org/wiki/LRC_(file_format)';
 
-type EditLyricsTab = 'edit' | 'lrclib';
-const EDIT_LYRICS_TABS = ['edit', 'lrclib'] satisfies readonly EditLyricsTab[];
+/** Placeholder the library writes when a song carries no artist metadata. */
+const UNKNOWN_ARTIST = 'Unknown Artist';
+
+type EditLyricsTab = 'edit' | 'lrclib' | 'web';
+const EDIT_LYRICS_TABS = ['edit', 'lrclib', 'web'] satisfies readonly EditLyricsTab[];
+
+const TAB_LABELS: Readonly<Record<EditLyricsTab, string>> = {
+  edit: 'Edit',
+  lrclib: 'LRCLIB matches',
+  web: 'Lyricsify',
+};
+
+const isEditLyricsTab = (value: string): value is EditLyricsTab =>
+  EDIT_LYRICS_TABS.some((tab) => tab === value);
 
 const editSongState = (song: Song | null) => ({
   fileHash: song?.file_hash ?? null,
@@ -49,6 +72,7 @@ const editSongState = (song: Song | null) => ({
 
 type NavigationStateInput = {
   candidateCount: number;
+  matchesLoading: boolean;
   currentHasLrc: boolean;
   hasLrc: boolean;
   useProvidedTiming: boolean;
@@ -57,13 +81,41 @@ type NavigationStateInput = {
 };
 
 const navigationState = (input: NavigationStateInput) => ({
-  hasCandidates: input.candidateCount > 0,
+  // While a search runs the matches pane shows a spinner instead of the
+  // candidate buttons, so their slots have to leave the ring as well.
+  hasCandidates: input.candidateCount > 0 && !input.matchesLoading,
   useSlots: input.currentHasLrc ? 2 : 1,
+  shiftNav: input.hasLrc && !input.saving,
   timingNav: input.hasLrc && !input.saving,
   audioNav: input.useProvidedTiming && !input.stemsSeparated && !input.saving,
 });
 
 const queryError = (error: unknown): Error | null => (error instanceof Error ? error : null);
+
+/** Results of a manual search replace the auto-derived ones while they are set. */
+const resolveCandidates = (
+  manual: LrclibCandidate[] | null,
+  auto: LrclibCandidate[] | undefined,
+): LrclibCandidate[] => manual ?? auto ?? [];
+
+/** Once manual results are showing, a stale auto-query failure is irrelevant. */
+const autoQueryError = (manual: LrclibCandidate[] | null, error: unknown): Error | null =>
+  manual === null ? queryError(error) : null;
+
+const searchFailureMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : 'LRCLIB search failed.';
+
+type SearchTerms = { track: string; artist: string };
+
+/** Seed the manual boxes with the song's own metadata, minus the placeholder artist. */
+const defaultSearchTerms = (song: Song | null): SearchTerms => ({
+  track: song?.title ?? '',
+  artist: song !== null && song.artist !== UNKNOWN_ARTIST ? song.artist : '',
+});
+
+/** The element being typed in, when the DOM focus sits on one of `elements`. */
+const activeAmong = (elements: readonly (HTMLElement | null)[]): HTMLElement | null =>
+  elements.find((element) => element !== null && document.activeElement === element) ?? null;
 
 const editedSong = (mode: ReturnType<typeof useDialog>['mode']): Song | null =>
   isEditLyricsDialogMode(mode) ? mode.song : null;
@@ -89,16 +141,6 @@ const footerMessage = (input: FooterMessageInput): string | undefined => {
   }
 
   return hints.length > 0 ? hints.join(' ') : undefined;
-};
-
-const candidateMeta = (
-  candidates: readonly LrclibCandidate[],
-  isAnalyzed: boolean,
-  loading: boolean,
-) => {
-  const count = candidates.length;
-  const hasMatches = isAnalyzed ? count > 1 : count > 0;
-  return { count, showMatchesTab: hasMatches || loading };
 };
 
 type TimingMetaInput = {
@@ -151,13 +193,24 @@ const getSaveLabel = (
 type NavLayout = {
   stops: number[];
   editorSegment: number | null;
-  // Top "header row" containing tabs (slots 0..1) and, on the LRCLIB tab, the
-  // carousel arrows (slots 2..3) — all in the same segment so left/right walks
+  // Top "header row" containing the tab triggers and, on the LRCLIB tab, the
+  // carousel arrows after them — all in the same segment so left/right walks
   // across them.
   headerSegment: number | null;
   // Slot offset where the carousel arrows start inside `headerSegment`; null
   // if no arrows in this view.
   arrowSlotStart: number | null;
+  // Track / artist inputs plus the search button on the LRCLIB pane.
+  searchSegment: number | null;
+  // One-click word chips under each search input, present only while the
+  // matching field holds more than one word.
+  trackChipsSegment: number | null;
+  artistChipsSegment: number | null;
+  // "Open in browser" on the Lyricsify pane.
+  webSegment: number | null;
+  // Timestamp offset buttons on the edit pane, present only while the text
+  // carries LRC timing.
+  shiftSegment: number | null;
   // Timing / audio radio rows (each 2 slots) on the edit pane, present only
   // when their controls are enabled.
   timingSegment: number | null;
@@ -167,43 +220,75 @@ type NavLayout = {
 };
 
 type NavLayoutInput = {
-  showMatchesTab: boolean;
   activeTab: EditLyricsTab;
   hasCandidates: boolean;
+  shiftNav: boolean;
   // Number of action buttons on the current LRCLIB candidate: 2 when it has
   // synced lyrics ("Use LRC" + "Use as plain text"), otherwise 1.
   useSlots: number;
   timingNav: boolean;
   audioNav: boolean;
+  trackChipCount: number;
+  artistChipCount: number;
 };
 
+type NavSegment = { key: string; width: number };
+
+type LrclibSegmentsInput = {
+  hasCandidates: boolean;
+  useSlots: number;
+  trackChipCount: number;
+  artistChipCount: number;
+};
+
+/** Rows under the LRCLIB tab header, in DOM order. */
+function lrclibSegments(input: LrclibSegmentsInput): NavSegment[] {
+  const segments: NavSegment[] = [{ key: 'search', width: LRCLIB_SEARCH_SLOTS }];
+
+  if (input.trackChipCount > 0) {
+    segments.push({ key: 'trackChips', width: input.trackChipCount });
+  }
+  if (input.artistChipCount > 0) {
+    segments.push({ key: 'artistChips', width: input.artistChipCount });
+  }
+  if (input.hasCandidates) {
+    segments.push({ key: 'use', width: Math.max(1, input.useSlots) });
+  }
+
+  return segments;
+}
+
 function navLayout({
-  showMatchesTab,
   activeTab,
   hasCandidates,
   useSlots,
+  shiftNav,
   timingNav,
   audioNav,
+  trackChipCount,
+  artistChipCount,
 }: NavLayoutInput): NavLayout {
-  const onLrclib = showMatchesTab && activeTab === 'lrclib';
-  const segments: { key: string; width: number }[] = [];
+  const onLrclib = activeTab === 'lrclib';
+  const tabCount = EDIT_LYRICS_TABS.length;
+  const segments: NavSegment[] = [];
   let arrowSlotStart: number | null = null;
 
-  if (showMatchesTab) {
-    if (onLrclib && hasCandidates) {
-      segments.push({ key: 'header', width: 4 });
-      arrowSlotStart = 2;
-    } else {
-      segments.push({ key: 'header', width: 2 });
-    }
+  if (onLrclib && hasCandidates) {
+    segments.push({ key: 'header', width: tabCount + 2 });
+    arrowSlotStart = tabCount;
+  } else {
+    segments.push({ key: 'header', width: tabCount });
   }
 
   if (onLrclib) {
-    if (hasCandidates) {
-      segments.push({ key: 'use', width: Math.max(1, useSlots) });
-    }
+    segments.push(...lrclibSegments({ hasCandidates, useSlots, trackChipCount, artistChipCount }));
+  } else if (activeTab === 'web') {
+    segments.push({ key: 'web', width: 1 });
   } else {
     segments.push({ key: 'editor', width: 1 });
+    if (shiftNav) {
+      segments.push({ key: 'shift', width: SHIFT_SLOTS });
+    }
     if (timingNav) {
       segments.push({ key: 'timing', width: 2 });
     }
@@ -223,7 +308,12 @@ function navLayout({
     stops: segments.map((s) => s.width),
     headerSegment: indexOf('header'),
     arrowSlotStart,
+    searchSegment: indexOf('search'),
+    trackChipsSegment: indexOf('trackChips'),
+    artistChipsSegment: indexOf('artistChips'),
+    webSegment: indexOf('web'),
     editorSegment: indexOf('editor'),
+    shiftSegment: indexOf('shift'),
     timingSegment: indexOf('timing'),
     audioSegment: indexOf('audio'),
     useThisSegment: indexOf('use'),
@@ -232,7 +322,6 @@ function navLayout({
 }
 
 type EditLyricsWorkspaceProps = {
-  showMatches: boolean;
   activeTab: EditLyricsTab;
   setActiveTab: (tab: EditLyricsTab) => void;
   focusTab: (slot: number) => void;
@@ -244,6 +333,8 @@ type EditLyricsWorkspaceProps = {
   carouselIndex: number;
   setCarouselIndex: (index: number) => void;
   editorPane: ReactNode;
+  searchPane: ReactNode;
+  webPane: ReactNode;
   candidates: LrclibCandidate[];
   matchesError: Error | null;
   useThisSegment: number | null;
@@ -252,15 +343,11 @@ type EditLyricsWorkspaceProps = {
 };
 
 const EditLyricsWorkspace = (props: EditLyricsWorkspaceProps) => {
-  if (!props.showMatches) {
-    return <div className="flex min-h-0 flex-1 flex-col">{props.editorPane}</div>;
-  }
-
   return (
     <Tabs
       value={props.activeTab}
       onValueChange={(value) => {
-        if (value === 'edit' || value === 'lrclib') {
+        if (isEditLyricsTab(value)) {
           props.setActiveTab(value);
         }
       }}
@@ -279,7 +366,7 @@ const EditLyricsWorkspace = (props: EditLyricsWorkspaceProps) => {
                 props.headerSegment !== null && props.isFocused(props.headerSegment, slot),
               )}
             >
-              {tab === 'edit' ? 'Edit' : 'LRCLIB matches'}
+              {TAB_LABELS[tab]}
               {tab === 'lrclib' &&
                 (props.matchesLoading ? (
                   <Loader2Icon className="size-3 animate-spin" />
@@ -305,7 +392,11 @@ const EditLyricsWorkspace = (props: EditLyricsWorkspaceProps) => {
       <TabsContent value="edit" className="mt-3 flex min-h-0 flex-1 flex-col">
         {props.editorPane}
       </TabsContent>
-      <TabsContent value="lrclib" className="mt-3 flex min-h-0 flex-1 flex-col">
+      <TabsContent value="web" className="mt-3 flex min-h-0 flex-1 flex-col">
+        {props.webPane}
+      </TabsContent>
+      <TabsContent value="lrclib" className="mt-3 flex min-h-0 flex-1 flex-col gap-2">
+        {props.searchPane}
         <LrclibMatches
           candidates={props.candidates}
           isLoading={props.matchesLoading}
@@ -331,20 +422,26 @@ export const EditLyricsDialog = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const trackRef = useRef<HTMLInputElement>(null);
+  const artistRef = useRef<HTMLInputElement>(null);
 
   const editor = useLyricsEditor({ song, onSaved: close });
   const candidatesQuery = useLrclibCandidates(fileHash);
-  const candidates = candidatesQuery.data ?? [];
-  const matchesLoading = candidatesQuery.isLoading;
-  const { count: candidateCount, showMatchesTab } = candidateMeta(
-    candidates,
-    isAnalyzed,
-    matchesLoading,
-  );
+  // A manual LRCLIB search (custom track / artist) overrides the auto results.
+  const [manualResults, setManualResults] = useState<LrclibCandidate[] | null>(null);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [searchTrack, setSearchTrack] = useState(() => defaultSearchTerms(song).track);
+  const [searchArtist, setSearchArtist] = useState(() => defaultSearchTerms(song).artist);
+  const trackChips = useMemo(() => wordChips(searchTrack), [searchTrack]);
+  const artistChips = useMemo(() => wordChips(searchArtist), [searchArtist]);
+  const candidates = resolveCandidates(manualResults, candidatesQuery.data);
+  const candidateCount = candidates.length;
+  const matchesLoading = [candidatesQuery.isLoading, manualLoading].some(Boolean);
 
   const provideLrcMutation = useProvideLrcMutation();
   const applyTimedMutation = useApplyTimedLyricsMutation();
   const saveLyricsMutation = useSaveLyricsMutation();
+  const clearLyricsMutation = useClearLyricsMutation();
 
   const [activeTab, setActiveTab] = useState<EditLyricsTab>('edit');
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -352,12 +449,37 @@ export const EditLyricsDialog = () => {
   const [separateStems, setSeparateStems] = useState(false);
   const [lastHash, setLastHash] = useState<string | null>(fileHash);
   if (lastHash !== fileHash) {
+    const terms = defaultSearchTerms(song);
     setLastHash(fileHash);
     setActiveTab('edit');
     setCarouselIndex(0);
     setTimingChoice('provided');
     setSeparateStems(false);
+    setManualResults(null);
+    setManualLoading(false);
+    setSearchTrack(terms.track);
+    setSearchArtist(terms.artist);
   }
+
+  const runManualSearch = async (): Promise<void> => {
+    const track = searchTrack.trim();
+    if (manualLoading || track.length === 0) {
+      return;
+    }
+    setManualLoading(true);
+    try {
+      const results = await searchLrclibTerms(track, searchArtist.trim());
+      setManualResults(results);
+      setCarouselIndex(0);
+      if (results.length === 0) {
+        toast.info('No LRCLIB matches for those terms.');
+      }
+    } catch (error) {
+      toast.error(searchFailureMessage(error));
+    } finally {
+      setManualLoading(false);
+    }
+  };
 
   const lrcLevel = useMemo(() => detectLrcLevel(editor.text), [editor.text]);
   const hasLrc = lrcLevel !== 'none';
@@ -373,6 +495,7 @@ export const EditLyricsDialog = () => {
     provideLrcMutation.isLoading,
     applyTimedMutation.isLoading,
     saveLyricsMutation.isLoading,
+    clearLyricsMutation.isLoading,
   ].some(Boolean);
   const canSave = canSaveLyrics(
     saving,
@@ -422,6 +545,13 @@ export const EditLyricsDialog = () => {
     saveLyricsMutation.mutate({ hash, lines, title }, { onSuccess: close });
   };
 
+  const handleDelete = () => {
+    if (saving || song === null) {
+      return;
+    }
+    clearLyricsMutation.mutate({ hash: song.file_hash, title: song.title }, { onSuccess: close });
+  };
+
   const applyCandidate = (candidate: LrclibCandidate) => {
     editor.setText(candidate.lines.join('\n'));
     setTimingChoice('provided');
@@ -437,9 +567,31 @@ export const EditLyricsDialog = () => {
     setActiveTab('edit');
   };
 
+  // The Lyricsify tab opens straight on this song's search results.
+  const lyricsifyUrl = lyricsifySearchUrl(searchTrack, searchArtist);
+  const applyCopiedLyrics = (text: string) => {
+    if (editor.isDirty) {
+      toast.info('Lyrics copied \u2014 paste them into the Edit tab to keep your changes.');
+      return;
+    }
+
+    editor.setText(text);
+    setTimingChoice('provided');
+    setActiveTab('edit');
+    toast.success('Pasted the lyrics you copied from Lyricsify.');
+  };
+
+  const { openLyricsify } = useLyricsifyWindow({
+    dialogOpen: open,
+    onWebTab: activeTab === 'web',
+    url: lyricsifyUrl,
+    onLyrics: applyCopiedLyrics,
+  });
+
   const currentCandidate = selectedCandidate(candidates, carouselIndex);
   const nav = navigationState({
     candidateCount,
+    matchesLoading,
     currentHasLrc: hasSyncedLyrics(currentCandidate),
     hasLrc,
     useProvidedTiming,
@@ -447,7 +599,12 @@ export const EditLyricsDialog = () => {
     saving,
   });
 
-  const layout = navLayout({ showMatchesTab, activeTab, ...nav });
+  const layout = navLayout({
+    activeTab,
+    ...nav,
+    trackChipCount: trackChips.length,
+    artistChipCount: artistChips.length,
+  });
 
   const { isFocused, focusSegment } = useDialogNav({
     open,
@@ -460,8 +617,9 @@ export const EditLyricsDialog = () => {
         if (layout.headerSegment === null || segment !== layout.headerSegment) {
           return false;
         }
-        if (slot < 2) {
-          setActiveTab(slot === 0 ? 'edit' : 'lrclib');
+        const tab = slot < EDIT_LYRICS_TABS.length ? EDIT_LYRICS_TABS.at(slot) : undefined;
+        if (tab !== undefined) {
+          setActiveTab(tab);
           return true;
         }
         if (layout.arrowSlotStart !== null && slot >= layout.arrowSlotStart) {
@@ -473,7 +631,59 @@ export const EditLyricsDialog = () => {
         return true;
       };
 
+      const handleSearch = (): boolean => {
+        if (layout.searchSegment === null || segment !== layout.searchSegment) {
+          return false;
+        }
+        if (slot === 0) {
+          trackRef.current?.focus();
+        } else if (slot === 1) {
+          setSearchTrack('');
+        } else if (slot === 2) {
+          artistRef.current?.focus();
+        } else if (slot === 3) {
+          setSearchArtist('');
+        } else {
+          void runManualSearch();
+        }
+        return true;
+      };
+
+      const handleChips = (): boolean => {
+        if (layout.trackChipsSegment !== null && segment === layout.trackChipsSegment) {
+          const word = trackChips.at(slot);
+          if (word !== undefined) {
+            setSearchTrack(word);
+          }
+          return true;
+        }
+        if (layout.artistChipsSegment !== null && segment === layout.artistChipsSegment) {
+          const word = artistChips.at(slot);
+          if (word !== undefined) {
+            setSearchArtist(word);
+          }
+          return true;
+        }
+        return false;
+      };
+
+      const handleWeb = (): boolean => {
+        if (layout.webSegment === null || segment !== layout.webSegment) {
+          return false;
+        }
+        openLyricsify();
+        return true;
+      };
+
+      // Shift / timing / audio rows all sit under the editor on the edit pane.
       const handleOption = (): boolean => {
+        if (layout.shiftSegment !== null && segment === layout.shiftSegment) {
+          const step = shiftStepAt(slot);
+          if (step !== undefined) {
+            editor.setText(shiftLrcTimestamps(editor.text, step));
+          }
+          return true;
+        }
         if (layout.timingSegment !== null && segment === layout.timingSegment) {
           setTimingChoice(slot === 0 ? 'provided' : 'align');
           return true;
@@ -510,12 +720,11 @@ export const EditLyricsDialog = () => {
         return true;
       };
 
-      const textarea = textareaRef.current;
-      const editingInTextarea = textarea !== null && document.activeElement === textarea;
+      const editing = activeAmong([textareaRef.current, trackRef.current, artistRef.current]);
 
-      if (editingInTextarea) {
+      if (editing !== null) {
         if (action.back) {
-          textarea.blur();
+          editing.blur();
         }
         return true;
       }
@@ -525,11 +734,19 @@ export const EditLyricsDialog = () => {
       }
 
       if (layout.editorSegment !== null && segment === layout.editorSegment) {
-        textarea?.focus();
+        textareaRef.current?.focus();
         return true;
       }
 
-      for (const handler of [handleHeader, handleOption, handleCandidate, handleFooter]) {
+      for (const handler of [
+        handleHeader,
+        handleSearch,
+        handleChips,
+        handleWeb,
+        handleOption,
+        handleCandidate,
+        handleFooter,
+      ]) {
         if (handler()) {
           return true;
         }
@@ -549,21 +766,64 @@ export const EditLyricsDialog = () => {
     }
   };
 
-  const focusedSlotIn = (segment: number | null): number | null => {
+  const focusedSlotIn = (segment: number | null, slots = 2): number | null => {
     if (segment === null) {
       return null;
     }
-    if (isFocused(segment, 0)) {
-      return 0;
-    }
-    if (isFocused(segment, 1)) {
-      return 1;
+    for (let slot = 0; slot < slots; slot++) {
+      if (isFocused(segment, slot)) {
+        return slot;
+      }
     }
     return null;
   };
 
   const carouselHeaderSegment = layout.headerSegment;
   const carouselArrowSlotStart = layout.arrowSlotStart;
+
+  const chipSegment = (field: SearchField): number | null =>
+    field === 'track' ? layout.trackChipsSegment : layout.artistChipsSegment;
+
+  const searchPane = (
+    <LrclibSearch
+      durationSecs={song.duration_secs}
+      track={searchTrack}
+      artist={searchArtist}
+      trackChips={trackChips}
+      artistChips={artistChips}
+      onTrackChange={setSearchTrack}
+      onArtistChange={setSearchArtist}
+      onSearch={() => {
+        void runManualSearch();
+      }}
+      loading={manualLoading}
+      trackRef={trackRef}
+      artistRef={artistRef}
+      isFocused={(slot) => layout.searchSegment !== null && isFocused(layout.searchSegment, slot)}
+      onFocusSlot={(slot) => {
+        if (layout.searchSegment !== null) {
+          focusSegment(layout.searchSegment, slot);
+        }
+      }}
+      isChipFocused={(field, index) => {
+        const segment = chipSegment(field);
+        return segment !== null && isFocused(segment, index);
+      }}
+      onFocusChip={(field, index) => {
+        const segment = chipSegment(field);
+        if (segment !== null) {
+          focusSegment(segment, index);
+        }
+      }}
+    />
+  );
+
+  const webPane = (
+    <LyricsifyWeb
+      onOpen={openLyricsify}
+      focused={layout.webSegment !== null && isFocused(layout.webSegment)}
+    />
+  );
 
   const editorPane = (
     <>
@@ -577,6 +837,18 @@ export const EditLyricsDialog = () => {
         isDirty={editor.isDirty}
         focused={editorFocused}
       />
+      {hasLrc && (
+        <LrcShift
+          onShift={(seconds) => editor.setText(shiftLrcTimestamps(editor.text, seconds))}
+          disabled={saving}
+          focusedSlot={focusedSlotIn(layout.shiftSegment, SHIFT_SLOTS)}
+          onFocusSlot={(slot) => {
+            if (layout.shiftSegment !== null) {
+              focusSegment(layout.shiftSegment, slot);
+            }
+          }}
+        />
+      )}
       <LrcOptions
         level={lrcLevel}
         stemsSeparated={stemsSeparated}
@@ -628,7 +900,6 @@ export const EditLyricsDialog = () => {
           </DialogHeader>
 
           <EditLyricsWorkspace
-            showMatches={showMatchesTab}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             focusTab={focusTab}
@@ -640,8 +911,10 @@ export const EditLyricsDialog = () => {
             carouselIndex={carouselIndex}
             setCarouselIndex={setCarouselIndex}
             editorPane={editorPane}
+            searchPane={searchPane}
+            webPane={webPane}
             candidates={candidates}
-            matchesError={queryError(candidatesQuery.error)}
+            matchesError={autoQueryError(manualResults, candidatesQuery.error)}
             useThisSegment={layout.useThisSegment}
             onSelect={applyCandidate}
             onUseLrc={applyCandidateLrc}
@@ -654,6 +927,7 @@ export const EditLyricsDialog = () => {
             canSave={canSave}
             saveLabel={saveLabel}
             hint={footerHint}
+            onDelete={isAnalyzed ? handleDelete : undefined}
             isFocused={(slot) => isFocused(layout.footerSegment, slot)}
           />
         </div>

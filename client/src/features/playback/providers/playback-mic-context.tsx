@@ -23,7 +23,12 @@ import { useMicReactive, type MicReactiveRef } from '@/features/microphone/hooks
 import { useMicDevices } from '@/features/microphone/queries/use-mic-devices';
 import { usePitchScoring } from '@/features/playback/hooks/use-pitch-scoring';
 import { usePlaybackConfigPersist } from '@/features/playback/hooks/use-playback-config-persist';
-import { DEFAULT_MIC_LATENCY_COMPENSATION_SEC } from '@/features/playback/lib/pitch/constants';
+import {
+  DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
+  MAX_SEMITONE_TOLERANCE,
+  MIN_SEMITONE_TOLERANCE,
+  SEMITONE_TOLERANCE,
+} from '@/features/playback/lib/pitch/constants';
 import type { PitchSeries } from '@/features/playback/lib/pitch/state';
 import type { AppConfig } from '@/types/AppConfig';
 
@@ -83,9 +88,17 @@ const captureState = (input: CaptureStateInput) => {
 const latencyCompensation = (config: AppConfig | null): number =>
   config?.mic_latency_compensation_sec ?? DEFAULT_MIC_LATENCY_COMPENSATION_SEC;
 
+// Scoring tolerance in semitones, clamped to the range the settings slider
+// offers so a hand-edited config cannot make every note score zero.
+const scoringTolerance = (config: AppConfig | null): number =>
+  Math.min(
+    MAX_SEMITONE_TOLERANCE,
+    Math.max(MIN_SEMITONE_TOLERANCE, config?.pitch_tolerance_semitones ?? SEMITONE_TOLERANCE),
+  );
+
 export function PlaybackMicProvider({ config, children }: PlaybackMicProviderProps) {
   const { isReady, isPlaying, paused, duration } = usePlaybackTransportState();
-  const { subscribe, getScoringBuffer } = usePlaybackTransportActions();
+  const { subscribe, getScoringBuffer, getSeekEpoch } = usePlaybackTransportActions();
 
   const persistConfig = usePlaybackConfigPersist(config);
 
@@ -120,9 +133,10 @@ export function PlaybackMicProvider({ config, children }: PlaybackMicProviderPro
   const reactiveRef = useMicReactive(micPitchEnabled);
 
   const { series, score } = usePitchScoring(
-    { isReady, duration, getReferenceBuffer: getScoringBuffer, subscribe },
+    { isReady, duration, getReferenceBuffer: getScoringBuffer, subscribe, getSeekEpoch },
     latestPitch,
     latencyCompensation(config),
+    scoringTolerance(config),
   );
 
   const micErrorShown = useRef(false);

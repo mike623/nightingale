@@ -1,26 +1,42 @@
 mod analyzer;
 mod cache;
 mod config;
+mod import;
 mod logging;
+mod logs;
 mod lyrics;
 mod microphones;
+mod play_history;
 mod playback;
 mod playback_queue;
 mod playback_session;
 mod profile;
+mod remote_control;
 mod scanner;
 mod vendor;
 
 use analyzer::{
-    cancel_analysis, delete_song_cache, enqueue, realign, reanalyze_force_transcribe,
+    cancel_analysis, delete_song, delete_song_cache, enqueue, realign, reanalyze_force_transcribe,
     reanalyze_full, reanalyze_transcript, refresh_metadata, shift_key, shift_tempo,
 };
 use app_core::{AppConfig, PlaybackQueue, PlaybackSessionStore, SongsStore};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-use cache::{calculate_cache_stats, clear_all, clear_models_command, clear_videos_command};
+use cache::{
+    calculate_cache_stats, clear_all, clear_models_command, clear_songs_command,
+    clear_videos_command, sweep_orphan_cache_command,
+};
 use config::{load_config, save_config};
-use lyrics::{apply_timed_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics};
+use import::{
+    clear_finished_imports, import_available, import_queue, imported_video_id, imported_video_ids,
+    probe_import, redownload_song, spawn_import_worker, start_import,
+};
+use logs::read_log;
+use lyrics::{
+    apply_timed_lyrics, clear_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
+    search_lrclib_terms,
+};
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
+use play_history::{pick_next_song, record_song_play};
 use playback::{
     ensure_mp3_stems, ensure_playable_source_video, fetch_pixabay_videos, get_audio_paths,
     load_transcript,
@@ -31,10 +47,11 @@ use playback_queue::{
 };
 use playback_session::{load_playback_session, save_playback_session};
 use profile::{add_score, create_profile, delete_profile, load_profiles, switch_profile};
+use remote_control::{remote_diagnostics, remote_start, remote_status, remote_stop, RemoteControl};
 use scanner::{
     clear_library_source, jellyfin_login, jellyfin_ping, load_analysis_queue,
     load_library_menu_items, load_songs, load_songs_by_hashes, load_songs_meta, navidrome_login,
-    navidrome_ping, plex_begin_pin, plex_manual_login, plex_ping, plex_poll_pin,
+    navidrome_ping, plex_begin_pin, plex_manual_login, plex_ping, plex_poll_pin, rename_song,
     set_library_source, trigger_scan,
 };
 use tauri::{Manager, RunEvent, WebviewWindowBuilder};
@@ -87,8 +104,9 @@ pub fn run() {
     logging::init();
 
     tauri::Builder::default()
-        .manage(PlaybackQueue::default())
         .manage(PlaybackSessionStore::default())
+        .manage(RemoteControl::default())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
@@ -101,10 +119,15 @@ pub fn run() {
             // Config
             load_config,
             save_config,
+            // Diagnostics
+            read_log,
+            remote_diagnostics,
             // Cache
             calculate_cache_stats,
             clear_videos_command,
             clear_models_command,
+            clear_songs_command,
+            sweep_orphan_cache_command,
             clear_all,
             // Profile
             load_profiles,
@@ -120,8 +143,12 @@ pub fn run() {
             // Playback session
             load_playback_session,
             save_playback_session,
+            // Play history
+            pick_next_song,
+            record_song_play,
             // Scanner
             trigger_scan,
+            rename_song,
             set_library_source,
             clear_library_source,
             jellyfin_login,
@@ -137,10 +164,20 @@ pub fn run() {
             load_songs_meta,
             load_analysis_queue,
             load_library_menu_items,
+            // Import
+            import_available,
+            imported_video_ids,
+            probe_import,
+            start_import,
+            import_queue,
+            clear_finished_imports,
+            imported_video_id,
+            redownload_song,
             // Analyzer
             enqueue,
             cancel_analysis,
             delete_song_cache,
+            delete_song,
             reanalyze_transcript,
             reanalyze_full,
             realign,
@@ -151,9 +188,11 @@ pub fn run() {
             // Lyrics
             load_lyrics,
             search_lrclib_lyrics,
+            search_lrclib_terms,
             save_lyrics,
             provide_lrc,
             apply_timed_lyrics,
+            clear_lyrics,
             // Playback
             load_transcript,
             get_audio_paths,
@@ -164,6 +203,10 @@ pub fn run() {
             list_microphones,
             start_mic_capture,
             stop_mic_capture,
+            // Remote control
+            remote_start,
+            remote_stop,
+            remote_status,
             // Vendor
             is_ready,
             trigger_setup
@@ -173,6 +216,10 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
             app_core::startup()?;
+            // The saved queue names songs by hash, so the library must be open
+            // before it can be read back.
+            app.manage(std::sync::Arc::new(PlaybackQueue::load()));
+            spawn_import_worker(app.handle().clone());
             app_core::media_server::start()?;
             let media_endpoint = app_core::media_server::endpoint();
 

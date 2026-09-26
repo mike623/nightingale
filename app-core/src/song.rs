@@ -493,3 +493,61 @@ fn parse_ffmpeg_duration(s: &str) -> f64 {
         0.0
     }
 }
+
+/// Longest display name accepted from a client. Well past any real title while
+/// still bounding what a self-hosted caller can write into the library row.
+const MAX_DISPLAY_NAME_CHARS: usize = 512;
+
+fn validated_display_name(value: Option<String>, field: &str) -> Result<Option<String>, String> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(format!("{field} cannot be empty"));
+    }
+    if trimmed.chars().count() > MAX_DISPLAY_NAME_CHARS {
+        return Err(format!("{field} is too long"));
+    }
+    Ok(Some(trimmed.to_string()))
+}
+
+/// Rewrite a locally-owned song's title and/or artist in the library database.
+///
+/// Only the library row changes: the media file's own tags are left as the
+/// user's source of truth. Songs served by a media server keep that server's
+/// metadata, and USDX songs keep what their bundle declares, so neither can be
+/// renamed here.
+pub fn rename_song(
+    file_hash: &str,
+    title: Option<String>,
+    artist: Option<String>,
+) -> Result<Song, String> {
+    let title = validated_display_name(title, "Title")?;
+    let artist = validated_display_name(artist, "Artist")?;
+    if title.is_none() && artist.is_none() {
+        return Err("Nothing to rename".to_string());
+    }
+
+    let Some(mut song) =
+        crate::library_db::load_song_by_hash(file_hash).map_err(|e| e.to_string())?
+    else {
+        return Err("Song not found".to_string());
+    };
+    if song.usdx.is_some() {
+        return Err("Cannot rename USDX songs".to_string());
+    }
+    if song.origin != SongOrigin::LocalFile {
+        return Err("Only local library songs can be renamed".to_string());
+    }
+
+    if let Some(title) = title {
+        song.title = title;
+    }
+    if let Some(artist) = artist {
+        song.artist = artist;
+    }
+
+    crate::library_db::update_song_fields(file_hash, &song).map_err(|e| e.to_string())?;
+    Ok(song)
+}

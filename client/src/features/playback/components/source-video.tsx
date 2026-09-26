@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { playbackAdapter } from '@/bridge/playback';
 import { useSourceVideoSync } from '@/features/playback/hooks/use-source-video-sync';
-import { VIDEO_CLASS_NAME } from '@/features/playback/lib/video-styles';
+import { SOURCE_VIDEO_CLASS_NAME } from '@/features/playback/lib/video-styles';
 import { usePlaybackThemeState } from '@/features/playback/providers/playback-theme-context';
 import {
   usePlaybackTransportActions,
@@ -63,7 +63,7 @@ export const SourceVideo = ({ isActive }: SourceVideoProps) => {
   return (
     <video
       ref={videoRef}
-      className={VIDEO_CLASS_NAME}
+      className={SOURCE_VIDEO_CLASS_NAME}
       style={{ visibility: ready && isActive ? 'visible' : 'hidden' }}
       src={src}
       muted

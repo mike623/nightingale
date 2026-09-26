@@ -1,6 +1,9 @@
 import {
   AlignLeftIcon,
+  DownloadIcon,
+  FolderOpenIcon,
   AudioLinesIcon,
+  FileX2Icon,
   ImageIcon,
   LanguagesIcon,
   MicIcon,
@@ -8,8 +11,10 @@ import {
   RefreshCwIcon,
   Trash2Icon,
   XCircleIcon,
+  YoutubeIcon,
 } from 'lucide-react';
 
+import { FILE_MANAGER_NAME } from '@/bridge/platform';
 import type { Song } from '@/types/Song';
 
 import type { SongStatusInfo } from '../shared/song-status';
@@ -34,8 +39,14 @@ type BuildActionGroupsParams = {
   analysisBusy: boolean;
   supportsAnalysisActions: boolean;
   analysis: AnalysisHandlers;
+  /** Set only for a song imported from YouTube. Both actions are handles on
+   * the video it came from, so they arrive and disappear together. */
+  youtube: { onRedownload: () => void; onOpen: () => void } | null;
+  /** Set only where the file is this machine's to show. */
+  onRevealFile: (() => void) | null;
   onEditLyrics: () => void;
   onChangeLanguage: () => void;
+  onDeleteSong: () => void;
   run: (
     message: string,
     action: () => void | boolean | undefined | Promise<void | boolean | undefined>,
@@ -49,8 +60,11 @@ export function buildActionGroups({
   analysisBusy,
   supportsAnalysisActions,
   analysis,
+  youtube,
+  onRevealFile,
   onEditLyrics,
   onChangeLanguage,
+  onDeleteSong,
   run,
 }: BuildActionGroupsParams): ActionItemProps[][] {
   const groups: ActionItemProps[][] = [];
@@ -186,6 +200,51 @@ export function buildActionGroups({
         onClick: run(`Cache deleted for "${song.title}"`, () =>
           analysis.deleteSongCache(song.file_hash),
         ),
+      },
+    ]);
+  }
+
+  if (youtube !== null) {
+    groups.push([
+      {
+        icon: DownloadIcon,
+        title: 'Re-download video',
+        description:
+          'Fetch the video from YouTube again, replacing the file. Keeps lyrics, timing, and stems when the new video runs the same length.',
+        disabled: analysisBusy,
+        onClick: youtube.onRedownload,
+      },
+      {
+        icon: YoutubeIcon,
+        title: 'Open on YouTube',
+        description: 'Open the video this song was imported from in your browser.',
+        onClick: youtube.onOpen,
+      },
+    ]);
+  }
+
+  if (onRevealFile !== null) {
+    groups.push([
+      {
+        icon: FolderOpenIcon,
+        title: `Show in ${FILE_MANAGER_NAME}`,
+        description: 'Open the folder holding this file, with the file selected.',
+        onClick: onRevealFile,
+      },
+    ]);
+  }
+
+  // Only a song whose bytes we own can be deleted. Remote-origin songs live on
+  // someone else's server, so `song.path` is just a local materialisation.
+  if (song.origin.kind === 'local_file') {
+    groups.push([
+      {
+        icon: FileX2Icon,
+        title: 'Delete song',
+        description: 'Permanently delete the file and its generated files.',
+        destructive: true,
+        disabled: analysisBusy,
+        onClick: onDeleteSong,
       },
     ]);
   }

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { saveLyrics } from '@/bridge/lyrics';
-import { ANALYSIS_QUEUE, LYRICS, MENU, SONGS, SONGS_META } from '@/shared/query-keys';
+import { ANALYSIS_QUEUE, LYRICS, MENU, SONGS, SONGS_META, TRANSCRIPT } from '@/shared/query-keys';
 
 export type SaveLyricsInput = {
   hash: string;
@@ -20,6 +20,7 @@ export const useSaveLyricsMutation = () => {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: LYRICS });
+      void queryClient.invalidateQueries({ queryKey: TRANSCRIPT });
       void queryClient.invalidateQueries({ queryKey: MENU });
       void queryClient.invalidateQueries({ queryKey: SONGS });
       void queryClient.invalidateQueries({ queryKey: SONGS_META });
