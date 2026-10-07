@@ -1,5 +1,5 @@
 use app_core::{
-    ensure_mp3_stems_ready_payload, load_lyrics_file, save_lyrics_and_realign,
+    ensure_mp3_stems_ready_payload, load_lyrics_file, load_sidecar_lrc, save_lyrics_and_realign,
     search_lrclib_for_hash, shift_key_done_payload, shift_tempo_done_payload, AnalysisQueue,
     AppConfig, CacheStats, LibraryMenuItems, LibrarySource, LoadSongsParams,
     PixabayVideoDownloaded, PlaybackSession, ProfileStore, SongTarget, SongsStore,
@@ -121,10 +121,11 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
             struct Args {
                 song_hash: String,
                 score: u32,
+                profile: Option<String>,
             }
             let args: Args = deserialize(payload)?;
             let mut store = ProfileStore::load();
-            store.add_score(&args.song_hash, args.score);
+            store.add_score(&args.song_hash, args.score, args.profile.as_deref());
             Ok(Value::Null)
         }
 
@@ -145,6 +146,21 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
             let entries = state
                 .playback_queue
                 .add(&args.file_hash, args.tempo, args.key_offset)
+                .map_err(ApiError::bad_request)?;
+            events.emit("playback-queue-changed", &entries);
+            Ok(serde_json::to_value(entries).map_err(serde_err)?)
+        }
+        "move_playback_queue_entry" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                id: String,
+                target_index: usize,
+            }
+            let args: Args = deserialize(payload)?;
+            let entries = state
+                .playback_queue
+                .move_entry(&args.id, args.target_index)
                 .map_err(ApiError::bad_request)?;
             events.emit("playback-queue-changed", &entries);
             Ok(serde_json::to_value(entries).map_err(serde_err)?)
@@ -191,6 +207,13 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
         "trigger_scan" => {
             app_core::start_scan();
             Ok(Value::Null)
+        }
+        "reconcile_cache" => {
+            let summary = tokio::task::spawn_blocking(app_core::reconcile_cache)
+                .await
+                .map_err(blocking_task_err)?
+                .map_err(ApiError::internal)?;
+            Ok(serde_json::to_value(summary).map_err(serde_err)?)
         }
         "set_library_source" => {
             #[derive(Deserialize)]
@@ -473,6 +496,13 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
             app_core::apply_timed_lyrics(&args.file_hash, &args.lrc_text)
                 .map_err(ApiError::bad_request)?;
             Ok(Value::Null)
+        }
+        "load_sidecar_lrc" => {
+            let args: FileHashArgs = deserialize(payload)?;
+            let sidecar = tokio::task::spawn_blocking(move || load_sidecar_lrc(&args.file_hash))
+                .await
+                .map_err(blocking_task_err)?;
+            Ok(serde_json::to_value(sidecar).map_err(serde_err)?)
         }
 
         // ── Playback ─────────────────────────────────────────────────────

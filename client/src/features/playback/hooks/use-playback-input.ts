@@ -8,6 +8,7 @@ import {
   resolveSkipCommand,
   type PlaybackCommand,
 } from '@/features/playback/lib/playback-commands';
+import { usePlaybackMicState } from '@/features/playback/providers';
 import type { AppConfig } from '@/types/AppConfig';
 
 /** How far `+` / `-` move the guide volume per press. */
@@ -22,6 +23,9 @@ const LETTER_COMMANDS = new Map<string, PlaybackCommand>([
   ['l', { action: 'toggle_lyrics' }],
 ]);
 
+/** Mic keys pick the single player's mic; each multiplayer seat has its own. */
+const SOLO_MIC_KEYS = new Set(['m', 'n']);
+
 /** The command a key press asks for, or `null` for keys playback ignores. */
 function commandForKey(key: string, guideVolume: number): PlaybackCommand | null {
   switch (key) {
@@ -32,9 +36,15 @@ function commandForKey(key: string, guideVolume: number): PlaybackCommand | null
       return { action: 'toggle_guide' };
     case '=':
     case '+':
-      return { action: 'set_guide_volume', volume: guideVolume + GUIDE_VOLUME_STEP };
+      return {
+        action: 'set_guide_volume',
+        volume: guideVolume + GUIDE_VOLUME_STEP,
+      };
     case '-':
-      return { action: 'set_guide_volume', volume: guideVolume - GUIDE_VOLUME_STEP };
+      return {
+        action: 'set_guide_volume',
+        volume: guideVolume - GUIDE_VOLUME_STEP,
+      };
     case 'ArrowRight':
       return { action: 'next' };
     default:
@@ -48,15 +58,17 @@ function commandForKey(key: string, guideVolume: number): PlaybackCommand | null
  * `PlaybackCommand`, and dispatches it. The app config is passed in so guide
  * volume can be persisted without coupling this hook to the config query, and
  * `playNext` because song selection belongs to the route, not the session.
+ * `enabled` is false while the result dialog owns input.
  */
-export function usePlaybackInput(config: AppConfig | null, playNext: () => void) {
+export function usePlaybackInput(config: AppConfig | null, playNext: () => void, enabled = true) {
   const deps = usePlaybackCommandDeps(config, playNext);
+  const { multiplayer } = usePlaybackMicState();
 
   // A dialog opened from the pause overlay (lyrics editor) owns input while it
   // is up: its own controls handle confirm/back, and typing must not reach the
   // playback shortcuts.
   const { mode } = useDialog();
-  const dialogOpen = mode !== null;
+  const dialogOpen = mode !== null || !enabled;
 
   // Gamepad: nav.back = pause/resume, nav.confirm = skip intro/outro
   useNavInput(
@@ -89,6 +101,10 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
         return;
       }
 
+      if (multiplayer && SOLO_MIC_KEYS.has(event.key.toLowerCase())) {
+        return;
+      }
+
       const command = commandForKey(event.key, deps.guideVolume);
       if (command === null) {
         return;
@@ -104,5 +120,5 @@ export function usePlaybackInput(config: AppConfig | null, playNext: () => void)
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deps, dialogOpen]);
+  }, [deps, dialogOpen, multiplayer]);
 }

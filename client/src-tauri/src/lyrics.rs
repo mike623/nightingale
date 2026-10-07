@@ -1,13 +1,18 @@
 use app_core::{
     apply_timed_lyrics as core_apply_timed_lyrics, clear_lyrics as core_clear_lyrics,
-    load_lyrics_file, provide_lrc as core_provide_lrc, save_lyrics_and_realign,
-    search_lrclib_for_hash, search_lrclib_terms as core_search_lrclib_terms, LrclibCandidate,
-    LyricsFile,
+    load_lyrics_file, load_sidecar_lrc as core_load_sidecar_lrc, provide_lrc as core_provide_lrc,
+    save_lyrics_and_realign, search_lrclib_for_hash,
+    search_lrclib_terms as core_search_lrclib_terms, LrclibCandidate, LyricsFile, SidecarLrc,
 };
 
 #[tauri::command]
 pub(crate) fn load_lyrics(file_hash: String) -> Option<LyricsFile> {
     load_lyrics_file(&file_hash)
+}
+
+#[tauri::command]
+pub(crate) fn load_sidecar_lrc(file_hash: String) -> Option<SidecarLrc> {
+    core_load_sidecar_lrc(&file_hash)
 }
 
 #[tauri::command]

@@ -8,7 +8,11 @@ import type { AppConfig } from '@/types/AppConfig';
 export { PLAYBACK_SCALE_MAX, PLAYBACK_SCALE_MIN } from '@/features/playback/lib/display-scale';
 
 export type SettingsTab = 'general' | 'playback' | 'analysis';
-export type SettingsOption = { value: string; label: string; description?: string };
+export type SettingsOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
 
 export const SETTINGS_TABS: { value: SettingsTab; label: string }[] = [
   { value: 'general', label: 'General' },
@@ -91,6 +95,11 @@ export const LYRICS_HORIZONTAL_POSITIONS: SettingsOption[] = [
   { value: 'right', label: 'Right' },
 ];
 
+export const LYRICS_ROMANIZATION_MODES: SettingsOption[] = [
+  { value: 'enabled', label: 'Enabled' },
+  { value: 'disabled', label: 'Disabled' },
+];
+
 export const DEFAULTS = {
   separator: 'karaoke',
   asr_engine: 'whisper',
@@ -103,11 +112,13 @@ export const DEFAULTS = {
   mic_latency_compensation_sec: DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   auto_analyze: false,
   auto_play_next: false,
+  master_volume: 1,
   playback_mode: 'classic',
   lyrics_vertical_position: 'bottom',
   lyrics_horizontal_position: 'center',
   lyrics_scale: DEFAULT_PLAYBACK_SCALE,
   pitch_graph_scale: DEFAULT_PLAYBACK_SCALE,
+  lyrics_romanization_mode: 'enabled',
 } satisfies Pick<
   AppConfig,
   | 'separator'
@@ -121,11 +132,13 @@ export const DEFAULTS = {
   | 'mic_latency_compensation_sec'
   | 'auto_analyze'
   | 'auto_play_next'
+  | 'master_volume'
   | 'playback_mode'
   | 'lyrics_vertical_position'
   | 'lyrics_horizontal_position'
   | 'lyrics_scale'
   | 'pitch_graph_scale'
+  | 'lyrics_romanization_mode'
 >;
 
 export const MIC_MONITOR_GAIN_STEP = 0.01;
@@ -151,15 +164,17 @@ export const NAV = {
   },
   playback: {
     mode: 1,
-    lyricsVerticalPosition: 2,
-    lyricsHorizontalPosition: 3,
-    lyricsScale: 4,
-    pitchGraphScale: 5,
-    scoringTolerance: 6,
-    autoPlayNext: 7,
-    remoteControl: 8,
-    partyImport: 9,
-    partyLyricShift: 10,
+    masterVolume: 2,
+    lyricsVerticalPosition: 3,
+    lyricsHorizontalPosition: 4,
+    lyricsScale: 5,
+    pitchGraphScale: 6,
+    lyricsRomanizationMode: 7,
+    scoringTolerance: 8,
+    autoPlayNext: 9,
+    remoteControl: 10,
+    partyImport: 11,
+    partyLyricShift: 12,
   },
 } as const;
 
@@ -200,9 +215,9 @@ export function getSettingsStops(tab: SettingsTab, isParakeet: boolean) {
     return [3, 2, 1, 1, 2, 2, 2];
   }
   if (tab === 'playback') {
-    // tabs, mode, lyrics v/h, lyrics scale, graph scale, tolerance, auto-next,
-    // remote control, footer
-    return [3, 1, 1, 1, 1, 1, 1, 2, 2, 2];
+    // tabs, mode, master volume, lyrics v/h, lyrics scale, graph scale,
+    // romanization, tolerance, auto-next, remote control, footer
+    return [3, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2];
   }
 
   return isParakeet

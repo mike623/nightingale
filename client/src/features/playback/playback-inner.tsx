@@ -6,11 +6,13 @@
  * presentational tree that consumes the playback contexts via hooks.
  */
 
+import type { PlaybackPlayer } from '@/bridge/playback-session';
 import { isTauri } from '@/bridge/runtime';
 import { EditLyricsDialog, isEditLyricsDialogMode } from '@/features/lyrics/components';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { Background } from '@/features/playback/components/background';
 import { ResultDialog } from '@/features/playback/components/dialogs/result';
+import { LoadingScreen } from '@/features/playback/components/loading-screen';
 import { LyricsDisplay } from '@/features/playback/components/lyrics-display';
 import { PauseOverlay } from '@/features/playback/components/pause-overlay';
 import { PitchGraph } from '@/features/playback/components/pitch-graph';
@@ -34,9 +36,12 @@ export type PlaybackInnerProps = {
   config: AppConfig | null;
   queuePlayback: boolean;
   sessionPlayback: boolean;
+  players?: readonly PlaybackPlayer[];
 };
 
 type PlaybackLayoutProps = PlaybackInnerProps;
+
+const EMPTY_PLAYERS: readonly PlaybackPlayer[] = [];
 
 function displaySettings(config: AppConfig | null) {
   return {
@@ -44,40 +49,52 @@ function displaySettings(config: AppConfig | null) {
     lyricsHorizontalPosition: config?.lyrics_horizontal_position ?? 'center',
     lyricsScale: config?.lyrics_scale,
     pitchGraphScale: config?.pitch_graph_scale,
+    lyricsRomanizationMode: config?.lyrics_romanization_mode ?? 'enabled',
   };
 }
 
-function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: PlaybackLayoutProps) {
+function PlaybackLayout({
+  song,
+  config,
+  queuePlayback,
+  sessionPlayback,
+  players,
+}: PlaybackLayoutProps) {
   const { isReady, paused } = usePlaybackTransportState();
   const { handleContinue, handleExit } = usePlaybackTransportActions();
   const { segments } = usePlaybackTranscriptState();
-  const { series } = usePlaybackMicState();
-  const { lyricsVerticalPosition, lyricsHorizontalPosition, lyricsScale, pitchGraphScale } =
-    displaySettings(config);
+  const mic = usePlaybackMicState();
+  const {
+    lyricsVerticalPosition,
+    lyricsHorizontalPosition,
+    lyricsScale,
+    pitchGraphScale,
+    lyricsRomanizationMode,
+  } = displaySettings(config);
   const hudPosition = lyricsVerticalPosition === 'top' ? 'bottom' : 'top';
   const sessionWindowControls = sessionPlayback && isTauri;
 
-  const next = usePlaybackNext(song.file_hash);
+  const next = usePlaybackNext(song.file_hash, players ?? EMPTY_PLAYERS);
   const { playNext } = next;
 
   const { mode, setMode } = useDialog();
   const editingLyrics = isEditLyricsDialogMode(mode);
   const openLyricsEditor = () => setMode({ mode: 'edit-lyrics', song });
 
-  usePlaybackInput(config, playNext);
-  usePlaybackHistory(song.file_hash);
-  useRemoteHost(song, config, playNext);
   const result = usePlaybackResult(song, {
     queuePlayback,
     autoPlayNext: config?.auto_play_next === true,
     next,
   });
+  usePlaybackInput(config, playNext, !result.open);
+  usePlaybackHistory(song.file_hash);
+  useRemoteHost(song, config, playNext);
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black" style={{ contain: 'strict' }}>
       <Background />
 
-      {isReady && (
+      {isReady ? (
         <>
           <PlaybackBar onNext={playNext} />
           <PlaybackHud
@@ -87,14 +104,17 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
             position={hudPosition}
             windowControls={sessionWindowControls}
           />
-          <PitchGraph series={series} position={hudPosition} scale={pitchGraphScale} />
+          <PitchGraph series={mic.series} position={hudPosition} scale={pitchGraphScale} />
           <LyricsDisplay
             segments={segments}
             verticalPosition={lyricsVerticalPosition}
             horizontalPosition={lyricsHorizontalPosition}
             scale={lyricsScale}
+            romanizationMode={lyricsRomanizationMode}
           />
         </>
+      ) : (
+        <LoadingScreen song={song} />
       )}
 
       <PauseOverlay
@@ -110,15 +130,15 @@ function PlaybackLayout({ song, config, queuePlayback, sessionPlayback }: Playba
 
       <ResultDialog
         open={result.open}
-        score={result.score}
+        results={result.results}
         song={song}
         scores={result.scores}
-        activeProfile={result.activeProfile}
         nextPending={result.nextPending}
         autoNextIn={result.autoNextIn}
         exitLabel={sessionPlayback ? 'Exit Playback' : 'Back to Menu'}
         onBack={result.onBack}
         onNext={result.onNext}
+        onStopAutoNext={result.onStopAutoNext}
       />
     </div>
   );
@@ -129,14 +149,16 @@ export function PlaybackInner({
   config,
   queuePlayback,
   sessionPlayback,
+  players,
 }: PlaybackInnerProps) {
   return (
-    <PlaybackProviders song={song} config={config}>
+    <PlaybackProviders song={song} config={config} players={players}>
       <PlaybackLayout
         song={song}
         config={config}
         queuePlayback={queuePlayback}
         sessionPlayback={sessionPlayback}
+        players={players}
       />
     </PlaybackProviders>
   );

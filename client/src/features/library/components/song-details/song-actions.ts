@@ -17,7 +17,7 @@ import {
 import { FILE_MANAGER_NAME } from '@/bridge/platform';
 import type { Song } from '@/types/Song';
 
-import type { SongStatusInfo } from '../shared/song-status';
+import type { SongStatusInfo } from '../song/song-status';
 import type { ActionItemProps } from './action-item';
 
 type AnalysisHandler = (fileHash: string) => void | Promise<void>;

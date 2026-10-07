@@ -387,6 +387,7 @@ fn discard_cancelled_job(initial_hash: &str, file_hash: &str) -> bool {
     true
 }
 
+/// Returns whether a library row was written; `false` when the song is gone.
 pub(crate) fn update_song_analyzed(
     file_hash: &str,
     is_analyzed: bool,
@@ -394,9 +395,9 @@ pub(crate) fn update_song_analyzed(
     transcript_source: Option<TranscriptSource>,
     key: Option<String>,
     tempo: Option<f64>,
-) {
+) -> bool {
     let Some(mut song) = library_db::load_song_by_hash(file_hash).ok().flatten() else {
-        return;
+        return false;
     };
     song.is_analyzed = is_analyzed;
     song.language = language;
@@ -416,7 +417,7 @@ pub(crate) fn update_song_analyzed(
         song.key_offset = 0;
         song.no_stems = false;
     }
-    let _ = library_db::update_song_fields(file_hash, &song);
+    library_db::update_song_fields(file_hash, &song).is_ok()
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -431,7 +432,7 @@ pub(crate) fn is_usdx_song(file_hash: &str) -> bool {
 
 fn resolve_target<F>(target: SongTarget, filtered: F) -> Result<Vec<String>, String>
 where
-    F: FnOnce(&LibraryMenuFilters) -> rusqlite::Result<Vec<String>>,
+    F: FnOnce(&LibraryMenuFilters) -> Result<Vec<String>, NightingaleError>,
 {
     let mut hashes = match target {
         SongTarget::Hashes { hashes } => hashes,
@@ -444,7 +445,7 @@ where
 
 fn run_for_target<Q, A>(target: SongTarget, filtered: Q, mut action: A) -> Result<usize, String>
 where
-    Q: FnOnce(&LibraryMenuFilters) -> rusqlite::Result<Vec<String>>,
+    Q: FnOnce(&LibraryMenuFilters) -> Result<Vec<String>, NightingaleError>,
     A: FnMut(&str) -> Result<bool, String>,
 {
     let hashes = resolve_target(target, filtered)?;

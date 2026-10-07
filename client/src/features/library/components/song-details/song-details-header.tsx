@@ -7,9 +7,9 @@ import { wordChips } from '@/shared/utils/word-chips';
 import type { QueuedStatus } from '@/types/QueuedStatus';
 import type { Song } from '@/types/Song';
 
-import { AlbumArt } from '../shared/album-art';
-import { LanguageBadge, isDisplayableLanguage } from '../shared/language-badge';
-import { StatusBadge } from '../shared/status-badge';
+import { AlbumArt } from '../song/album-art';
+import { LanguageBadge, isDisplayableLanguage } from '../song/language-badge';
+import { StatusBadge } from '../song/status-badge';
 
 export type SongRename = { title?: string; artist?: string };
 

@@ -11,6 +11,7 @@ export const APP_VERSION = ['app-version'];
 export const LYRICS = ['lyrics'];
 export const TRANSCRIPT = ['transcript'];
 export const LRCLIB = ['lrclib'];
+export const SIDECAR_LRC = ['sidecar-lrc'];
 export const JELLYFIN_HEALTH = ['jellyfin-health'];
 export const NAVIDROME_HEALTH = ['navidrome-health'];
 export const PLEX_HEALTH = ['plex-health'];

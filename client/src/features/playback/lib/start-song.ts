@@ -8,14 +8,27 @@
 
 import type { NavigateFunction } from 'react-router';
 
-import { isSessionPlayback, savePlaybackSession } from '@/bridge/playback-session';
+import {
+  isSessionPlayback,
+  savePlaybackSession,
+  type PlaybackPlayer,
+} from '@/bridge/playback-session';
 import type { Song } from '@/types/Song';
 
-export async function startSong(song: Song, navigate: NavigateFunction): Promise<void> {
+export async function startSong(
+  song: Song,
+  navigate: NavigateFunction,
+  players: readonly PlaybackPlayer[] = [],
+): Promise<void> {
+  // A multiplayer lineup carries over to the next song; solo stays unset.
+  const lineup = players.length > 0 ? [...players] : undefined;
   if (isSessionPlayback()) {
-    await savePlaybackSession({ song, queuePlayback: false });
+    await savePlaybackSession({ song, queuePlayback: false, players: lineup });
     return;
   }
 
-  await navigate('/playback', { state: { song }, replace: true });
+  await navigate('/playback', {
+    state: { song, players: lineup },
+    replace: true,
+  });
 }

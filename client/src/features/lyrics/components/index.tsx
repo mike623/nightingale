@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 import { searchLrclibTerms } from '@/bridge/lyrics';
 import { openUrl } from '@/bridge/opener';
-import { useLyricsEditor } from '@/features/lyrics/hooks/use-lyrics-editor';
+import { useLyricsEditor, type LyricsEditorState } from '@/features/lyrics/hooks/use-lyrics-editor';
 import { useLyricsifyWindow } from '@/features/lyrics/hooks/use-lyricsify-window';
 import { useSaveLyricsMutation } from '@/features/lyrics/mutations/use-save-lyrics-mutation';
 import {
@@ -44,6 +44,7 @@ import { LRCLIB_SEARCH_SLOTS, LrclibSearch, type SearchField } from './lrclib-se
 import { LyricsEditor } from './lyrics-editor';
 import { LyricsifyWeb } from './lyricsify-web';
 import { ringFor } from './parts';
+import { SidecarLrcNotice } from './sidecar-lrc-notice';
 
 export { isEditLyricsDialogMode } from '@/features/lyrics/utils/edit-lyrics';
 
@@ -116,6 +117,25 @@ const defaultSearchTerms = (song: Song | null): SearchTerms => ({
 /** The element being typed in, when the DOM focus sits on one of `elements`. */
 const activeAmong = (elements: readonly (HTMLElement | null)[]): HTMLElement | null =>
   elements.find((element) => element !== null && document.activeElement === element) ?? null;
+
+const EditorSidecarNotice = ({
+  editor,
+  saving,
+  onUse,
+}: {
+  editor: LyricsEditorState;
+  saving: boolean;
+  onUse: () => void;
+}) =>
+  editor.sidecar ? (
+    <SidecarLrcNotice
+      fileName={editor.sidecar.file_name}
+      kind={editor.sidecar.kind}
+      showing={editor.showingSidecar}
+      canUse={editor.canUseSidecar && !saving}
+      onUse={onUse}
+    />
+  ) : null;
 
 const editedSong = (mode: ReturnType<typeof useDialog>['mode']): Song | null =>
   isEditLyricsDialogMode(mode) ? mode.song : null;
@@ -281,7 +301,14 @@ function navLayout({
   }
 
   if (onLrclib) {
-    segments.push(...lrclibSegments({ hasCandidates, useSlots, trackChipCount, artistChipCount }));
+    segments.push(
+      ...lrclibSegments({
+        hasCandidates,
+        useSlots,
+        trackChipCount,
+        artistChipCount,
+      }),
+    );
   } else if (activeTab === 'web') {
     segments.push({ key: 'web', width: 1 });
   } else {
@@ -588,6 +615,12 @@ export const EditLyricsDialog = () => {
     onLyrics: applyCopiedLyrics,
   });
 
+  const applySidecar = () => {
+    editor.applySidecar();
+    setTimingChoice('provided');
+    setActiveTab('edit');
+  };
+
   const currentCandidate = selectedCandidate(candidates, carouselIndex);
   const nav = navigationState({
     candidateCount,
@@ -849,6 +882,7 @@ export const EditLyricsDialog = () => {
           }}
         />
       )}
+      <EditorSidecarNotice editor={editor} saving={saving} onUse={applySidecar} />
       <LrcOptions
         level={lrcLevel}
         stemsSeparated={stemsSeparated}

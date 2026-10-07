@@ -8,13 +8,13 @@ export type AppConfig = { data_path: string | null, cache_paths: CachePaths | nu
  * Deprecated. Kept for one-shot migration into `library_source`; never
  * written by code that has been through `with_defaults`.
  */
-last_folder: string | null, library_source: LibrarySource | null, last_theme: number | null, guide_volume: number | null, fullscreen: boolean | null, playback_mode: string | null, dark_mode: boolean | null, mic_active: boolean | null, 
+last_folder: string | null, library_source: LibrarySource | null, last_theme: number | null, guide_volume: number | null, master_volume: number | null, fullscreen: boolean | null, playback_mode: string | null, dark_mode: boolean | null, mic_active: boolean | null, 
 /**
  * `serde(alias = "mic_mirroring")` keeps configs written by builds that
  * called this feature "mic mirroring" loading without a manual migration;
  * the next `save` rewrites them under the new name.
  */
-mic_monitoring: boolean | null, mic_monitor_gain: number | null, mic_latency_compensation_sec: number | null, preferred_mic: string | null, whisper_model: string | null, beam_size: number | null, batch_size: number | null, last_video_flavor: number | null, lyrics_vertical_position: string | null, lyrics_horizontal_position: string | null, lyrics_scale: number | null, pitch_graph_scale: number | null, separator: string | null, asr_engine: string | null, align_backend: string | null, vocal_detection_threshold_pct: number | null, auto_analyze: boolean | null, 
+mic_monitoring: boolean | null, mic_monitor_gain: number | null, mic_latency_compensation_sec: number | null, preferred_mic: string | null, whisper_model: string | null, beam_size: number | null, batch_size: number | null, last_video_flavor: number | null, lyrics_vertical_position: string | null, lyrics_horizontal_position: string | null, lyrics_scale: number | null, pitch_graph_scale: number | null, lyrics_romanization_mode: string | null, separator: string | null, asr_engine: string | null, align_backend: string | null, vocal_detection_threshold_pct: number | null, auto_analyze: boolean | null, 
 /**
  * When set, analysis always runs WhisperX to produce word-level lyric
  * timing. Default (`None`/false) uses LRCLIB's line-level synced lyrics and

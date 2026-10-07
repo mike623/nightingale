@@ -38,6 +38,11 @@ below.
 - A song imported from YouTube has a Re-download video action in its details panel, for a download that arrived broken or in a codec the player cannot decode. It fetches the video again and replaces the file. Lyrics, timing, and stems are kept when the new video runs the same length as the old one, and are rebuilt when it does not. The song's name, scores, and play history follow it either way, and nothing is offered for songs that did not come from an import.
 - A finished import that had failures offers a Retry button next to New import, so songs whose download failed can be tried again without pasting the link back in. The retry re-runs the same batch: tracks already on disk are skipped without downloading, and a playlist keeps its full membership.
 - The playback overlay's top-right readout now names the lyrics the song is playing with: `UltraStar`, `Enhanced LRC`, `LRC`, `Aligned (AI)`, `Generated (AI)`, or `none` when the song has no lyrics at all. Plain and Enhanced LRC stay distinct because they carry line-level and word-level timing respectively.
+- Added a master volume control to Playback settings.
+- Added local multiplayer playback for two to four singers, with per-player microphone and profile selection, editable queue lineups, keyboard and gamepad navigation, live scores, and ranked results.
+- **Rescan library** now also picks up analyses that another machine left in a shared cache folder: songs already in the library whose stems and transcript exist in the cache are marked ready without re-running analysis, and a toast summarizes how many were updated.
+- The lyrics editor pre-fills from a `.lrc` / `.elrc` file next to a local song's audio when the song has no lyrics yet, and offers a **Use local .lrc** action otherwise; nothing is written until Save.
+- Added the ability to toggle the display of romanized lyrics for CJK languages in Settings.
 
 ### Improvements
 
@@ -57,6 +62,9 @@ below.
 - Pushes to `dev-port` now publish a signed release the desktop updater picks up, versioned `<next-minor>-mike.<run>` so each dev build supersedes the last without outranking a real release of that version.
 - YouTube imports now prefer H.264 video and AAC audio, so downloaded videos play in the desktop webview without conversion.
 - Added `scripts/repair-videos.sh`, which converts already-imported videos the webview cannot decode into cached playable copies. Source files, song identity, and existing analysis are left untouched.
+- Migrated library persistence from handwritten runtime SQL to Diesel's typed SQLite query builder without changing existing databases or library behavior.
+- Playback queue songs can now be reordered by dragging or with Alt+Arrow keys.
+- The playback screen now shows the song's cover art, title, and artist on a loading screen while audio is still downloading/decoding, instead of a blank/shader background.
 
 ### Fixes
 
@@ -68,6 +76,10 @@ below.
 - Saving lyrics while a song is playing now updates the running playback. The transcript was loaded once per song, so new timing only appeared after a restart.
 - A cached playable copy of a video is now used ahead of the original, so an MP4 holding codecs the webview cannot decode no longer plays as a black or silent screen.
 - Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
+- Song details now open without re-rendering every loaded song or initializing multiplayer devices.
+- Song selections now remain active while searching and after clearing the search field.
+- Song search is now case- and accent-insensitive for Unicode metadata and paths.
+- Stems, source videos, and background videos now play when the songs or videos cache has been moved to a separate folder (for example a network share): the desktop and self-hosted media servers only allowed files under the data folder and library folder, so a relocated cache failed with "Failed to fetch instrumental: 404".
 - Analysis status sorting now orders ready songs by the transcript source shown in their status badge.
 
 ## [1.2.0] - 2026-09-02

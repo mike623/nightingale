@@ -49,10 +49,11 @@ pub use library_model::{
 };
 pub use logs::{LogTail, log_path, read_log_tail};
 pub use lyrics::{
-    LrclibCandidate, LyricsFile, apply_timed_lyrics, clear_lyrics, load_lyrics_file, lyric_lines,
-    provide_lrc, save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,
+    LrclibCandidate, LyricsFile, SidecarLrc, SidecarLrcKind, apply_timed_lyrics, clear_lyrics,
+    load_lyrics_file, load_sidecar_lrc, lyric_lines, provide_lrc, save_lyrics_and_realign,
+    search_lrclib_for_hash, search_lrclib_terms,
 };
-pub use media_server::MediaEndpoint;
+pub use media_server::{MediaEndpoint, local_media_roots};
 pub use play_history::{pick_next_song, record_song_play};
 pub use playback::{
     AudioPaths, PixabayVideoDownloaded, ShiftDone, ShiftResult, StemsReady,
@@ -62,9 +63,9 @@ pub use playback::{
     shift_tempo_done_payload,
 };
 pub use playback_queue::{PlaybackQueue, PlaybackQueueEntry};
-pub use playback_session::{PlaybackSession, PlaybackSessionStore};
+pub use playback_session::{PlaybackPlayer, PlaybackSession, PlaybackSessionStore};
 pub use profile::ProfileStore;
-pub use scanner::start_scan;
+pub use scanner::{CacheReconcileSummary, reconcile_cache, start_scan};
 pub use song::{Song, SongOrigin, rename_song};
 pub use source::{
     JellyfinAuth, JellyfinSource, MediaSource, NavidromeAuth, NavidromeSource, PlexAuth,

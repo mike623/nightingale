@@ -37,7 +37,7 @@ Ships as a single binary. No manual installation of Python, ffmpeg, or ML models
 
 🧭 **Sidebar + library filters** — browse by quick filters, metadata cleanup buckets, artists, albums, and existing playlists from Plex, Jellyfin, Navidrome, or folder-library `.m3u` / `.m3u8` / `.pls` files. **Analyze All** and optional auto-analysis help queue your library faster, and the sidebar/song list remember scroll position when you come back.
 
-🗂️ **Flexible storage** — choose the main data folder during setup, then split cache, models, videos, and vendor tools into separate folders from Settings when needed.
+🗂️ **Flexible storage** — choose the main data folder during setup, then split cache, models, videos, and vendor tools into separate folders from Settings when needed. Point several machines at one shared cache folder and **Rescan library** picks up analyses done elsewhere without re-running them.
 
 📦 **Self-contained** — ffmpeg, uv, Python, PyTorch, and ML packages are downloaded automatically during setup. Video backgrounds are pre-downloaded so the first session is ready to go.
 
@@ -47,7 +47,7 @@ Ships as a single binary. No manual installation of Python, ffmpeg, or ML models
 
 📝 **Word-level lyrics** — automatic transcription with alignment, or fetched from [LRCLIB](https://lrclib.net) when available.
 
-✏️ **Lyrics editor with LRCLIB browser** — edit lyrics, browse LRCLIB matches, or paste your own **LRC / Enhanced LRC** from a song's Actions button. Timed LRC is used as-is (optionally skipping stem separation to sing over the original mix); plain lyrics run alignment.
+✏️ **Lyrics editor with LRCLIB browser** — edit lyrics, browse LRCLIB matches, paste your own **LRC / Enhanced LRC**, or load a `.lrc` / `.elrc` sitting beside the source audio, all from a song's Actions button. Timed LRC is used as-is (optionally skipping stem separation to sing over the original mix); plain lyrics run alignment.
 
 🈯 **CJK lyric support** — Japanese, Chinese, Cantonese, and Korean songs get per-character forced alignment and romanized readings (Hepburn / pinyin / Jyutping / Revised Romanization) shown above each token.
 

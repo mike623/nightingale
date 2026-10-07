@@ -5,6 +5,7 @@ import type { VideoFlavor } from '@/features/playback/lib/video-flavor';
 import {
   usePlaybackMicActions,
   usePlaybackMicState,
+  type PlaybackPlayerMicState,
   usePlaybackThemeActions,
   usePlaybackThemeState,
   usePlaybackTranscriptActions,
@@ -93,6 +94,29 @@ function TouchButton({
   );
 }
 
+function MicHint({
+  multiplayer,
+  micUserEnabled,
+  micName,
+  showShortcuts,
+}: {
+  multiplayer: boolean;
+  micUserEnabled: boolean;
+  micName: string;
+  showShortcuts: boolean;
+}) {
+  // Each multiplayer seat has its own mic, so the single-mic line does not apply.
+  if (multiplayer) {
+    return null;
+  }
+  return (
+    <HintText>
+      Mic: {micUserEnabled ? micName : 'OFF'}
+      {showShortcuts ? ' [M/N]' : ''}
+    </HintText>
+  );
+}
+
 function SettingsInfo({
   lyrics,
   guideVolume,
@@ -100,6 +124,7 @@ function SettingsInfo({
   micUserEnabled,
   micName,
   micMonitorUserEnabled,
+  multiplayer,
   themeIndex,
   videoFlavor,
   showShortcuts,
@@ -110,6 +135,7 @@ function SettingsInfo({
   micUserEnabled: boolean;
   micName: string;
   micMonitorUserEnabled: boolean;
+  multiplayer: boolean;
   themeIndex: number;
   videoFlavor: VideoFlavor;
   showShortcuts: boolean;
@@ -124,10 +150,12 @@ function SettingsInfo({
             : `Guide: ${Math.round(guideVolume * 100)}%`}
         </HintText>
       )}
-      <HintText>
-        Mic: {micUserEnabled ? micName : 'OFF'}
-        {showShortcuts ? ' [M/N]' : ''}
-      </HintText>
+      <MicHint
+        multiplayer={multiplayer}
+        micUserEnabled={micUserEnabled}
+        micName={micName}
+        showShortcuts={showShortcuts}
+      />
       <HintText>
         Monitor: {micMonitorUserEnabled ? 'ON' : 'OFF'}
         {showShortcuts ? ' [R]' : ''}
@@ -155,7 +183,7 @@ function TouchControls({
   const [open, setOpen] = useState(false);
   const { guideVolume, guideAvailable } = usePlaybackTransportState();
   const { setGuideVolume, handlePause } = usePlaybackTransportActions();
-  const { micUserEnabled, micName, micMonitorUserEnabled } = usePlaybackMicState();
+  const { micUserEnabled, micName, micMonitorUserEnabled, multiplayer } = usePlaybackMicState();
   const { handleToggleMic, handleCycleMic, handleToggleMicMonitor } = usePlaybackMicActions();
   const { themeIndex, videoFlavor } = usePlaybackThemeState();
   const { cycleTheme, cycleFlavor } = usePlaybackThemeActions();
@@ -187,6 +215,7 @@ function TouchControls({
           micUserEnabled={micUserEnabled}
           micName={micName}
           micMonitorUserEnabled={micMonitorUserEnabled}
+          multiplayer={multiplayer}
           themeIndex={themeIndex}
           videoFlavor={videoFlavor}
           showShortcuts={false}
@@ -221,8 +250,15 @@ function TouchControls({
               />
             </>
           )}
-          <TouchButton label={micUserEnabled ? 'Mic Off' : 'Mic On'} onClick={handleToggleMic} />
-          <TouchButton label="Mic Select" onClick={handleCycleMic} />
+          {!multiplayer && (
+            <>
+              <TouchButton
+                label={micUserEnabled ? 'Mic Off' : 'Mic On'}
+                onClick={handleToggleMic}
+              />
+              <TouchButton label="Mic Select" onClick={handleCycleMic} />
+            </>
+          )}
           <TouchButton
             label={micMonitorUserEnabled ? 'Monitor Off' : 'Monitor On'}
             onClick={handleToggleMicMonitor}
@@ -309,6 +345,32 @@ function creditPositionClass(position: PlaybackHudPosition, windowControls: bool
   return windowControls && position === 'bottom' ? 'top-12' : notePositionClass(position);
 }
 
+const PLAYER_COLORS = ['bg-rose-400', 'bg-fuchsia-400', 'bg-amber-400', 'bg-emerald-400'];
+
+const scoreTextClass = (score: number | null): string =>
+  `text-base md:text-lg ${score !== null && score !== 0 ? 'text-white' : 'text-white/50'}`;
+
+function MultiplayerScores({ players }: { players: PlaybackPlayerMicState[] }) {
+  return (
+    <div className="grid justify-items-end gap-0.5" aria-label="Player scores">
+      {players.map((player, index) => (
+        <div
+          key={player.id}
+          className={`flex items-center justify-end gap-2 ${scoreTextClass(player.pitchScore)}`}
+        >
+          <span className="whitespace-nowrap">
+            {player.profile ?? `Guest ${index + 1}`}: {player.pitchScore ?? '--'}
+          </span>
+          <span className={`size-2 rounded-full ${PLAYER_COLORS[index]}`} aria-hidden="true" />
+          <span className="sr-only">
+            {player.micReady ? 'Microphone ready' : 'Microphone unavailable'}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type PlaybackHudProps = {
   title: string;
   artist: string;
@@ -330,7 +392,8 @@ function PlaybackHudImpl({
   const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, segments, transcriptSource } =
     usePlaybackTranscriptState();
   const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
-  const { pitchScore, micUserEnabled, micName, micMonitorUserEnabled } = usePlaybackMicState();
+  const { pitchScore, micUserEnabled, micName, micMonitorUserEnabled, multiplayer, players } =
+    usePlaybackMicState();
 
   const skipIntroRef = useRef<HTMLButtonElement>(null);
   const skipOutroRef = useRef<HTMLButtonElement>(null);
@@ -409,11 +472,12 @@ function PlaybackHudImpl({
         </div>
 
         <div className={`flex min-w-0 items-end ${hudFlowClass} ${rightHudOffset}`}>
-          <div
-            className={`text-base md:text-lg ${typeof pitchScore === 'number' && pitchScore !== 0 ? 'text-white' : 'text-white/50'}`}
-          >
-            Score: {pitchScore ?? '--'}
-          </div>
+          {multiplayer ? (
+            <MultiplayerScores players={players} />
+          ) : (
+            <div className={scoreTextClass(pitchScore)}>Score: {pitchScore ?? '--'}</div>
+          )}
+          <div className="my-1.5 hidden h-px w-full bg-white/20 sm:block" aria-hidden="true" />
           <div className="hidden sm:block">
             <SettingsInfo
               lyrics={transcriptLabel(transcriptSource, segments)}
@@ -422,6 +486,7 @@ function PlaybackHudImpl({
               micUserEnabled={micUserEnabled}
               micName={micName}
               micMonitorUserEnabled={micMonitorUserEnabled}
+              multiplayer={multiplayer}
               themeIndex={themeIndex}
               videoFlavor={videoFlavor}
               showShortcuts={!hasTouch}

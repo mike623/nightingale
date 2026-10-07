@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { pickNextSong } from '@/bridge/play-history';
+import type { PlaybackPlayer } from '@/bridge/playback-session';
 import {
   usePlaybackQueueQuery,
   useStartNextPlaybackQueueSong,
@@ -27,13 +28,18 @@ import { usePlaybackTransportActions } from '@/features/playback/providers';
 export type PlaybackNext = {
   /** Starts the queue's head, or a random draw when the queue is empty. */
   playNext: () => void;
+  /** `playNext` with a different player lineup than the current session's. */
+  playNextWith: (players: readonly PlaybackPlayer[]) => void;
   /** True when the next advance consumes the queue instead of drawing. */
   hasQueueNext: boolean;
   /** True while a queued song is being prepared. */
   isPreparing: boolean;
 };
 
-export function usePlaybackNext(currentFileHash: string): PlaybackNext {
+export function usePlaybackNext(
+  currentFileHash: string,
+  sessionPlayers: readonly PlaybackPlayer[] = [],
+): PlaybackNext {
   const navigate = useNavigate();
   const { handleExit } = usePlaybackTransportActions();
   const { data: entries = [] } = usePlaybackQueueQuery();
@@ -43,34 +49,41 @@ export function usePlaybackNext(currentFileHash: string): PlaybackNext {
   const drawingRef = useRef(false);
   const hasQueueNext = entries.length > 0;
 
-  const playNext = useCallback(() => {
-    if (hasQueueNext) {
-      playQueueNext();
-      return;
-    }
-
-    if (drawingRef.current) {
-      return;
-    }
-    drawingRef.current = true;
-
-    void (async () => {
-      try {
-        const song = await pickNextSong(currentFileHash);
-
-        if (song === null) {
-          toast.info('No other analyzed song to play next');
-          handleExit();
-          return;
-        }
-
-        await startSong(song, navigate);
-      } catch (e) {
-        toast.error(`Could not pick the next song: ${e instanceof Error ? e.message : String(e)}`);
-        drawingRef.current = false;
+  const playNextWith = useCallback(
+    (players: readonly PlaybackPlayer[]) => {
+      if (hasQueueNext) {
+        playQueueNext([...players]);
+        return;
       }
-    })();
-  }, [currentFileHash, handleExit, hasQueueNext, navigate, playQueueNext]);
 
-  return { playNext, hasQueueNext, isPreparing };
+      if (drawingRef.current) {
+        return;
+      }
+      drawingRef.current = true;
+
+      void (async () => {
+        try {
+          const song = await pickNextSong(currentFileHash);
+
+          if (song === null) {
+            toast.info('No other analyzed song to play next');
+            handleExit();
+            return;
+          }
+
+          await startSong(song, navigate, players);
+        } catch (e) {
+          toast.error(
+            `Could not pick the next song: ${e instanceof Error ? e.message : String(e)}`,
+          );
+          drawingRef.current = false;
+        }
+      })();
+    },
+    [currentFileHash, handleExit, hasQueueNext, navigate, playQueueNext],
+  );
+
+  const playNext = useCallback(() => playNextWith(sessionPlayers), [playNextWith, sessionPlayers]);
+
+  return { playNext, playNextWith, hasQueueNext, isPreparing };
 }

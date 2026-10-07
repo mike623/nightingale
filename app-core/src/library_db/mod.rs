@@ -31,7 +31,9 @@ mod playlists;
 mod queries;
 mod rebase;
 pub(crate) mod remote;
+mod schema;
 mod songs;
+mod sql_functions;
 
 pub(crate) use analysis_queue::{
     analysis_queue_clear, analysis_queue_delete, analysis_queue_load_rows,
@@ -50,8 +52,8 @@ pub(crate) use playlists::{PlaylistDefinition, PlaylistSongKeyKind, replace_all_
 pub(crate) use queries::{
     iter_file_hashes_filtered_analysis_busy, iter_file_hashes_filtered_full_reanalyzable,
     iter_file_hashes_filtered_not_analyzed, iter_file_hashes_filtered_realignable,
-    iter_file_hashes_filtered_refreshable, load_meta_sql, load_songs_page,
-    query_library_menu_items,
+    iter_file_hashes_filtered_refreshable, iter_file_hashes_reconcilable, load_meta_sql,
+    load_songs_page, query_library_menu_items,
 };
 pub(crate) use rebase::{rebase_song_album_art_cache_paths, rebase_song_album_art_paths};
 pub(crate) use songs::{
@@ -77,7 +79,7 @@ pub fn library_db_path() -> PathBuf {
     nightingale_dir().join("songs.db")
 }
 
-pub fn init_library() -> rusqlite::Result<()> {
+pub fn init_library() -> Result<(), crate::error::NightingaleError> {
     if connection::is_initialised() {
         return Ok(());
     }

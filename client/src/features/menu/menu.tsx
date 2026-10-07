@@ -3,9 +3,6 @@ import { Outlet, useLocation } from 'react-router';
 
 import { EXIT_SUPPORTED } from '@/bridge/exit';
 import { useImportNotifications } from '@/features/import/hooks/use-import-notifications';
-import { EmptySongList } from '@/features/library/components/song-list/empty-song-list';
-import { SongList } from '@/features/library/components/song-list/song-list';
-import { useSongsMeta } from '@/features/library/queries/use-songs';
 import { EditLyricsDialog } from '@/features/lyrics/components';
 import { SelectLanguageDialog } from '@/features/lyrics/components/language';
 import { ClearCacheDialog } from '@/features/menu/components/clear-cache';
@@ -30,20 +27,6 @@ import { FolderSourceConfirmDialog } from '@/features/sources/components/source-
 import { UpdateDialog } from '@/features/updates/components';
 import { SidebarInset } from '@/shared/components/ui/sidebar';
 import { useConfig } from '@/shared/config/use-config';
-
-export const MenuIndex = () => {
-  const { data: meta, isLoading: isLoadingMeta } = useSongsMeta();
-
-  if (isLoadingMeta) {
-    return null;
-  }
-
-  if (typeof meta?.folder === 'string' && meta.folder !== '') {
-    return <SongList />;
-  }
-
-  return <EmptySongList />;
-};
 
 const SourceDialogs = ({ mode }: { mode: DialogMode }) => (
   <>

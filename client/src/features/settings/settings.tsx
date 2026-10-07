@@ -16,6 +16,7 @@ import {
   ASR_ENGINES,
   DEFAULTS,
   LYRICS_HORIZONTAL_POSITIONS,
+  LYRICS_ROMANIZATION_MODES,
   LYRICS_VERTICAL_POSITIONS,
   MODELS,
   NAV,
@@ -36,6 +37,7 @@ import {
   NumberButtonGroup,
   OnOffButtonGroup,
   PageHeader,
+  SettingsButtonGroup,
   SettingsSelect,
 } from '@/features/settings/components/settings-controls';
 import { useSettingsNavigation } from '@/features/settings/hooks/use-settings-navigation';
@@ -79,15 +81,21 @@ const lyricsLayoutSettings = (config: AppConfig | undefined) => ({
   lyricsScale: clampPlaybackScale(config?.lyrics_scale),
 });
 
-const playbackSettings = (config: AppConfig | undefined) => ({
-  mode: config?.playback_mode ?? DEFAULTS.playback_mode,
-  ...lyricsLayoutSettings(config),
-  pitchGraphScale: clampPlaybackScale(config?.pitch_graph_scale),
-  scoringTolerance: clampScoringTolerance(config?.pitch_tolerance_semitones),
-  autoPlayNext: config?.auto_play_next === true,
+const remoteSettings = (config: AppConfig | undefined) => ({
   remoteControl: config?.remote_control === true,
   partyImport: config?.party_import === true,
   partyLyricShift: config?.party_lyric_shift === true,
+});
+
+const playbackSettings = (config: AppConfig | undefined) => ({
+  mode: config?.playback_mode ?? DEFAULTS.playback_mode,
+  masterVolume: config?.master_volume ?? DEFAULTS.master_volume,
+  ...lyricsLayoutSettings(config),
+  pitchGraphScale: clampPlaybackScale(config?.pitch_graph_scale),
+  lyricsRomanizationMode: config?.lyrics_romanization_mode ?? DEFAULTS.lyrics_romanization_mode,
+  scoringTolerance: clampScoringTolerance(config?.pitch_tolerance_semitones),
+  autoPlayNext: config?.auto_play_next === true,
+  ...remoteSettings(config),
 });
 
 const pendingValue = <T,>(input: T | null, saved: T): T => input ?? saved;
@@ -141,6 +149,8 @@ export const SettingsPage = () => {
   const micMonitorGain = micMonitorGainInput ?? general.micMonitorGain;
   const [micLatencySecInput, setMicLatencySec] = useState<number | null>(null);
   const micLatencySec = micLatencySecInput ?? general.micLatency;
+  const [masterVolumeInput, setMasterVolume] = useState<number | null>(null);
+  const masterVolume = pendingValue(masterVolumeInput, playback.masterVolume);
   const [lyricsVerticalInput, setLyricsVertical] = useState<string | null>(null);
   const lyricsVertical = pendingValue(lyricsVerticalInput, playback.lyricsVertical);
   const [lyricsHorizontalInput, setLyricsHorizontal] = useState<string | null>(null);
@@ -149,6 +159,11 @@ export const SettingsPage = () => {
   const lyricsScale = pendingValue(lyricsScaleInput, playback.lyricsScale);
   const [pitchGraphScaleInput, setPitchGraphScale] = useState<number | null>(null);
   const pitchGraphScale = pendingValue(pitchGraphScaleInput, playback.pitchGraphScale);
+  const [lyricsRomanizationModeInput, setLyricsRomanizationMode] = useState<string | null>(null);
+  const lyricsRomanizationMode = pendingValue(
+    lyricsRomanizationModeInput,
+    playback.lyricsRomanizationMode,
+  );
   const [scoringToleranceInput, setScoringTolerance] = useState<number | null>(null);
   const scoringTolerance = pendingValue(scoringToleranceInput, playback.scoringTolerance);
   const [vocalThresholdPctInput, setVocalThresholdPct] = useState<number | null>(null);
@@ -162,6 +177,7 @@ export const SettingsPage = () => {
   const analysisNav = getAnalysisNav(isParakeet);
 
   const modelOptions = useMemo(() => MODELS.map((model) => ({ value: model, label: model })), []);
+  const masterVolumePct = Math.round(masterVolume * 100);
   const lyricsScalePct = Math.round(lyricsScale * 100);
   const pitchGraphScalePct = Math.round(pitchGraphScale * 100);
   const vocalThresholdDisplayPct = Math.round(vocalThresholdPct * 100);
@@ -184,6 +200,11 @@ export const SettingsPage = () => {
   const updateMicLatency = (latencySec: number) => {
     setMicLatencySec(latencySec);
     mutate({ mic_latency_compensation_sec: latencySec });
+  };
+
+  const updateMasterVolume = (volume: number) => {
+    setMasterVolume(volume);
+    mutate({ master_volume: volume });
   };
 
   const updateLyricsScale = (scale: number) => {
@@ -216,10 +237,12 @@ export const SettingsPage = () => {
     mutate(DEFAULTS);
     setMicMonitorGain(DEFAULTS.mic_monitor_gain);
     setMicLatencySec(DEFAULTS.mic_latency_compensation_sec);
+    setMasterVolume(DEFAULTS.master_volume);
     setLyricsVertical(DEFAULTS.lyrics_vertical_position);
     setLyricsHorizontal(DEFAULTS.lyrics_horizontal_position);
     setLyricsScale(DEFAULTS.lyrics_scale);
     setPitchGraphScale(DEFAULTS.pitch_graph_scale);
+    setLyricsRomanizationMode(DEFAULTS.lyrics_romanization_mode);
     setVocalThresholdPct(DEFAULTS.vocal_detection_threshold_pct);
   };
 
@@ -229,6 +252,7 @@ export const SettingsPage = () => {
     isParakeet,
     micMonitorGain,
     micLatencySec,
+    masterVolume,
     lyricsScale,
     pitchGraphScale,
     scoringTolerance,
@@ -237,6 +261,7 @@ export const SettingsPage = () => {
     onTabChange: setTab,
     onMicMonitorGainChange: updateMicMonitorGain,
     onMicLatencyChange: updateMicLatency,
+    onMasterVolumeChange: updateMasterVolume,
     onLyricsScaleChange: updateLyricsScale,
     onPitchGraphScaleChange: updatePitchGraphScale,
     onScoringToleranceChange: updateScoringTolerance,
@@ -338,6 +363,19 @@ export const SettingsPage = () => {
                 </Field>
 
                 <Field>
+                  <Label>Master volume</Label>
+                  <Hint>Overall playback volume ({masterVolumePct}%)</Hint>
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[masterVolumePct]}
+                    onValueChange={([pct]) => updateMasterVolume(pct / 100)}
+                    className={getFocusClassName(NAV.playback.masterVolume)}
+                  />
+                </Field>
+
+                <Field>
                   <Label htmlFor="lyrics-vertical-position-1">Lyrics vertical position</Label>
                   <Hint>Top moves playback HUD and pitch graph to the bottom</Hint>
                   <SettingsSelect
@@ -394,6 +432,21 @@ export const SettingsPage = () => {
                     value={[pitchGraphScalePct]}
                     onValueChange={([pct]) => updatePitchGraphScale(pct / 100)}
                     className={getFocusClassName(NAV.playback.pitchGraphScale)}
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Romanize lyrics</Label>
+                  <Hint>Whether to show romanized lyrics for songs in CJK languages</Hint>
+                  <SettingsButtonGroup
+                    value={lyricsRomanizationMode}
+                    options={LYRICS_ROMANIZATION_MODES}
+                    segment={NAV.playback.lyricsRomanizationMode}
+                    getFocusClassName={getFocusClassName}
+                    onChange={(lyrics_romanization_mode) => {
+                      setLyricsRomanizationMode(lyrics_romanization_mode);
+                      mutate({ lyrics_romanization_mode });
+                    }}
                   />
                 </Field>
 

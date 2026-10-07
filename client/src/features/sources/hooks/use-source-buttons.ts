@@ -171,7 +171,7 @@ export const useSourceButtons = (): SourceButton[] => {
         key: 'rescan',
         icon: RefreshCwIcon,
         label: 'Rescan library',
-        tooltip: 'Rescan library',
+        tooltip: 'Rescan library (reuses cached analyses)',
         handler: rescan,
         disabled: rescanDisabled,
       });

@@ -32,8 +32,8 @@ use import::{
 };
 use logs::read_log;
 use lyrics::{
-    apply_timed_lyrics, clear_lyrics, load_lyrics, provide_lrc, save_lyrics, search_lrclib_lyrics,
-    search_lrclib_terms,
+    apply_timed_lyrics, clear_lyrics, load_lyrics, load_sidecar_lrc, provide_lrc, save_lyrics,
+    search_lrclib_lyrics, search_lrclib_terms,
 };
 use microphones::{list_microphones, set_monitor_gain, start_mic_capture, stop_mic_capture};
 use play_history::{pick_next_song, record_song_play};
@@ -42,7 +42,7 @@ use playback::{
     load_transcript,
 };
 use playback_queue::{
-    add_playback_queue_entry, clear_playback_queue, load_playback_queue,
+    add_playback_queue_entry, clear_playback_queue, load_playback_queue, move_playback_queue_entry,
     remove_playback_queue_entry,
 };
 use playback_session::{load_playback_session, save_playback_session};
@@ -51,8 +51,8 @@ use remote_control::{remote_diagnostics, remote_start, remote_status, remote_sto
 use scanner::{
     clear_library_source, jellyfin_login, jellyfin_ping, load_analysis_queue,
     load_library_menu_items, load_songs, load_songs_by_hashes, load_songs_meta, navidrome_login,
-    navidrome_ping, plex_begin_pin, plex_manual_login, plex_ping, plex_poll_pin, rename_song,
-    set_library_source, trigger_scan,
+    navidrome_ping, plex_begin_pin, plex_manual_login, plex_ping, plex_poll_pin, reconcile_cache,
+    rename_song, set_library_source, trigger_scan,
 };
 use tauri::{Manager, RunEvent, WebviewWindowBuilder};
 use vendor::{is_ready, trigger_setup};
@@ -138,6 +138,7 @@ pub fn run() {
             // Playback queue
             load_playback_queue,
             add_playback_queue_entry,
+            move_playback_queue_entry,
             remove_playback_queue_entry,
             clear_playback_queue,
             // Playback session
@@ -149,6 +150,7 @@ pub fn run() {
             // Scanner
             trigger_scan,
             rename_song,
+            reconcile_cache,
             set_library_source,
             clear_library_source,
             jellyfin_login,
@@ -187,6 +189,7 @@ pub fn run() {
             shift_tempo,
             // Lyrics
             load_lyrics,
+            load_sidecar_lrc,
             search_lrclib_lyrics,
             search_lrclib_terms,
             save_lyrics,

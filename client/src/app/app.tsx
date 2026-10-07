@@ -5,7 +5,8 @@ import { BrowserRouter, Routes, Route } from 'react-router';
 
 import { UPDATES_SUPPORTED } from '@/bridge/platform';
 import { ImportPage } from '@/features/import/import';
-import { MenuIndex, MenuLayout } from '@/features/menu/menu';
+import { LibraryPage } from '@/features/library/library-page';
+import { MenuLayout } from '@/features/menu/menu';
 import { MenuFocusProvider } from '@/features/menu/providers/menu-focus-context';
 import { Playback } from '@/features/playback/playback';
 import { RemotePage } from '@/features/remote/remote';
@@ -33,7 +34,7 @@ const InnerWrapper = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<MenuLayout />}>
-            <Route index element={<MenuIndex />} />
+            <Route index element={<LibraryPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="import" element={<ImportPage />} />
           </Route>
