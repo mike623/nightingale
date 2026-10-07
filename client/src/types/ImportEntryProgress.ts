@@ -6,16 +6,18 @@ import type { ImportEntryStatus } from "./ImportEntryStatus";
  * (`DOWNLOAD_CONCURRENCY`), so a listener keyed by `id` can show each of them
  * moving independently — which the aggregate counters below cannot express.
  */
-export type ImportEntryProgress = { 
-/**
- * YouTube video id — the stable key a listener addresses rows by.
- */
-id: string, status: ImportEntryStatus, 
-/**
- * Download fraction (0.0–1.0). 1.0 for every terminal status.
- */
-pct: number, 
-/**
- * Failure text, present only on `Failed`.
- */
-reason: string | null, };
+export type ImportEntryProgress = {
+  /**
+   * YouTube video id — the stable key a listener addresses rows by.
+   */
+  id: string;
+  status: ImportEntryStatus;
+  /**
+   * Download fraction (0.0–1.0). 1.0 for every terminal status.
+   */
+  pct: number;
+  /**
+   * Failure text, present only on `Failed`.
+   */
+  reason: string | null;
+};

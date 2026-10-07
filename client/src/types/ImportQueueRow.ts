@@ -9,27 +9,36 @@ import type { ImportSubmitter } from "./ImportSubmitter";
  * always read whole, never joined. `position` is the order within the job,
  * which for a playlist is its playlist order and so decides the `.m3u`.
  */
-export type ImportQueueRow = { 
-/**
- * YouTube video id — the queue's primary key, so one video holds one row
- * however many times it is submitted.
- */
-id: string, jobId: string, title: string, artist: string, 
-/**
- * Seconds, `0.0` when the submitter could not supply one.
- */
-durationSecs: number, playlistId: string | null, playlistTitle: string | null, status: ImportEntryStatus, 
-/**
- * Download fraction (0.0–1.0).
- */
-pct: number, 
-/**
- * Failure text, present only on `Failed`.
- */
-reason: string | null, submittedBy: ImportSubmitter, position: number, 
-/**
- * Unix seconds, and the queue's ordering key across jobs. Exported as a
- * number rather than ts-rs's default `bigint`, which is what JSON actually
- * delivers and what the page compares against.
- */
-createdAt: number, };
+export type ImportQueueRow = {
+  /**
+   * YouTube video id — the queue's primary key, so one video holds one row
+   * however many times it is submitted.
+   */
+  id: string;
+  jobId: string;
+  title: string;
+  artist: string;
+  /**
+   * Seconds, `0.0` when the submitter could not supply one.
+   */
+  durationSecs: number;
+  playlistId: string | null;
+  playlistTitle: string | null;
+  status: ImportEntryStatus;
+  /**
+   * Download fraction (0.0–1.0).
+   */
+  pct: number;
+  /**
+   * Failure text, present only on `Failed`.
+   */
+  reason: string | null;
+  submittedBy: ImportSubmitter;
+  position: number;
+  /**
+   * Unix seconds, and the queue's ordering key across jobs. Exported as a
+   * number rather than ts-rs's default `bigint`, which is what JSON actually
+   * delivers and what the page compares against.
+   */
+  createdAt: number;
+};
