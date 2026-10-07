@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost; media-src 'self' http://127.0.0.1:* https:; style-src 'self' 'unsafe-inline'",
+      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:* ws://127.0.0.1:*; img-src 'self' asset: http://asset.localhost; media-src 'self' http://127.0.0.1:* https:; style-src 'self' 'unsafe-inline'",
       "assetProtocol": {
         "enable": true,
         "scope": ["$HOME/.nightingale/**"]
@@ -45,12 +45,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkwODM4MDM1QjIzNTVGRQpSV1QrVlNOYkF6Z0lDYjRmZzlRR3VWVHFSQllmOVVWMnpxTUlrYlNrTlhXVEQrZjNYY0ttNWIvSgo=",
-      "endpoints": ["https://github.com/rzru/nightingale/releases/latest/download/latest.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwRTRGMUNDMTcxQjVENTIKUldSU1hSc1h6UEhrY09YWEY0Z2FvRnlvOGM1eWJIc1ZycXpoQ2NKUS9GcWtDSHQ5WnlCUlRYcGsK",
+      "endpoints": ["https://github.com/mike623/nightingale/releases/latest/download/latest.json"],
       "windows": {
         "installMode": "passive"
       }

@@ -31,6 +31,13 @@ export type AudioPlayer = {
   pause: () => void;
   resume: () => void;
   seek: (time: number) => void;
+  /**
+   * Counts the seeks so far. Playback state that accumulates over a pass
+   * (pitch history, scoring) compares it against the pass it holds to know the
+   * position jumped. It is read rather than observed so a seek taken while
+   * paused is already visible to the subscribers that same seek notifies.
+   */
+  getSeekEpoch: () => number;
   setGuideVolume: (v: number) => void;
   cleanup: () => void;
   getVocalsBuffer: () => AudioBuffer | null;
@@ -65,6 +72,7 @@ export function useAudioPlayer(
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const seekEpochRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [guideVolume, setGuideVolumeState] = useState(initialGuideVolume);
   const [guideAvailable, setGuideAvailable] = useState(true);
@@ -336,11 +344,14 @@ export function useAudioPlayer(
         setIsPlaying(true);
       }
 
+      seekEpochRef.current += 1;
       notifySubscribers(time);
       setIsFinished(false);
     },
     [stopSources, startSources, notifySubscribers],
   );
+
+  const getSeekEpoch = useCallback(() => seekEpochRef.current, []);
 
   const setGuideVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
@@ -378,6 +389,7 @@ export function useAudioPlayer(
       pause,
       resume,
       seek,
+      getSeekEpoch,
       setGuideVolume,
       cleanup,
       getVocalsBuffer,
@@ -398,6 +410,7 @@ export function useAudioPlayer(
       pause,
       resume,
       seek,
+      getSeekEpoch,
       setGuideVolume,
       cleanup,
       getVocalsBuffer,

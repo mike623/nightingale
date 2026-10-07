@@ -26,3 +26,16 @@ export const provideLrc = async (
 export const applyTimedLyrics = async (fileHash: string, lrcText: string): Promise<void> => {
   return await invoke<void>('apply_timed_lyrics', { fileHash, lrcText });
 };
+
+/** Manual LRCLIB search with user-supplied track/artist terms. */
+export const searchLrclibTerms = async (
+  track: string,
+  artist: string,
+): Promise<LrclibCandidate[]> => {
+  return await invoke<LrclibCandidate[]>('search_lrclib_terms', { track, artist });
+};
+
+/** Remove a song's lyrics entirely, leaving it lyricless but still playable. */
+export const clearLyrics = async (fileHash: string): Promise<void> => {
+  return await invoke<void>('clear_lyrics', { fileHash });
+};

@@ -102,6 +102,7 @@ export const DEFAULTS = {
   mic_monitor_gain: 0.65,
   mic_latency_compensation_sec: DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   auto_analyze: false,
+  auto_play_next: false,
   playback_mode: 'classic',
   lyrics_vertical_position: 'bottom',
   lyrics_horizontal_position: 'center',
@@ -119,6 +120,7 @@ export const DEFAULTS = {
   | 'mic_monitor_gain'
   | 'mic_latency_compensation_sec'
   | 'auto_analyze'
+  | 'auto_play_next'
   | 'playback_mode'
   | 'lyrics_vertical_position'
   | 'lyrics_horizontal_position'
@@ -153,6 +155,11 @@ export const NAV = {
     lyricsHorizontalPosition: 3,
     lyricsScale: 4,
     pitchGraphScale: 5,
+    scoringTolerance: 6,
+    autoPlayNext: 7,
+    remoteControl: 8,
+    partyImport: 9,
+    partyLyricShift: 10,
   },
 } as const;
 
@@ -169,8 +176,10 @@ export function getAnalysisNav(isParakeet: boolean) {
         beamSize: -1,
         alignBackend: 3,
         autoAnalyze: 4,
-        vocalThreshold: 5,
-        batchSize: 6,
+        wordLevelLyrics: 5,
+        lyricsLookup: 6,
+        vocalThreshold: 7,
+        batchSize: 8,
       }
     : {
         separator: 1,
@@ -179,8 +188,10 @@ export function getAnalysisNav(isParakeet: boolean) {
         beamSize: 4,
         alignBackend: 5,
         autoAnalyze: 6,
-        vocalThreshold: 7,
-        batchSize: 8,
+        wordLevelLyrics: 7,
+        lyricsLookup: 8,
+        vocalThreshold: 9,
+        batchSize: 10,
       };
 }
 
@@ -189,10 +200,12 @@ export function getSettingsStops(tab: SettingsTab, isParakeet: boolean) {
     return [3, 2, 1, 1, 2, 2, 2];
   }
   if (tab === 'playback') {
-    return [3, 1, 1, 1, 1, 1, 2];
+    // tabs, mode, lyrics v/h, lyrics scale, graph scale, tolerance, auto-next,
+    // remote control, footer
+    return [3, 1, 1, 1, 1, 1, 1, 2, 2, 2];
   }
 
   return isParakeet
-    ? [3, 1, 1, 1, 2, 1, NUMBER_PICKER_SIZE, 2]
-    : [3, 1, 1, 1, NUMBER_PICKER_SIZE, 1, 2, 1, NUMBER_PICKER_SIZE, 2];
+    ? [3, 1, 1, 1, 2, 2, 2, 1, NUMBER_PICKER_SIZE, 2]
+    : [3, 1, 1, 1, NUMBER_PICKER_SIZE, 1, 2, 2, 2, 1, NUMBER_PICKER_SIZE, 2];
 }

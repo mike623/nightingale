@@ -611,6 +611,48 @@ pub fn delete_cache(target: SongTarget) -> Result<usize, String> {
     )
 }
 
+/// Remove one song from the library entirely: its source file, every
+/// generated file keyed by its hash, and its library + queue rows.
+///
+/// Local-file songs only. A remote-origin song lives on someone else's
+/// server, so `song.path` is only a local materialisation and deleting it
+/// would say nothing about the library the user actually sees.
+fn delete_song_one(file_hash: &str) -> Result<bool, String> {
+    let Some(song) = library_db::load_song_by_hash(file_hash)
+        .map_err(|e| format!("failed loading song: {e}"))?
+    else {
+        return Ok(false);
+    };
+
+    if !matches!(song.origin, SongOrigin::LocalFile) {
+        return Err("only songs from a local folder library can be deleted".to_string());
+    }
+
+    // Cache and rows go first: if the file delete fails (permissions,
+    // read-only volume) we would rather leave a file the next scan re-adds
+    // than a library row pointing at media the user believes is gone.
+    CacheDir::new().delete_song_cache(file_hash);
+    library_db::delete_song_by_hash(file_hash)
+        .map_err(|e| format!("failed updating library: {e}"))?;
+
+    match std::fs::remove_file(&song.path) {
+        Ok(()) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(e) => Err(format!("failed deleting {}: {e}", song.path.display())),
+    }
+}
+
+/// Delete songs outright. Irreversible: the files leave the disk.
+pub fn delete_song(target: SongTarget) -> Result<usize, String> {
+    // Deliberately hash-only. There is no "every song matching this filter"
+    // query, and adding one for an irreversible delete would make wiping a
+    // whole filtered view a single click away.
+    if matches!(target, SongTarget::Filter { .. }) {
+        return Err("songs can only be deleted by explicit selection".to_string());
+    }
+    run_for_target(target, |_| Ok(Vec::new()), delete_song_one)
+}
+
 fn reanalyze_transcript_one(file_hash: &str, language: Option<String>) -> bool {
     if is_usdx_song(file_hash) {
         return false;
@@ -834,6 +876,48 @@ fn process_song(initial_hash: &str, cache: &CacheDir) {
         }
         return;
     };
+
+    // Default lyrics path (see docs/adr/0003): no WhisperX, and — unless lyric
+    // lookup is opted into — no LRCLIB lookup either, so analysis is just stem
+    // separation + key. When word-level is off and this isn't a forced /
+    // already-stems-only pass:
+    //   - lookup off (default)       -> separate stems, no lyrics at all.
+    //   - lookup on, synced match    -> line-level LRC + stem separation.
+    //   - lookup on, no synced match -> separate stems, NO transcription.
+    // WhisperX runs only when word-level is enabled globally or forced per-song.
+    let prefs = AppConfig::load();
+    if !prefs.word_level_lyrics()
+        && !lock_unpoisoned(&STEMS_ONLY).contains(initial_hash)
+        && !lock_unpoisoned(&FORCE_TRANSCRIBE).contains(initial_hash)
+    {
+        if !prefs.lyrics_lookup() {
+            info!(
+                "[analyzer] Lyric lookup off for {}; separating stems only",
+                song.file_hash
+            );
+        } else if let Some(lrc) = crate::lyrics::best_synced_lrc(&song) {
+            match crate::lyrics::provide_lrc(&song.file_hash, &lrc, true) {
+                Ok(()) => {
+                    info!(
+                        "[analyzer] Using LRCLIB line-level lyrics for {} (skipping WhisperX)",
+                        song.file_hash
+                    );
+                    return;
+                }
+                Err(e) => {
+                    warn!("[analyzer] LRC path failed ({e}); separating stems without lyrics")
+                }
+            }
+        } else {
+            info!(
+                "[analyzer] No LRCLIB synced lyrics for {}; separating stems without lyrics \
+                 (enable word-level timing or search LRCLIB manually to get lyrics)",
+                song.file_hash
+            );
+        }
+        // Lyric-less: run the stems-only pass (separation + key), no WhisperX.
+        mark_stems_only(&song.file_hash);
+    }
 
     let (song, local_path, file_hash_owned) = match prepare_audio_for_analysis(&song, cache) {
         Ok(out) => out,

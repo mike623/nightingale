@@ -1,4 +1,4 @@
-import { BoxIcon, Trash2Icon, VideoIcon, type LucideIcon } from 'lucide-react';
+import { BoxIcon, BrushCleaningIcon, Trash2Icon, VideoIcon, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 
 import { useDialog, type ClearCacheTarget } from '@/features/menu/hooks/use-dialog';
@@ -26,6 +26,7 @@ export const CacheActions = ({ focusedSidebarIndex, registerCallback }: CacheAct
   const buttons = useMemo<CacheButton[]>(
     () => [
       { icon: Trash2Icon, label: 'Clear all cache', target: 'all' },
+      { icon: BrushCleaningIcon, label: 'Clean orphaned cache', target: 'orphans' },
       { icon: VideoIcon, label: 'Clear videos cache', target: 'videos' },
       { icon: BoxIcon, label: 'Clear models cache', target: 'models' },
     ],

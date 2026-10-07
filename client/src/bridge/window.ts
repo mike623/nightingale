@@ -23,6 +23,18 @@ export const minimizeWindow = async (): Promise<void> => {
   return invoke<void>('minimize_window');
 };
 
+/** Brings the application forward after a window it opened took the focus. */
+export const focusAppWindow = async (): Promise<void> => {
+  if (!isTauri) {
+    window.focus();
+    return;
+  }
+
+  const current = getCurrentWindow();
+  await current.show();
+  await current.setFocus();
+};
+
 export const closePlaybackWindow = async (): Promise<void> => {
   if (isTauri) {
     await getCurrentWindow().close();

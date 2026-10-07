@@ -16,6 +16,8 @@ export const SMOOTHING = 0.55;
 export const PITCH_BUFFER_SIZE = 200;
 
 export const SEMITONE_TOLERANCE = 6;
+export const MIN_SEMITONE_TOLERANCE = 1;
+export const MAX_SEMITONE_TOLERANCE = 12;
 
 export const DEFAULT_MIC_LATENCY_COMPENSATION_SEC = 0.08;
 export const MIN_MIC_LATENCY_COMPENSATION_SEC = 0;

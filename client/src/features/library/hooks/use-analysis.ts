@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import {
   cancelAnalysis,
+  deleteSong,
   deleteSongCache,
   enqueue,
   realign,
@@ -149,6 +150,13 @@ export const useAnalysis = () => {
         () => deleteSongCache(filtered()),
         invalidateSongs,
       ),
+      // Unlike the other actions this one rethrows: the caller closes the
+      // details sidebar on success, and must not do that when the file could
+      // not actually be removed.
+      deleteSong: async (fileHash: string) => {
+        await deleteSong(one(fileHash));
+        invalidateSongs();
+      },
       reanalyzeTranscript: wrap(
         (fileHash: string, language?: string) => reanalyzeTranscript(one(fileHash), language),
         invalidateSongs,

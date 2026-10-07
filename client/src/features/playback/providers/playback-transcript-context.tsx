@@ -22,12 +22,21 @@ export type PlaybackTranscriptState = {
   lastSegmentEnd: number;
   introSkipLeadSec: number;
   skipOutroPending: boolean;
+  /**
+   * Seconds the lyric display is held back from the song's own timing;
+   * positive shows each line later. It corrects a transcript that reads early
+   * or late against the audio everyone hears, so it moves the words on screen
+   * and nothing else. This provider is mounted per song, so the offset starts
+   * at zero again with every song and never reaches the transcript on disk.
+   */
+  lyricOffsetSec: number;
 };
 
 export type PlaybackTranscriptActions = {
   handleSkipIntro: () => void;
   handleSkipOutro: () => void;
   clearSkipOutroPending: () => void;
+  setLyricOffsetSec: (seconds: number) => void;
 };
 
 const TranscriptStateContext = createContext<PlaybackTranscriptState | null>(null);
@@ -45,6 +54,7 @@ export function PlaybackTranscriptProvider({
   const { seek, pauseAudio } = usePlaybackTransportActions();
   const { segments, transcriptSource } = usePlaybackTranscript(fileHash);
   const [skipOutroPending, setSkipOutroPending] = useState(false);
+  const [lyricOffsetSec, setLyricOffsetSec] = useState(0);
 
   const firstSegmentStart = segments.length > 0 ? segments[0].start : 0;
   const lastSegmentEnd = segments.length > 0 ? segments[segments.length - 1].end : 0;
@@ -76,8 +86,16 @@ export function PlaybackTranscriptProvider({
       lastSegmentEnd,
       introSkipLeadSec: INTRO_SKIP_LEAD_SEC,
       skipOutroPending,
+      lyricOffsetSec,
     }),
-    [segments, transcriptSource, firstSegmentStart, lastSegmentEnd, skipOutroPending],
+    [
+      segments,
+      transcriptSource,
+      firstSegmentStart,
+      lastSegmentEnd,
+      skipOutroPending,
+      lyricOffsetSec,
+    ],
   );
 
   const actionsValue = useMemo<PlaybackTranscriptActions>(
@@ -85,6 +103,7 @@ export function PlaybackTranscriptProvider({
       handleSkipIntro,
       handleSkipOutro,
       clearSkipOutroPending,
+      setLyricOffsetSec,
     }),
     [handleSkipIntro, handleSkipOutro, clearSkipOutroPending],
   );

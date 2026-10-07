@@ -24,7 +24,7 @@ use crate::song::{Song, SongOrigin};
 use super::connection::{with_conn, with_conn_mut};
 use super::songs::{append_songs, update_library_meta};
 
-const SCHEMA_VERSION: i32 = 2;
+const SCHEMA_VERSION: i32 = 4;
 
 static MIGRATING: AtomicBool = AtomicBool::new(false);
 static MIGRATION_TOTAL: AtomicUsize = AtomicUsize::new(0);
@@ -122,6 +122,54 @@ pub(super) fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
                 ON playlist_songs(playlist_id, position);
             CREATE INDEX IF NOT EXISTS idx_playlist_songs_song
                 ON playlist_songs(song_id);
+        ",
+        )?;
+    }
+    if v < 3 {
+        // No foreign key to `songs` on purpose: a rescan clears that table and
+        // this history has to survive it. See `play_stats`.
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS song_play_stats (
+                file_hash TEXT PRIMARY KEY,
+                sung_count INTEGER NOT NULL DEFAULT 0,
+                skip_count INTEGER NOT NULL DEFAULT 0,
+                last_played_at INTEGER NOT NULL DEFAULT 0
+            );
+        ",
+        )?;
+    }
+    if v < 4 {
+        // One row per video an import is working through, denormalised onto the
+        // job that submitted it: a queue is read whole and never joined, so the
+        // repeated job columns cost less than a second table would.
+        //
+        // No foreign key to `songs`: a row here describes a file that does not
+        // exist yet, and the terminal rows outlive the run so the import screen
+        // can still show what happened.
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS import_queue (
+                video_id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL,
+                duration_secs REAL NOT NULL DEFAULT 0,
+                playlist_id TEXT,
+                playlist_title TEXT,
+                status TEXT NOT NULL CHECK (status IN (
+                    'draft', 'queued', 'downloading', 'imported', 'skipped', 'failed'
+                )),
+                pct REAL NOT NULL DEFAULT 0,
+                reason TEXT,
+                submitted_by TEXT NOT NULL CHECK (submitted_by IN ('desktop', 'phone')),
+                position INTEGER NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_import_queue_job
+                ON import_queue(job_id, position);
+            CREATE INDEX IF NOT EXISTS idx_import_queue_status
+                ON import_queue(status);
         ",
         )?;
     }

@@ -7,6 +7,8 @@ import { freqToSemitone, snapToRefOctave } from '@/features/playback/lib/pitch/s
 import { usePlaybackMicState } from '@/features/playback/providers';
 import type { Rgb } from '@/types/Rgb';
 
+import { ABOVE_PLAYBACK_BAR_CLASS } from './playback-bar';
+
 type CanvasLayout = {
   width: number;
   height: number;
@@ -332,7 +334,8 @@ export function PitchGraph({ series, position = 'top', scale = 1 }: PitchGraphPr
     return null;
   }
 
-  const positionClass = position === 'bottom' ? 'bottom-2 sm:bottom-3' : 'top-2 sm:top-3';
+  // A bottom graph clears the playback bar the same way the bottom HUD does.
+  const positionClass = position === 'bottom' ? ABOVE_PLAYBACK_BAR_CLASS : 'top-2 sm:top-3';
 
   return (
     <div

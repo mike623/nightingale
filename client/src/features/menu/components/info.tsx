@@ -1,8 +1,11 @@
+import { StethoscopeIcon } from 'lucide-react';
 import { useRef } from 'react';
 
+import { DIAGNOSTICS_SUPPORTED } from '@/bridge/diagnostics';
 import { openUrl } from '@/bridge/opener';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
+import { useAppVersion } from '@/features/menu/queries/use-app-version';
 import { Button } from '@/shared/components/ui/button';
 import {
   Dialog,
@@ -14,8 +17,6 @@ import {
 import { Separator } from '@/shared/components/ui/separator';
 import { Table, TableBody, TableCell, TableRow } from '@/shared/components/ui/table';
 import { cn } from '@/shared/utils/cn';
-
-import { version } from '../../../../package.json';
 
 const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -42,15 +43,20 @@ const attributions = [
 ];
 
 export const InfoDialog = () => {
-  const { mode, close } = useDialog();
+  const { mode, close, setMode } = useDialog();
+  const version = useAppVersion();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   const open = mode === 'about';
 
+  // The browser build has no log file of its own to show, so it has no
+  // Doctor to offer and one fewer stop to walk through.
+  const closeIndex = DIAGNOSTICS_SUPPORTED ? 3 : 2;
+
   const { focusedIndex } = useDialogNav({
     open,
-    itemCount: 3,
+    itemCount: closeIndex + 1,
     onBack: close,
     containerRef,
   });
@@ -87,7 +93,7 @@ export const InfoDialog = () => {
               </Button>
             </div>
             <div className="text-sm text-muted-foreground">
-              <p>Version {version}</p>
+              <p>Version {version ?? '\u2026'}</p>
               <p>License: GPL-3.0-or-later</p>
             </div>
           </DialogHeader>
@@ -108,12 +114,25 @@ export const InfoDialog = () => {
             </Table>
           </div>
           <DialogFooter>
+            {DIAGNOSTICS_SUPPORTED && (
+              <Button
+                variant="outline"
+                onClick={() => setMode('doctor')}
+                className={cn(
+                  'focus-visible:ring-0 focus-visible:border-transparent',
+                  focusedIndex === 2 && 'ring-2 ring-primary',
+                )}
+              >
+                <StethoscopeIcon />
+                Doctor
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={close}
               className={cn(
                 'focus-visible:ring-0 focus-visible:border-transparent',
-                focusedIndex === 2 && 'ring-2 ring-primary',
+                focusedIndex === closeIndex && 'ring-2 ring-primary',
               )}
             >
               Close

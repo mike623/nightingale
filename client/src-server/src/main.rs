@@ -1,7 +1,6 @@
 mod bootstrap;
 mod commands;
 mod events;
-mod jukebox;
 mod media;
 mod state;
 mod static_files;
@@ -71,7 +70,48 @@ async fn main() -> Result<(), String> {
         pin_folder_library(library);
     }
 
-    let state = AppState::new(data.is_some(), library.is_some());
+    let listener = match tokio::net::TcpListener::bind(args.bind).await {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::error!("failed to bind {}: {e}", args.bind);
+            std::process::exit(1);
+        }
+    };
+
+    // Bind first: with `:0` the configured port is not the one phones must
+    // dial, and the bootstrap response carries that URL.
+    let bind_port = match listener.local_addr() {
+        Ok(addr) => addr.port(),
+        Err(e) => {
+            tracing::error!("bound listener has no local address: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let state = AppState::new(data.is_some(), library.is_some(), bind_port);
+
+    // The import worker is the same one the desktop runs; only the way it
+    // announces itself differs. `run_import_worker` never returns, so it owns a
+    // blocking thread rather than a task on the async runtime.
+    {
+        let events = state.events.clone();
+        std::thread::spawn(move || {
+            app_core::run_import_worker(|event| match event {
+                app_core::ImportEvent::Progress(progress) => {
+                    events.emit("import-progress", &progress);
+                }
+                app_core::ImportEvent::Done(report) => events.emit("import-done", &report),
+                app_core::ImportEvent::Error(error) => events.emit("import-error", &error),
+            });
+        });
+    }
+
+    let party = {
+        let events = state.events.clone();
+        remote::party::PartyState::new(state.playback_queue.clone(), move |entries| {
+            events.emit("playback-queue-changed", &entries);
+        })
+    };
 
     let app = Router::new()
         .route("/api/bootstrap", get(bootstrap::handle))
@@ -80,15 +120,8 @@ async fn main() -> Result<(), String> {
         .route("/media/:hash/:kind", get(media::handle_hashed))
         .route("/ws", any(ws::handle_upgrade))
         .fallback(static_files::handle)
-        .with_state(state.clone());
-
-    let listener = match tokio::net::TcpListener::bind(args.bind).await {
-        Ok(l) => l,
-        Err(e) => {
-            tracing::error!("failed to bind {}: {e}", args.bind);
-            std::process::exit(1);
-        }
-    };
+        .with_state(state.clone())
+        .merge(remote::party::router(party));
 
     tracing::info!(addr = %args.bind, "Nightingale self-hosted server listening");
 

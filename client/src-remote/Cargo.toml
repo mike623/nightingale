@@ -1,0 +1,31 @@
+[package]
+name = "remote"
+version = "1.2.0"
+description = "Nightingale remote-control relay shared by the desktop and self-hosted targets."
+authors = ["rzru <rzzzzru@gmail.com>"]
+license = "GPL-3.0"
+edition = "2021"
+
+[features]
+# The standalone listener (its own axum router plus the embedded SPA). The
+# self-hosted server already owns a router and a static handler, so it depends
+# on this crate without the feature and reuses only the relay.
+listener = ["party", "dep:rust-embed", "dep:mime_guess", "tokio/net"]
+
+# The library and queue surface the phone page calls. Both targets serve it,
+# so it lives here rather than in either binary.
+party = ["dep:app-core"]
+
+[dependencies]
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1", features = ["macros", "rt", "sync"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures-util = "0.3"
+tracing = "0.1"
+rust-embed = { version = "8", features = ["compression"], optional = true }
+mime_guess = { version = "2", optional = true }
+app-core = { path = "../../app-core", optional = true }
+
+[lints]
+workspace = true

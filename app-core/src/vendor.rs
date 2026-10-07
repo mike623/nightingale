@@ -66,6 +66,105 @@ pub(crate) fn ffmpeg_path() -> PathBuf {
     vendor_dir().join(name)
 }
 
+pub(crate) fn ytdlp_path() -> PathBuf {
+    let name = if cfg!(windows) {
+        "yt-dlp.exe"
+    } else {
+        "yt-dlp"
+    };
+    vendor_dir().join(name)
+}
+
+fn ytdlp_download_url() -> Result<String, String> {
+    let base = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
+    let file = match (std::env::consts::OS, std::env::consts::ARCH) {
+        // macOS ships a universal2 standalone binary.
+        ("macos", _) => "yt-dlp_macos",
+        ("linux", "x86_64") => "yt-dlp_linux",
+        ("linux", "aarch64") => "yt-dlp_linux_aarch64",
+        ("windows", _) => "yt-dlp.exe",
+        (os, arch) => return Err(format!("Unsupported platform for yt-dlp: {os}-{arch}")),
+    };
+    Ok(format!("{base}/{file}"))
+}
+
+/// How long a successful `yt-dlp -U` keeps the binary considered current.
+/// yt-dlp breaks when YouTube changes its internals, which is frequent but not
+/// hourly; a day bounds the staleness window without putting a GitHub round
+/// trip in front of every probe and download.
+const YTDLP_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+fn ytdlp_update_marker() -> PathBuf {
+    vendor_dir().join(".ytdlp-updated")
+}
+
+fn ytdlp_update_is_recent() -> bool {
+    std::fs::metadata(ytdlp_update_marker())
+        .and_then(|m| m.modified())
+        .and_then(|t| t.elapsed().map_err(std::io::Error::other))
+        .is_ok_and(|age| age < YTDLP_UPDATE_INTERVAL)
+}
+
+/// Runs `yt-dlp -U` unless a successful update is still within
+/// `YTDLP_UPDATE_INTERVAL`. Non-fatal — the (possibly older) binary still runs.
+fn update_ytdlp(dest: &Path) -> bool {
+    if ytdlp_update_is_recent() {
+        return true;
+    }
+
+    match silent_command(dest).arg("-U").output() {
+        Ok(o) if o.status.success() => {
+            let _ = std::fs::write(ytdlp_update_marker(), b"");
+            true
+        }
+        Ok(o) => {
+            tracing::warn!(
+                "[ytdlp] self-update failed: {}",
+                String::from_utf8_lossy(&o.stderr)
+            );
+            false
+        }
+        Err(e) => {
+            tracing::warn!("[ytdlp] could not run self-update: {e}");
+            false
+        }
+    }
+}
+
+/// Lazily ensure yt-dlp is present (downloaded on the first Import, not at
+/// launch — see docs/adr/0002) and keep it current, since yt-dlp breaks
+/// whenever YouTube changes its internals. A failed update on an
+/// already-present binary is non-fatal; a failed initial download is fatal.
+///
+/// Returns the binary path and whether the binary is considered current. The
+/// caller uses the flag to surface a clear "yt-dlp outdated" error when a
+/// subsequent download fails after a failed update (rather than a generic
+/// failure).
+///
+/// Concurrent callers (the import popup probes several links at once) are
+/// serialized so they share one download and one update attempt instead of
+/// racing on the same path.
+pub(crate) fn ensure_ytdlp() -> Result<(PathBuf, bool), String> {
+    static GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = GUARD.lock().unwrap_or_else(|e| e.into_inner());
+
+    let dest = ytdlp_path();
+
+    if !dest.is_file() {
+        let _ = std::fs::create_dir_all(vendor_dir());
+        download_to_file(&ytdlp_download_url()?, &dest)
+            .map_err(|e| format!("Failed to download yt-dlp: {e}"))?;
+        mark_executable(&dest)?;
+        // A freshly downloaded latest release needs no self-update.
+        let _ = std::fs::write(ytdlp_update_marker(), b"");
+        return Ok((dest, true));
+    }
+
+    let updated = update_ytdlp(&dest);
+
+    Ok((dest, updated))
+}
+
 pub(crate) fn python_path() -> PathBuf {
     if cfg!(windows) {
         vendor_dir().join("venv").join("Scripts").join("python.exe")
@@ -704,6 +803,7 @@ pub fn step_install_packages() -> Result<(), String> {
     if gpu.legacy_torch {
         pkg_args.push("torch<2.3");
         pkg_args.push("torchaudio<2.3");
+        pkg_args.push("numba<0.63");
     }
 
     pkg_args.push("--python");

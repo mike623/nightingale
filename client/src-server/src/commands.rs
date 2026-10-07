@@ -55,6 +55,15 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
         // ── Init/window stubs ────────────────────────────────────────────
         "frontend_ready" | "window_immersive" | "minimize_window" => Ok(Value::Null),
 
+        // ── Import ───────────────────────────────────────────────────────
+        // Read-only: the self-hosted build has no import page of its own, but
+        // it runs the same worker, so the queue is what shows a phone's
+        // submission moving.
+        "import_queue" => Ok(serde_json::to_value(app_core::import_queue()).map_err(serde_err)?),
+        "clear_finished_imports" => {
+            Ok(serde_json::to_value(app_core::clear_finished_imports()).map_err(serde_err)?)
+        }
+
         // ── Config ───────────────────────────────────────────────────────
         "load_config" => Ok(serde_json::to_value(AppConfig::load()).map_err(serde_err)?),
         "save_config" => save_config_cmd(payload),
@@ -71,9 +80,18 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
             app_core::clear_models();
             Ok(Value::Null)
         }
+        "clear_songs_command" => {
+            app_core::clear_songs();
+            Ok(Value::Null)
+        }
+        "sweep_orphan_cache_command" => {
+            let report = app_core::sweep_orphan_cache().map_err(ApiError::bad_request)?;
+            Ok(serde_json::to_value(report).map_err(serde_err)?)
+        }
         "clear_all" => {
             app_core::clear_models();
             app_core::clear_videos();
+            app_core::clear_songs();
             Ok(Value::Null)
         }
 
@@ -302,6 +320,43 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
                     .map_err(serde_err)?,
             )
         }
+        "rename_song" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                file_hash: String,
+                title: Option<String>,
+                artist: Option<String>,
+            }
+            let args: Args = deserialize(payload)?;
+            let song = app_core::rename_song(&args.file_hash, args.title, args.artist)
+                .map_err(ApiError::bad_request)?;
+            Ok(serde_json::to_value(song).map_err(serde_err)?)
+        }
+        "record_song_play" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                file_hash: String,
+                sung: bool,
+            }
+            let args: Args = deserialize(payload)?;
+            app_core::record_song_play(&args.file_hash, args.sung)
+                .map_err(ApiError::bad_request)?;
+            Ok(Value::Null)
+        }
+        "pick_next_song" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                #[serde(default)]
+                exclude_file_hash: Option<String>,
+            }
+            let args: Args = deserialize(payload)?;
+            let song = app_core::pick_next_song(args.exclude_file_hash.as_deref())
+                .map_err(|e| ApiError::internal(e.to_string()))?;
+            Ok(serde_json::to_value(song).map_err(serde_err)?)
+        }
         "load_songs_meta" => Ok(serde_json::to_value(SongsStore::load_meta()).map_err(serde_err)?),
         "load_analysis_queue" => {
             Ok(serde_json::to_value(AnalysisQueue::load()).map_err(serde_err)?)
@@ -329,6 +384,12 @@ async fn dispatch(state: AppState, name: &str, payload: Value) -> CmdResult {
             let args: SongTargetArgs = deserialize(payload)?;
             Ok(Value::from(
                 app_core::delete_cache(args.target).map_err(ApiError::internal)?,
+            ))
+        }
+        "delete_song" => {
+            let args: SongTargetArgs = deserialize(payload)?;
+            Ok(Value::from(
+                app_core::delete_song(args.target).map_err(ApiError::bad_request)?,
             ))
         }
         "reanalyze_transcript" => {

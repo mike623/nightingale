@@ -3,6 +3,10 @@ import { useMemo } from 'react';
 
 import { DIALOG_FOCUSABLE_SELECTOR, useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
 import {
+  MAX_SEMITONE_TOLERANCE,
+  MIN_SEMITONE_TOLERANCE,
+} from '@/features/playback/lib/pitch/constants';
+import {
   MIC_LATENCY_MAX,
   MIC_LATENCY_STEP,
   MIC_MONITOR_GAIN_MAX,
@@ -52,6 +56,7 @@ type UseSettingsNavigationOptions = {
   micLatencySec: number;
   lyricsScale: number;
   pitchGraphScale: number;
+  scoringTolerance: number;
   vocalThresholdPct: number;
   onBack: () => void;
   onTabChange: (tab: SettingsTab) => void;
@@ -59,6 +64,7 @@ type UseSettingsNavigationOptions = {
   onMicLatencyChange: (latencySec: number) => void;
   onLyricsScaleChange: (scale: number) => void;
   onPitchGraphScaleChange: (scale: number) => void;
+  onScoringToleranceChange: (semitones: number) => void;
   onVocalThresholdChange: (pct: number) => void;
 };
 
@@ -70,6 +76,7 @@ export function useSettingsNavigation({
   micLatencySec,
   lyricsScale,
   pitchGraphScale,
+  scoringTolerance,
   vocalThresholdPct,
   onBack,
   onTabChange,
@@ -77,6 +84,7 @@ export function useSettingsNavigation({
   onMicLatencyChange,
   onLyricsScaleChange,
   onPitchGraphScaleChange,
+  onScoringToleranceChange,
   onVocalThresholdChange,
 }: UseSettingsNavigationOptions) {
   const stops = useMemo(() => getSettingsStops(tab, isParakeet), [tab, isParakeet]);
@@ -117,6 +125,18 @@ export function useSettingsNavigation({
         if (segment === NAV.playback.pitchGraphScale) {
           onPitchGraphScaleChange(
             Math.min(PLAYBACK_SCALE_MAX, Math.max(PLAYBACK_SCALE_MIN, pitchGraphScale + delta)),
+          );
+          return true;
+        }
+        if (segment === NAV.playback.scoringTolerance) {
+          // Tolerance is whole semitones, so it steps by one rather than by
+          // the fractional scale step the size sliders use.
+          const semitoneDelta = action.right ? 1 : -1;
+          onScoringToleranceChange(
+            Math.min(
+              MAX_SEMITONE_TOLERANCE,
+              Math.max(MIN_SEMITONE_TOLERANCE, scoringTolerance + semitoneDelta),
+            ),
           );
           return true;
         }

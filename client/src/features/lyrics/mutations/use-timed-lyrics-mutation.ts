@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { applyTimedLyrics, provideLrc } from '@/bridge/lyrics';
-import { ANALYSIS_QUEUE, LYRICS, MENU, SONGS, SONGS_META } from '@/shared/query-keys';
+import { applyTimedLyrics, clearLyrics, provideLrc } from '@/bridge/lyrics';
+import { ANALYSIS_QUEUE, LYRICS, MENU, SONGS, SONGS_META, TRANSCRIPT } from '@/shared/query-keys';
 
-const LYRICS_QUERY_KEYS = [LYRICS, MENU, SONGS, SONGS_META, ANALYSIS_QUEUE];
+const LYRICS_QUERY_KEYS = [LYRICS, TRANSCRIPT, MENU, SONGS, SONGS_META, ANALYSIS_QUEUE];
 
 const invalidateLyricsQueries = (queryClient: ReturnType<typeof useQueryClient>) => {
   for (const key of LYRICS_QUERY_KEYS) {
@@ -53,6 +53,26 @@ export const useApplyTimedLyricsMutation = () => {
     onSuccess: () => invalidateLyricsQueries(queryClient),
     onError: (error: Error) => {
       toast.error(`Error while applying timed lyrics: ${error.message}`);
+    },
+  });
+};
+
+export type ClearLyricsInput = {
+  hash: string;
+  title: string;
+};
+
+export const useClearLyricsMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ hash, title }: ClearLyricsInput) => {
+      await clearLyrics(hash);
+      toast.info(`Removed lyrics from "${title}"`);
+    },
+    onSuccess: () => invalidateLyricsQueries(queryClient),
+    onError: (error: Error) => {
+      toast.error(`Error while removing lyrics: ${error.message}`);
     },
   });
 };

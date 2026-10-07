@@ -91,6 +91,39 @@ export function NumberButtonGroup({
   );
 }
 
+type OnOffButtonGroupProps = {
+  value: boolean;
+  segment: number;
+  getFocusClassName: (segment: number, slot?: number) => string;
+  onChange: (value: boolean) => void;
+};
+
+export function OnOffButtonGroup({
+  value,
+  segment,
+  getFocusClassName,
+  onChange,
+}: OnOffButtonGroupProps) {
+  return (
+    <ButtonGroup>
+      <Button
+        variant={value ? 'outline' : 'default'}
+        onClick={() => onChange(false)}
+        className={getFocusClassName(segment, 0)}
+      >
+        Off
+      </Button>
+      <Button
+        variant={value ? 'default' : 'outline'}
+        onClick={() => onChange(true)}
+        className={getFocusClassName(segment, 1)}
+      >
+        On
+      </Button>
+    </ButtonGroup>
+  );
+}
+
 export function PageHeader() {
   return (
     <div className="space-y-1">

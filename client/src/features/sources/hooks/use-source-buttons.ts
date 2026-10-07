@@ -1,5 +1,6 @@
-import { Disc3Icon, FolderIcon, RefreshCwIcon } from 'lucide-react';
+import { Disc3Icon, FolderIcon, RefreshCwIcon, YoutubeIcon } from 'lucide-react';
 import { useMemo, type ComponentType, type SVGProps } from 'react';
+import { useNavigate } from 'react-router';
 
 import type { BadgeTone } from '@/features/menu/components/sidebar/source-action-button';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
@@ -62,12 +63,14 @@ const remoteBadge = ({
  */
 export const useSourceButtons = (): SourceButton[] => {
   const { setMode } = useDialog();
+  const navigate = useNavigate();
   const {
     selectFolder,
     rescan,
     rescanDisabled,
     isPending,
     hasSource,
+    isFolderSource,
     libraryPinned,
     jellyfinSource,
     navidromeSource,
@@ -150,6 +153,19 @@ export const useSourceButtons = (): SourceButton[] => {
           },
         ];
 
+    // Import from URL lives with the Folder library only — imported files land
+    // in the watched folder and are reaped by any remote source's scan (ADR-0001).
+    if (isFolderSource) {
+      buttons.push({
+        key: 'import',
+        icon: YoutubeIcon,
+        label: 'Import',
+        tooltip: 'Import a YouTube video or playlist',
+        handler: () => void navigate('/import'),
+        disabled: isPending,
+      });
+    }
+
     if (hasSource) {
       buttons.push({
         key: 'rescan',
@@ -164,6 +180,8 @@ export const useSourceButtons = (): SourceButton[] => {
     return buttons;
   }, [
     hasSource,
+    isFolderSource,
+    navigate,
     libraryPinned,
     isPending,
     jellyfin,

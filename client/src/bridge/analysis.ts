@@ -22,6 +22,10 @@ export const deleteSongCache = async (target: SongTarget): Promise<number> => {
   return await invoke<number>('delete_song_cache', { target });
 };
 
+export const deleteSong = async (target: SongTarget): Promise<number> => {
+  return await invoke<number>('delete_song', { target });
+};
+
 export const reanalyzeTranscript = async (
   target: SongTarget,
   language?: string,
