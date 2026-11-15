@@ -50,20 +50,6 @@ pub(crate) fn start_import(preview: ImportPreview) -> Result<Vec<ImportQueueRow>
     app_core::submit_import(&preview, ImportSubmitter::Desktop)
 }
 
-/// The whole import queue, including rows from runs that have already ended —
-/// what the import screen renders.
-#[tauri::command]
-pub(crate) fn import_queue() -> Vec<ImportQueueRow> {
-    app_core::import_queue()
-}
-
-/// Forget the queue rows of runs that have ended. Anything still queued or
-/// downloading is left alone.
-#[tauri::command]
-pub(crate) fn clear_finished_imports() -> usize {
-    app_core::clear_finished_imports()
-}
-
 /// Start the one worker that drains the import queue, announcing what it does
 /// on the events the UI already listens for.
 pub(crate) fn spawn_import_worker(app: AppHandle) {

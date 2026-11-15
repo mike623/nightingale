@@ -7,18 +7,33 @@ import {
   ImageIcon,
   LanguagesIcon,
   MicIcon,
+  PackageIcon,
   PencilLineIcon,
   RefreshCwIcon,
+  ScrollTextIcon,
   Trash2Icon,
   XCircleIcon,
   YoutubeIcon,
 } from 'lucide-react';
 
 import { FILE_MANAGER_NAME } from '@/bridge/platform';
+import { t } from '@/i18n';
 import type { Song } from '@/types/Song';
 
 import type { SongStatusInfo } from '../song/song-status';
 import type { ActionItemProps } from './action-item';
+
+function bundleActionCaps(
+  song: Song,
+  status: SongStatusInfo,
+): { canExport: boolean; canViewLyrics: boolean } {
+  const isNge = song.path.toLowerCase().endsWith('.nge');
+  const ready = status.isReady === true;
+  return {
+    canExport: ready && !isNge,
+    canViewLyrics: ready && isNge,
+  };
+}
 
 type AnalysisHandler = (fileHash: string) => void | Promise<void>;
 
@@ -47,12 +62,77 @@ type BuildActionGroupsParams = {
   onEditLyrics: () => void;
   onChangeLanguage: () => void;
   onDeleteSong: () => void;
+  onExport: () => void;
+  onViewLyrics: () => void;
   run: (
     message: string,
     action: () => void | boolean | undefined | Promise<void | boolean | undefined>,
     onFalse?: string,
   ) => () => Promise<void>;
 };
+
+type FileActionParams = Pick<
+  BuildActionGroupsParams,
+  'song' | 'analysisBusy' | 'youtube' | 'onRevealFile' | 'onDeleteSong'
+>;
+
+/** Actions on the song's file itself rather than on its analysis. */
+function fileActionGroups({
+  song,
+  analysisBusy,
+  youtube,
+  onRevealFile,
+  onDeleteSong,
+}: FileActionParams): ActionItemProps[][] {
+  const groups: ActionItemProps[][] = [];
+
+  if (youtube !== null) {
+    groups.push([
+      {
+        icon: DownloadIcon,
+        title: 'library.songDetails.songActions.redownloadVideo',
+        description: 'library.songDetails.songActions.redownloadVideoDescription',
+        disabled: analysisBusy,
+        onClick: youtube.onRedownload,
+      },
+      {
+        icon: YoutubeIcon,
+        title: 'library.songDetails.songActions.openOnYoutube',
+        description: 'library.songDetails.songActions.openOnYoutubeDescription',
+        onClick: youtube.onOpen,
+      },
+    ]);
+  }
+
+  if (onRevealFile !== null) {
+    groups.push([
+      {
+        icon: FolderOpenIcon,
+        title: 'library.songDetails.songActions.showInFileManager',
+        titleValues: { name: FILE_MANAGER_NAME },
+        description: 'library.songDetails.songActions.showInFileManagerDescription',
+        onClick: onRevealFile,
+      },
+    ]);
+  }
+
+  // Only a song whose bytes we own can be deleted. Remote-origin songs live on
+  // someone else's server, so `song.path` is just a local materialisation.
+  if (song.origin.kind === 'local_file') {
+    groups.push([
+      {
+        icon: FileX2Icon,
+        title: 'library.songDetails.songActions.deleteSong',
+        description: 'library.songDetails.songActions.deleteSongDescription',
+        destructive: true,
+        disabled: analysisBusy,
+        onClick: onDeleteSong,
+      },
+    ]);
+  }
+
+  return groups;
+}
 
 export function buildActionGroups({
   song,
@@ -65,28 +145,31 @@ export function buildActionGroups({
   onEditLyrics,
   onChangeLanguage,
   onDeleteSong,
+  onExport,
+  onViewLyrics,
   run,
 }: BuildActionGroupsParams): ActionItemProps[][] {
   const groups: ActionItemProps[][] = [];
 
   const supportsProvideLyrics = song.transcript_source !== 'Usdx';
+  const { canExport, canViewLyrics } = bundleActionCaps(song, status);
 
   if (status.isReady !== true) {
     const notReadyGroup: ActionItemProps[] = [
       analysisBusy
         ? {
             icon: XCircleIcon,
-            title: 'Cancel analysis',
-            description: 'Stop analysis and remove this song from the queue.',
+            title: 'library.songDetails.songActions.cancelAnalysis',
+            description: 'library.songDetails.songActions.stopAnalysisAndRemoveThisDescription',
             destructive: true,
-            onClick: run(`Cancelled analysis for "${song.title}"`, () =>
+            onClick: run(t('library.songActions.analysisCancelled', { title: song.title }), () =>
               analysis.cancelAnalysisOne(song.file_hash),
             ),
           }
         : {
             icon: AudioLinesIcon,
-            title: 'Analyze song',
-            description: 'Prepare lyrics, timing, key, tempo, and stems.',
+            title: 'library.songDetails.songActions.analyzeSong',
+            description: 'library.songDetails.songActions.prepareLyricsTimingKeyTempoAndStems',
             onClick: () => analysis.enqueueOne(song.file_hash),
           },
     ];
@@ -94,14 +177,25 @@ export function buildActionGroups({
     if (supportsProvideLyrics) {
       notReadyGroup.push({
         icon: PencilLineIcon,
-        title: 'Provide lyrics',
-        description: 'Paste timed LRC, or lyrics to align.',
+        title: 'library.songDetails.songActions.provideLyrics',
+        description: 'library.songDetails.songActions.pasteTimedLrcOrLyricsToAlign',
         disabled: analysisBusy,
         onClick: onEditLyrics,
       });
     }
 
     groups.push(notReadyGroup);
+  }
+
+  if (canViewLyrics) {
+    groups.push([
+      {
+        icon: ScrollTextIcon,
+        title: 'library.songDetails.songActions.viewLyrics',
+        description: 'library.songDetails.songActions.showTheLyricsForThisDescription',
+        onClick: onViewLyrics,
+      },
+    ]);
   }
 
   if (supportsAnalysisActions) {
@@ -112,15 +206,15 @@ export function buildActionGroups({
       groups.push([
         {
           icon: PencilLineIcon,
-          title: 'Edit lyrics (LRC)',
-          description: 'Replace or re-time the provided LRC.',
+          title: 'library.songDetails.songActions.editLyricsLrc',
+          description: 'library.songDetails.songActions.replaceOrReTimeTheProvidedLrc',
           onClick: onEditLyrics,
         },
         {
           icon: AudioLinesIcon,
-          title: 'Analyze with AI',
-          description: 'Replace the LRC with AI stems, lyrics, timing, and key.',
-          onClick: run(`Analyzing "${song.title}" with AI`, () =>
+          title: 'library.songDetails.songActions.analyzeWithAi',
+          description: 'library.songDetails.songActions.replaceTheLrcWithAiDescription',
+          onClick: run(t('library.songActions.analyzingWithAi', { title: song.title }), () =>
             analysis.reanalyzeFull(song.file_hash),
           ),
         },
@@ -129,31 +223,33 @@ export function buildActionGroups({
       groups.push([
         {
           icon: AlignLeftIcon,
-          title: 'Realign',
-          description: 'Rebuild timing from the current lyrics.',
-          onClick: run(`Realigning "${song.title}"`, () => analysis.realign(song.file_hash)),
+          title: 'library.songDetails.songActions.realign',
+          description: 'library.songDetails.songActions.rebuildTimingFromTheCurrentLyrics',
+          onClick: run(t('library.songActions.realigning', { title: song.title }), () =>
+            analysis.realign(song.file_hash),
+          ),
         },
         {
           icon: RefreshCwIcon,
-          title: 'Refetch lyrics & align',
-          description: 'Fetch fresh lyrics, then rebuild timing.',
-          onClick: run(`Refetching lyrics & aligning "${song.title}"`, () =>
+          title: 'library.songDetails.songActions.refetchLyricsAlign',
+          description: 'library.songDetails.songActions.fetchFreshLyricsThenRebuildTiming',
+          onClick: run(t('library.songActions.refetchingLyrics', { title: song.title }), () =>
             analysis.reanalyzeTranscript(song.file_hash),
           ),
         },
         {
           icon: MicIcon,
-          title: 'Force transcribe',
-          description: 'Ignore online lyrics and transcribe the vocals.',
-          onClick: run(`Force transcribing "${song.title}"`, () =>
+          title: 'library.songDetails.songActions.forceTranscribe',
+          description: 'library.songDetails.songActions.ignoreOnlineLyricsAndTranscribeTheVocals',
+          onClick: run(t('library.songActions.forceTranscribing', { title: song.title }), () =>
             analysis.reanalyzeForceTranscribe(song.file_hash),
           ),
         },
         {
           icon: AudioLinesIcon,
-          title: 'Full reanalysis',
-          description: 'Recreate stems, lyrics, timing, key, and tempo.',
-          onClick: run(`Full reanalysis (w/ stems) for "${song.title}"`, () =>
+          title: 'library.songDetails.songActions.fullReanalysis',
+          description: 'library.songDetails.songActions.recreateStemsLyricsTimingKeyAndTempo',
+          onClick: run(t('library.songActions.fullReanalysis', { title: song.title }), () =>
             analysis.reanalyzeFull(song.file_hash),
           ),
         },
@@ -162,14 +258,14 @@ export function buildActionGroups({
       groups.push([
         {
           icon: PencilLineIcon,
-          title: 'Edit lyrics',
-          description: 'Correct the words and rebuild their timing.',
+          title: 'library.songDetails.songActions.editLyrics',
+          description: 'library.songDetails.songActions.correctTheWordsAndRebuildTheirTiming',
           onClick: onEditLyrics,
         },
         {
           icon: LanguagesIcon,
-          title: 'Change language',
-          description: 'Set the language and choose how to reprocess.',
+          title: 'library.songDetails.songActions.changeLanguage',
+          description: 'library.songDetails.songActions.setTheLanguageAndChooseDescription',
           onClick: onChangeLanguage,
         },
       ]);
@@ -179,13 +275,12 @@ export function buildActionGroups({
       groups.push([
         {
           icon: ImageIcon,
-          title: 'Refresh metadata',
-          description:
-            'Reload title, artist, album, duration, and cover art from the library source.',
+          title: 'library.songDetails.songActions.refreshMetadata',
+          description: 'library.songDetails.songActions.reloadTitleArtistAlbumDurationDescription',
           onClick: run(
-            `Refreshed metadata for "${song.title}"`,
+            t('library.songActions.metadataRefreshed', { title: song.title }),
             () => analysis.refreshMetadata(song.file_hash),
-            `Nothing to refresh for "${song.title}"`,
+            t('library.songActions.nothingToRefresh', { title: song.title }),
           ),
         },
       ]);
@@ -194,60 +289,28 @@ export function buildActionGroups({
     groups.push([
       {
         icon: Trash2Icon,
-        title: 'Delete cache',
-        description: 'Remove every generated file for this song.',
+        title: 'library.songDetails.songActions.deleteCache',
+        description: 'library.songDetails.songActions.removeEveryGeneratedFileForThisSong',
         destructive: true,
-        onClick: run(`Cache deleted for "${song.title}"`, () =>
+        onClick: run(t('library.songActions.cacheDeleted', { title: song.title }), () =>
           analysis.deleteSongCache(song.file_hash),
         ),
       },
     ]);
   }
 
-  if (youtube !== null) {
+  if (canExport) {
     groups.push([
       {
-        icon: DownloadIcon,
-        title: 'Re-download video',
-        description:
-          'Fetch the video from YouTube again, replacing the file. Keeps lyrics, timing, and stems when the new video runs the same length.',
-        disabled: analysisBusy,
-        onClick: youtube.onRedownload,
-      },
-      {
-        icon: YoutubeIcon,
-        title: 'Open on YouTube',
-        description: 'Open the video this song was imported from in your browser.',
-        onClick: youtube.onOpen,
+        icon: PackageIcon,
+        title: 'library.songDetails.songActions.exportNge',
+        description: 'library.songDetails.songActions.createASingleFileBundleDescription',
+        onClick: onExport,
       },
     ]);
   }
 
-  if (onRevealFile !== null) {
-    groups.push([
-      {
-        icon: FolderOpenIcon,
-        title: `Show in ${FILE_MANAGER_NAME}`,
-        description: 'Open the folder holding this file, with the file selected.',
-        onClick: onRevealFile,
-      },
-    ]);
-  }
-
-  // Only a song whose bytes we own can be deleted. Remote-origin songs live on
-  // someone else's server, so `song.path` is just a local materialisation.
-  if (song.origin.kind === 'local_file') {
-    groups.push([
-      {
-        icon: FileX2Icon,
-        title: 'Delete song',
-        description: 'Permanently delete the file and its generated files.',
-        destructive: true,
-        disabled: analysisBusy,
-        onClick: onDeleteSong,
-      },
-    ]);
-  }
+  groups.push(...fileActionGroups({ song, analysisBusy, youtube, onRevealFile, onDeleteSong }));
 
   return groups;
 }

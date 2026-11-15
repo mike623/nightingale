@@ -2,7 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import { loadLyrics, loadSidecarLrc, searchLrclibLyrics } from '@/bridge/lyrics';
 import { loadTranscript } from '@/bridge/playback';
-import { linesFromTranscript, lrcFromTranscript } from '@/features/lyrics/utils/edit-lyrics';
+import {
+  linesFromTranscript,
+  lrcFromTranscript,
+  lrcFromWindows,
+} from '@/features/lyrics/utils/edit-lyrics';
 import { LRCLIB, LYRICS, SIDECAR_LRC } from '@/shared/query-keys';
 import type { LrclibCandidate } from '@/types/LrclibCandidate';
 import type { SidecarLrc } from '@/types/SidecarLrc';
@@ -24,7 +28,7 @@ const fetchInitialLyrics = async (fileHash: string): Promise<string> => {
 
   const file = await loadLyrics(fileHash);
   if (file && file.lines.length > 0) {
-    return file.lines.join('\n');
+    return file.windows ? lrcFromWindows(file.lines, file.windows) : file.lines.join('\n');
   }
 
   return transcript === null ? '' : linesFromTranscript(transcript);

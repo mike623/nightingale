@@ -1,8 +1,9 @@
 import {
   ChevronDown,
+  ChevronRight,
   Flame,
   FileQuestionMark,
-  DiscIcon,
+  FolderIcon,
   ListMusicIcon,
   UserIcon,
   type LucideIcon,
@@ -11,6 +12,8 @@ import { Fragment, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ANALYSIS_STATUS_STYLES } from '@/features/library/lib/analysis-status-styles';
+import { artistParents, visibleArtistAlbums } from '@/features/library/lib/artist-album-tree';
+import { folderParents, visibleFolders } from '@/features/library/lib/folder-tree';
 import {
   isLibraryMenuItemActive,
   libraryFilterFromMenuSelection,
@@ -18,6 +21,8 @@ import {
 } from '@/features/library/lib/library-menu-filter';
 import { useLibraryMenuItems } from '@/features/library/queries/use-library-menu-items';
 import { useLibraryFilter } from '@/features/menu/hooks/use-library-filter';
+import { useSidebarArtistsExpanded } from '@/features/menu/hooks/use-sidebar-artists-expanded';
+import { useSidebarFoldersExpanded } from '@/features/menu/hooks/use-sidebar-folders-expanded';
 import { useSidebarSectionsOpen } from '@/features/menu/hooks/use-sidebar-sections-open';
 import { useMenuFocus } from '@/features/menu/providers/menu-focus-context';
 import {
@@ -25,6 +30,7 @@ import {
   useSidebarRowFocus,
   type SidebarNavRow,
 } from '@/features/menu/providers/sidebar-nav-context';
+import { t, type TranslationKey } from '@/i18n';
 import { Badge } from '@/shared/components/ui/badge';
 import {
   Collapsible,
@@ -43,7 +49,9 @@ import {
   useSidebar,
 } from '@/shared/components/ui/sidebar';
 import { useIsMobile } from '@/shared/hooks/use-is-mobile';
+import { useLatestRef } from '@/shared/hooks/use-latest-ref';
 import { usePersistentScroll } from '@/shared/hooks/use-persistent-scroll';
+import { cn } from '@/shared/utils/cn';
 import type { LibraryMenuFilters } from '@/types/LibraryMenuFilters';
 import type { LibraryMenuItem } from '@/types/LibraryMenuItem';
 
@@ -51,31 +59,56 @@ import { FolderActions } from './folder-actions';
 
 type NavSectionConfig = {
   section: LibraryMenuSection;
-  label: string;
+  label: TranslationKey;
   icon: LucideIcon;
 };
 
 const NAV_SECTIONS: NavSectionConfig[] = [
-  { section: 'hot', label: 'Quick Filters', icon: Flame },
-  { section: 'no_metadata', label: 'No Metadata', icon: FileQuestionMark },
-  { section: 'artists', label: 'Artists', icon: UserIcon },
-  { section: 'albums', label: 'Albums', icon: DiscIcon },
-  { section: 'playlists', label: 'Playlists', icon: ListMusicIcon },
+  { section: 'hot', label: 'menu.sidebar.mainNavigation.quickFilters', icon: Flame },
+  {
+    section: 'no_metadata',
+    label: 'menu.sidebar.mainNavigation.noMetadata',
+    icon: FileQuestionMark,
+  },
+  { section: 'artists', label: 'menu.sidebar.mainNavigation.artists', icon: UserIcon },
+  { section: 'playlists', label: 'menu.sidebar.mainNavigation.playlists', icon: ListMusicIcon },
+  { section: 'folders', label: 'menu.sidebar.mainNavigation.folders', icon: FolderIcon },
 ];
+
+const MENU_ITEM_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
+  all: 'library.bulkActionsMenu.allSongs',
+  queued: 'library.songStatus.queued',
+  analysed: 'library.libraryToolbar.analyzed',
+  videos: 'menu.sidebar.stats.videos',
+  unknown_artist: 'profiles.leaderboards.unknownArtist',
+  unknown_album: 'library.songDetails.unknownAlbum',
+};
+
+// Artists, albums, folders, and playlists carry their own data label from the backend.
+const menuItemLabel = (item: LibraryMenuItem): string => {
+  const key = MENU_ITEM_LABEL_KEYS[item.value];
+  return key === undefined ? item.label : t(key);
+};
 
 type MenuItemCountsProps = {
   item: LibraryMenuItem;
 };
 
 function MenuItemCounts({ item }: MenuItemCountsProps) {
-  const segments = [
+  const segments: { label: TranslationKey; value: bigint; className: string }[] = [
     ...(item.count > 0n
-      ? [{ label: 'total', value: item.count, className: 'bg-muted text-muted-foreground' }]
+      ? [
+          {
+            label: 'menu.sidebar.mainNavigation.total' as const,
+            value: item.count,
+            className: 'bg-muted text-muted-foreground',
+          },
+        ]
       : []),
     ...(item.queuedCount > 0n
       ? [
           {
-            label: 'queued',
+            label: 'menu.sidebar.mainNavigation.queued' as const,
             value: item.queuedCount,
             className: ANALYSIS_STATUS_STYLES.queued,
           },
@@ -84,7 +117,7 @@ function MenuItemCounts({ item }: MenuItemCountsProps) {
     ...(item.analysingCount > 0n
       ? [
           {
-            label: 'analysing',
+            label: 'menu.sidebar.mainNavigation.analysing' as const,
             value: item.analysingCount,
             className: ANALYSIS_STATUS_STYLES.analysing,
           },
@@ -93,7 +126,7 @@ function MenuItemCounts({ item }: MenuItemCountsProps) {
     ...(item.analysedCount > 0n
       ? [
           {
-            label: 'analysed',
+            label: 'menu.sidebar.mainNavigation.analysed' as const,
             value: item.analysedCount,
             className: ANALYSIS_STATUS_STYLES.analysed,
           },
@@ -108,7 +141,7 @@ function MenuItemCounts({ item }: MenuItemCountsProps) {
   return (
     <Badge
       className="h-[1.125rem] shrink-0 gap-0 overflow-hidden border border-foreground/15 bg-transparent p-0 text-[0.55rem] font-medium leading-none"
-      title={segments.map(({ label, value }) => `${value} ${label}`).join(', ')}
+      title={segments.map(({ label, value }) => `${value} ${t(label)}`).join(', ')}
     >
       {segments.map(({ label, value, className }, index) => (
         <Fragment key={label}>
@@ -122,26 +155,85 @@ function MenuItemCounts({ item }: MenuItemCountsProps) {
   );
 }
 
+type TreeNode = {
+  expandable: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+};
+
+type ItemTree = {
+  parents: ReadonlySet<string>;
+  expanded: ReadonlySet<string>;
+  onToggle: (value: string) => void;
+};
+
+const itemSection = (section: LibraryMenuSection, item: LibraryMenuItem): LibraryMenuSection =>
+  section === 'artists' && item.depth === 1 ? 'albums' : section;
+
 type LibraryNavSubItemProps = {
   section: LibraryMenuSection;
   item: LibraryMenuItem;
   filter: LibraryMenuFilters;
   onSelectItem: (section: LibraryMenuSection, item: LibraryMenuItem) => void;
+  treeNode?: TreeNode;
 };
 
-function LibraryNavSubItem({ section, item, filter, onSelectItem }: LibraryNavSubItemProps) {
-  const { isSidebarActive, isItemFocused, itemIndex } = useSidebarRowFocus(section, item.value);
+type TreeToggleProps = {
+  node: TreeNode;
+  label: string;
+};
+
+function TreeToggle({ node, label }: TreeToggleProps) {
+  if (!node.expandable) {
+    return <span aria-hidden className="size-5 shrink-0" />;
+  }
   return (
-    <SidebarMenuSubItem>
+    <button
+      type="button"
+      aria-label={t(
+        node.expanded ? 'menu.mainNavigation.collapseLabel' : 'menu.mainNavigation.expandLabel',
+        { label },
+      )}
+      aria-expanded={node.expanded}
+      onClick={node.onToggle}
+      className="flex size-5 shrink-0 items-center justify-center rounded-sm text-sidebar-foreground/70 hover:bg-sidebar-accent"
+    >
+      <ChevronRight
+        className={cn(
+          'size-3.5 transition-transform motion-reduce:transition-none',
+          node.expanded && 'rotate-90',
+        )}
+      />
+    </button>
+  );
+}
+
+function LibraryNavSubItem({
+  section,
+  item,
+  filter,
+  onSelectItem,
+  treeNode,
+}: LibraryNavSubItemProps) {
+  const { isSidebarActive, isItemFocused, itemIndex } = useSidebarRowFocus(section, item.value);
+  const depth = item.depth ?? 0;
+  return (
+    <SidebarMenuSubItem
+      className={cn(treeNode && 'flex items-center gap-0.5')}
+      style={depth > 0 ? { paddingInlineStart: `${depth * 0.75}rem` } : undefined}
+    >
+      {treeNode && <TreeToggle node={treeNode} label={menuItemLabel(item)} />}
       <SidebarMenuButton
         data-sidebar-nav-index={itemIndex}
         isActive={isLibraryMenuItemActive(section, item, filter)}
-        className={`flex h-fit items-center justify-between gap-2 px-2 py-1.5 hover:ring-primary ${
-          isSidebarActive && isItemFocused ? 'ring-2 ring-primary bg-sidebar-accent' : ''
-        }`}
+        className={cn(
+          'flex h-fit items-center justify-between gap-2 px-2 py-1.5 hover:ring-primary',
+          treeNode && 'min-w-0 flex-1',
+          isSidebarActive && isItemFocused && 'ring-2 ring-primary bg-sidebar-accent',
+        )}
         onClick={() => onSelectItem(section, item)}
       >
-        {item.label}
+        {menuItemLabel(item)}
         <MenuItemCounts item={item} />
       </SidebarMenuButton>
     </SidebarMenuSubItem>
@@ -154,6 +246,7 @@ type LibraryNavSectionProps = {
   open: boolean;
   onToggleOpen: (open: boolean) => void;
   onSelectItem: (section: LibraryMenuSection, item: LibraryMenuItem) => void;
+  itemTree?: ItemTree;
 } & NavSectionConfig;
 
 function LibraryNavSection({
@@ -165,6 +258,7 @@ function LibraryNavSection({
   open,
   onToggleOpen,
   onSelectItem,
+  itemTree,
 }: LibraryNavSectionProps) {
   const { isSidebarActive, isCollapseFocused, collapseIndex } = useSidebarRowFocus(section);
 
@@ -180,22 +274,32 @@ function LibraryNavSection({
           >
             <span className="flex items-center gap-2">
               <Icon className="size-4 shrink-0" />
-              {label}
+              {t(label)}
             </span>
             <ChevronDown className="transition-transform group-data-[state=open]/collapsible:rotate-180" />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub className="mr-0 pr-0">
-            {items.map((item) => (
-              <LibraryNavSubItem
-                key={`${section}:${item.value}`}
-                section={section}
-                item={item}
-                filter={filter}
-                onSelectItem={onSelectItem}
-              />
-            ))}
+            {items.map((item) => {
+              const sectionForItem = itemSection(section, item);
+              return (
+                <LibraryNavSubItem
+                  key={`${sectionForItem}:${item.value}`}
+                  section={sectionForItem}
+                  item={item}
+                  filter={filter}
+                  onSelectItem={onSelectItem}
+                  treeNode={
+                    itemTree && {
+                      expandable: itemTree.parents.has(item.value),
+                      expanded: itemTree.expanded.has(item.value),
+                      onToggle: () => itemTree.onToggle(item.value),
+                    }
+                  }
+                />
+              );
+            })}
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>
@@ -224,6 +328,9 @@ export const MainNavigation = ({
   const navigate = useNavigate();
   const { setScrollContainer } = usePersistentScroll('sidebar');
   const [openBySection, setOpenBySection] = useSidebarSectionsOpen();
+  const [expandedArtists, setExpandedArtists] = useSidebarArtistsExpanded();
+  const [expandedFolders, setExpandedFolders] = useSidebarFoldersExpanded();
+  const filterRef = useLatestRef(filter);
 
   const selectMenuItem = useCallback(
     (section: LibraryMenuSection, item: LibraryMenuItem) => {
@@ -240,24 +347,96 @@ export const MainNavigation = ({
     [isMobile, navigate, setLibraryFilter, setOpen],
   );
 
+  const parentArtists = useMemo(() => artistParents(menu?.albums ?? []), [menu]);
+  const parentFolders = useMemo(() => folderParents(menu?.folders ?? []), [menu]);
+
+  const toggleArtist = useCallback(
+    (value: string) => {
+      setExpandedArtists((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(value)) {
+          next.add(value);
+        }
+        return next;
+      });
+    },
+    [setExpandedArtists],
+  );
+
+  const toggleFolder = useCallback(
+    (value: string) => {
+      setExpandedFolders((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(value)) {
+          next.add(value);
+        }
+        return next;
+      });
+    },
+    [setExpandedFolders],
+  );
+
+  // Activating a parent opens it; activating it again while selected closes it,
+  // so keyboard and gamepad can fold either tree too.
+  const activateMenuItem = useCallback(
+    (section: LibraryMenuSection, item: LibraryMenuItem) => {
+      const parents = section === 'artists' ? parentArtists : parentFolders;
+      const setExpanded = section === 'artists' ? setExpandedArtists : setExpandedFolders;
+      if ((section === 'artists' || section === 'folders') && parents.has(item.value)) {
+        const reselected = isLibraryMenuItemActive(section, item, filterRef.current);
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          if (reselected && prev.has(item.value)) {
+            next.delete(item.value);
+          } else {
+            next.add(item.value);
+          }
+          return next;
+        });
+      }
+      selectMenuItem(section, item);
+    },
+    [
+      filterRef,
+      parentArtists,
+      parentFolders,
+      selectMenuItem,
+      setExpandedArtists,
+      setExpandedFolders,
+    ],
+  );
+
   const visibleSections = useMemo(() => {
     if (!menu) {
       return [];
     }
 
-    return NAV_SECTIONS.map((config) =>
-      Object.assign(config, {
-        visibleItems: menu[config.section].filter(({ count }) => count > 0n),
-      }),
-    ).filter(({ visibleItems }) => visibleItems.length > 0);
-  }, [menu]);
+    return NAV_SECTIONS.map((config) => {
+      const items = menu[config.section].filter(({ count }) => count > 0n);
+      let visibleItems = items;
+      if (config.section === 'artists') {
+        visibleItems = visibleArtistAlbums(
+          items,
+          menu.albums.filter(({ count }) => count > 0n),
+          expandedArtists,
+        );
+      } else if (config.section === 'folders') {
+        visibleItems = visibleFolders(items, expandedFolders);
+      }
+      return Object.assign({}, config, { visibleItems });
+    }).filter(({ visibleItems }) => visibleItems.length > 0);
+  }, [menu, expandedArtists, expandedFolders]);
 
   const rows = useMemo<SidebarNavRow[]>(() => {
     return visibleSections.flatMap(({ section, visibleItems }) => {
       const sectionRows: SidebarNavRow[] = [{ kind: 'collapse', section }];
       if (openBySection[section]) {
         sectionRows.push(
-          ...visibleItems.map(({ value }) => ({ kind: 'item' as const, section, value })),
+          ...visibleItems.map((item) => ({
+            kind: 'item' as const,
+            section: itemSection(section, item),
+            value: item.value,
+          })),
         );
       }
       return sectionRows;
@@ -277,7 +456,7 @@ export const MainNavigation = ({
         if (!item) {
           return;
         }
-        selectMenuItem(row.section, item);
+        activateMenuItem(row.section, item);
       };
     });
 
@@ -286,7 +465,7 @@ export const MainNavigation = ({
     return () => {
       registerCallbacks([]);
     };
-  }, [rows, menu, selectMenuItem, registerCallbacks, setOpenBySection]);
+  }, [rows, menu, activateMenuItem, registerCallbacks, setOpenBySection]);
 
   const isSidebarActive = focus.active && focus.panel === 'sidebar';
 
@@ -306,6 +485,18 @@ export const MainNavigation = ({
   }, [focus.sidebarIndex, focus.source, isSidebarActive]);
 
   const showEmptyPlaceholder = !menu || visibleSections.length === 0;
+  const itemTrees: Partial<Record<LibraryMenuSection, ItemTree>> = {
+    artists: {
+      parents: parentArtists,
+      expanded: expandedArtists,
+      onToggle: toggleArtist,
+    },
+    folders: {
+      parents: parentFolders,
+      expanded: expandedFolders,
+      onToggle: toggleFolder,
+    },
+  };
 
   return (
     <SidebarContent className="overflow-hidden">
@@ -341,7 +532,8 @@ export const MainNavigation = ({
                     onToggleOpen={(open) => {
                       setOpenBySection((prev) => ({ ...prev, [config.section]: open }));
                     }}
-                    onSelectItem={selectMenuItem}
+                    onSelectItem={activateMenuItem}
+                    itemTree={itemTrees[config.section]}
                   />
                 ))}
               </SidebarNavProvider>

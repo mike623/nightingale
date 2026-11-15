@@ -15,10 +15,12 @@ use std::time::Duration;
 /// machine surfaces as a bind error when remote control is switched on.
 const REMOTE_PORT: u16 = 51737;
 
+use app_api::CommandState;
 use app_core::{PlaybackQueue, PlaybackQueueEntry};
 use remote::listener::RemoteListener;
 use remote::party::PartyState;
 use serde::Serialize;
+use server::EventBus;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -66,20 +68,23 @@ pub(crate) struct RemoteControl {
 /// The listener shares the queue the desktop already owns, and announces a
 /// phone's change on the same event the desktop's own queue calls emit, so
 /// the library screen and the phones never disagree about what is queued.
-fn party_state(app: &AppHandle, queue: Arc<PlaybackQueue>) -> PartyState {
+/// The event bus copy reaches the token-gated queue page's phones too.
+fn party_state(app: &AppHandle, events: Arc<EventBus>, queue: Arc<PlaybackQueue>) -> PartyState {
     let app = app.clone();
 
     PartyState::new(queue, move |entries: &[PlaybackQueueEntry]| {
         if let Err(error) = app.emit("playback-queue-changed", entries) {
             tracing::warn!("failed to announce a queue change from the remote: {error}");
         }
+        events.emit("playback-queue-changed", &entries);
     })
 }
 
 #[tauri::command]
 pub(crate) async fn remote_start(
     app: AppHandle,
-    queue: tauri::State<'_, Arc<PlaybackQueue>>,
+    commands: tauri::State<'_, CommandState>,
+    events: tauri::State<'_, Arc<EventBus>>,
     control: tauri::State<'_, RemoteControl>,
 ) -> Result<RemoteStatus, String> {
     // The setting is the switch, so nothing may bind the network port while it
@@ -95,7 +100,11 @@ pub(crate) async fn remote_start(
     }
 
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, REMOTE_PORT));
-    let listener = remote::listener::serve(addr, party_state(&app, queue.inner().clone())).await?;
+    let listener = remote::listener::serve(
+        addr,
+        party_state(&app, events.inner().clone(), commands.playback_queue()),
+    )
+    .await?;
     let status = RemoteStatus::running(listener.port());
     *guard = Some(listener);
     Ok(status)

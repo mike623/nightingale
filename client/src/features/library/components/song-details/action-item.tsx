@@ -1,12 +1,14 @@
 import type { LucideIcon } from 'lucide-react';
 
+import { t, type TranslationKey } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/shared/utils/cn';
 
 export type ActionItemProps = {
   icon: LucideIcon;
-  title: string;
-  description: string;
+  title: TranslationKey;
+  titleValues?: Record<string, string>;
+  description: TranslationKey;
   onClick: () => void | Promise<void>;
   disabled?: boolean;
   destructive?: boolean;
@@ -15,6 +17,7 @@ export type ActionItemProps = {
 export const ActionItem = ({
   icon: Icon,
   title,
+  titleValues,
   description,
   onClick,
   disabled,
@@ -38,7 +41,7 @@ export const ActionItem = ({
   >
     <Icon className="mt-0.5 size-4" />
     <span className="min-w-0">
-      <span className="block text-xs font-medium leading-tight">{title}</span>
+      <span className="block text-xs font-medium leading-tight">{t(title, titleValues)}</span>
       <span
         className={
           destructive === true
@@ -46,7 +49,7 @@ export const ActionItem = ({
             : 'mt-0.5 block text-[0.625rem] leading-tight text-muted-foreground'
         }
       >
-        {description}
+        {t(description)}
       </span>
     </span>
   </Button>

@@ -26,6 +26,8 @@ import {
   SEMITONE_TOLERANCE,
 } from '@/features/playback/lib/pitch/constants';
 import type { PitchSeries } from '@/features/playback/lib/pitch/state';
+import { t } from '@/i18n';
+import { defaultPlayerColor, type PlayerColor } from '@/shared/player-colors';
 import type { AppConfig } from '@/types/AppConfig';
 
 import {
@@ -37,6 +39,7 @@ export type PlaybackPlayerMicState = {
   id: string;
   profile: string | null;
   microphoneId: string | null;
+  color: PlayerColor;
   micName: string;
   pitchScore: number | null;
   rawScore: number;
@@ -50,6 +53,7 @@ export type PlaybackPlayerMicState = {
 export type PlaybackMicState = {
   multiplayer: boolean;
   players: PlaybackPlayerMicState[];
+  devices: readonly MicDevice[];
   micUserEnabled: boolean;
   micMonitorUserEnabled: boolean;
   selectedMicId: string | null;
@@ -67,6 +71,7 @@ export type PlaybackMicActions = {
   handleToggleMic: () => void;
   handleCycleMic: () => void;
   handleToggleMicMonitor: () => void;
+  selectMic: (deviceId: string) => void;
 };
 
 const EMPTY_PLAYERS: readonly PlaybackPlayer[] = [];
@@ -84,6 +89,7 @@ type MicPlayerConfig = {
   id: string;
   profile: string | null;
   microphoneId: string | null;
+  color: PlayerColor;
 };
 
 type InternalPlayerMicState = PlaybackPlayerMicState & { present: boolean };
@@ -114,19 +120,32 @@ const scoringTolerance = (config: AppConfig | null): number =>
     MAX_SEMITONE_TOLERANCE,
     Math.max(MIN_SEMITONE_TOLERANCE, config?.pitch_tolerance_semitones ?? SEMITONE_TOLERANCE),
   );
+const combineMultiChannel = (config: AppConfig | null, multiplayer: boolean): boolean =>
+  multiplayer
+    ? (config?.multiplayer_combine_multi_channel ?? true)
+    : (config?.combine_multi_channel ?? true);
 
 function playerConfigs(
   players: readonly PlaybackPlayer[],
   selectedMicId: string | null,
 ): MicPlayerConfig[] {
   if (players.length === 0) {
-    return [{ present: true, id: 'solo', profile: null, microphoneId: selectedMicId }];
+    return [
+      {
+        present: true,
+        id: 'solo',
+        profile: null,
+        microphoneId: selectedMicId,
+        color: defaultPlayerColor(0),
+      },
+    ];
   }
   return players.map((player) => ({
     present: true,
     id: player.id,
     profile: player.profile,
     microphoneId: player.microphoneId,
+    color: player.color,
   }));
 }
 
@@ -140,6 +159,7 @@ function playerAt(players: readonly MicPlayerConfig[], index: number): MicPlayer
     id: `inactive-${index + 1}`,
     profile: null,
     microphoneId: null,
+    color: defaultPlayerColor(index),
   };
 }
 
@@ -153,14 +173,14 @@ function captureSettings(
     return {
       captureEnabled: playbackActive || micMonitorUserEnabled,
       pitchEnabled: playbackActive,
-      emitAudio: micMonitorUserEnabled,
+      emitAudio: playbackActive && micMonitorUserEnabled,
     };
   }
   const pitchEnabled = playbackActive && micUserEnabled;
   return {
     captureEnabled: pitchEnabled || micMonitorUserEnabled,
     pitchEnabled,
-    emitAudio: micMonitorUserEnabled,
+    emitAudio: playbackActive && micMonitorUserEnabled,
   };
 }
 
@@ -214,7 +234,8 @@ function namePlayer(player: InternalPlayerMicState, devices: readonly MicDevice[
     id: player.id,
     profile: player.profile,
     microphoneId: player.microphoneId,
-    micName: device?.label ?? player.microphoneId ?? 'Default',
+    color: player.color,
+    micName: device?.label ?? player.microphoneId ?? t('settings.microphone.default'),
     pitchScore: player.pitchScore,
     rawScore: player.rawScore,
     series: player.series,
@@ -226,12 +247,15 @@ function namePlayer(player: InternalPlayerMicState, devices: readonly MicDevice[
 }
 
 function errorPrefix(multiplayer: boolean, index: number): string {
-  return multiplayer ? `Player ${index + 1}` : 'Microphone';
+  return multiplayer
+    ? t('playback.players.playerNumber', { number: index + 1 })
+    : t('settings.microphone.label');
 }
 
 type MicStateInput = {
   multiplayer: boolean;
   players: PlaybackPlayerMicState[];
+  devices: readonly MicDevice[];
   primary: PlaybackPlayerMicState;
   micUserEnabled: boolean;
   micMonitorUserEnabled: boolean;
@@ -243,6 +267,7 @@ function micState(input: MicStateInput): PlaybackMicState {
     return {
       multiplayer,
       players,
+      devices: input.devices,
       micUserEnabled: true,
       micMonitorUserEnabled: input.micMonitorUserEnabled,
       selectedMicId: primary.microphoneId,
@@ -258,6 +283,7 @@ function micState(input: MicStateInput): PlaybackMicState {
   return {
     multiplayer,
     players,
+    devices: input.devices,
     micUserEnabled: input.micUserEnabled,
     micMonitorUserEnabled: input.micMonitorUserEnabled,
     selectedMicId: primary.microphoneId,
@@ -282,7 +308,7 @@ export function PlaybackMicProvider({ config, players, children }: PlaybackMicPr
     config?.mic_monitoring ?? false,
   );
   const [selectedMicId, setSelectedMicId] = useState<string | null>(config?.preferred_mic ?? null);
-  const micDevices = useMicDevices();
+  const micDevices = useMicDevices(undefined, combineMultiChannel(config, multiplayer));
   const settings = captureSettings(
     multiplayer,
     isReady && isPlaying && !paused,
@@ -317,7 +343,12 @@ export function PlaybackMicProvider({ config, players, children }: PlaybackMicPr
     .filter((player) => player.present)
     .map((player) => namePlayer(player, micDevices));
   const primary = namedPlayers[0];
-  const reactiveRef = useMicReactive(primary.id, primary.micReady);
+  const reactiveRef = useMicReactive([
+    { captureId: slotOne.id, enabled: slotOne.micReady },
+    { captureId: slotTwo.id, enabled: slotTwo.micReady },
+    { captureId: slotThree.id, enabled: slotThree.micReady },
+    { captureId: slotFour.id, enabled: slotFour.micReady },
+  ]);
 
   const shownErrors = useRef(new Set<string>());
   useEffect(() => {
@@ -328,7 +359,12 @@ export function PlaybackMicProvider({ config, players, children }: PlaybackMicPr
       }
       if (!shownErrors.current.has(player.id)) {
         shownErrors.current.add(player.id);
-        toast.error(`${errorPrefix(multiplayer, index)}: ${player.error}`);
+        toast.error(
+          t('playback.playbackMicContext.message', {
+            value1: errorPrefix(multiplayer, index),
+            value2: player.error,
+          }),
+        );
       }
     }
   }, [multiplayer, namedPlayers]);
@@ -349,15 +385,25 @@ export function PlaybackMicProvider({ config, players, children }: PlaybackMicPr
     });
   }, [micMonitorUserEnabled, multiplayer, persistConfig]);
 
+  const selectMic = useCallback(
+    (deviceId: string) => {
+      if (multiplayer || !micDevices.some((device) => device.deviceId === deviceId)) {
+        return;
+      }
+      setSelectedMicId(deviceId);
+      persistConfig({ preferred_mic: deviceId });
+    },
+    [micDevices, multiplayer, persistConfig],
+  );
+
   const handleCycleMic = useCallback(() => {
     if (multiplayer || micDevices.length <= 1) {
       return;
     }
     const currentIndex = micDevices.findIndex((device) => device.deviceId === selectedMicId);
     const next = micDevices[(currentIndex + 1) % micDevices.length];
-    setSelectedMicId(next.deviceId);
-    persistConfig({ preferred_mic: next.deviceId });
-  }, [micDevices, multiplayer, persistConfig, selectedMicId]);
+    selectMic(next.deviceId);
+  }, [micDevices, multiplayer, selectMic, selectedMicId]);
 
   const handleToggleMicMonitor = useCallback(() => {
     setMicMonitorUserEnabled((previous) => {
@@ -376,20 +422,16 @@ export function PlaybackMicProvider({ config, players, children }: PlaybackMicPr
       micState({
         multiplayer,
         players: namedPlayers,
+        devices: micDevices,
         primary,
         micUserEnabled,
         micMonitorUserEnabled,
       }),
-    [micMonitorUserEnabled, micUserEnabled, multiplayer, namedPlayers, primary],
+    [micDevices, micMonitorUserEnabled, micUserEnabled, multiplayer, namedPlayers, primary],
   );
   const actionsValue = useMemo<PlaybackMicActions>(
-    () => ({
-      reactiveRef,
-      handleToggleMic,
-      handleCycleMic,
-      handleToggleMicMonitor,
-    }),
-    [handleCycleMic, handleToggleMic, handleToggleMicMonitor, reactiveRef],
+    () => ({ reactiveRef, handleToggleMic, handleCycleMic, handleToggleMicMonitor, selectMic }),
+    [handleCycleMic, handleToggleMic, handleToggleMicMonitor, reactiveRef, selectMic],
   );
 
   return (

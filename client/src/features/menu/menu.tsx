@@ -5,6 +5,7 @@ import { EXIT_SUPPORTED } from '@/bridge/exit';
 import { useImportNotifications } from '@/features/import/hooks/use-import-notifications';
 import { EditLyricsDialog } from '@/features/lyrics/components';
 import { SelectLanguageDialog } from '@/features/lyrics/components/language';
+import { ViewLyricsDialog } from '@/features/lyrics/components/view-lyrics';
 import { ClearCacheDialog } from '@/features/menu/components/clear-cache';
 import { DeleteSongDialog } from '@/features/menu/components/delete-song';
 import { DoctorDialog } from '@/features/menu/components/doctor';
@@ -14,6 +15,7 @@ import { InfoDialog } from '@/features/menu/components/info';
 import { Sidebar } from '@/features/menu/components/sidebar/sidebar';
 import { useDialog, type DialogMode } from '@/features/menu/hooks/use-dialog';
 import { useMenuNav } from '@/features/menu/hooks/use-menu-nav';
+import { QueuePlaybackListener } from '@/features/playback-queue/components/queue-playback-listener';
 import { useRemoteIdleHost } from '@/features/playback/hooks/use-remote-idle-host';
 import { CreateProfileDialog } from '@/features/profiles/components/create';
 import { LeaderboardsDialog } from '@/features/profiles/components/leaderboards';
@@ -84,9 +86,11 @@ export const MenuLayout = () => {
       <DonateDialog />
       <SelectLanguageDialog />
       <EditLyricsDialog />
+      <ViewLyricsDialog />
       <ClearCacheDialog />
       <DeleteSongDialog />
       <SourceDialogs mode={mode} />
+      <QueuePlaybackListener />
       <Setup />
       <SidebarInset>
         <Outlet />

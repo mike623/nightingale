@@ -8,13 +8,10 @@ import {
   PITCH_WINDOW_SAMPLES,
   SEMITONE_TOLERANCE,
 } from '@/features/playback/lib/pitch/constants';
+import { createPitchDetector, detectPitchFromSamples } from '@/features/playback/lib/pitch/detect';
+import type { PitchSeries, ReferencePitchTrack } from '@/features/playback/lib/pitch/state';
 import {
-  createPitchDetector,
-  detectPitchFromSamplesRef,
-} from '@/features/playback/lib/pitch/detect';
-import type { PitchSeries } from '@/features/playback/lib/pitch/state';
-import {
-  computeSingableTime,
+  analyzeReferencePitches,
   PitchScoring,
   PitchStateBuffer,
   pitchSimilarity,
@@ -41,6 +38,7 @@ export function usePitchScoring(
   const scratchRef = useRef(new Float32Array(PITCH_WINDOW_SAMPLES));
   const bufferRef = useRef(new PitchStateBuffer());
   const scoringRef = useRef(new PitchScoring(1));
+  const referenceTrackRef = useRef<ReferencePitchTrack | null>(null);
   const micPitchRef = useLatestRef(micPitch);
   const toleranceRef = useLatestRef(toleranceSemitones);
   const latencyRef = useLatestRef(
@@ -49,13 +47,17 @@ export function usePitchScoring(
       Math.max(MIN_MIC_LATENCY_COMPENSATION_SEC, latencyCompensationSec),
     ),
   );
-  const singableRef = useRef<number | null>(null);
   /** The pass the current history and score belong to. */
   const appliedEpochRef = useRef(0);
   const [series, setSeries] = useState<PitchSeries>({
     refPitches: [],
     userPitches: [],
+    displaySemitones: [],
     similarities: [],
+    times: [],
+    referenceTrack: null,
+    referenceTime: 0,
+    currentTime: 0,
   });
   const [score, setScore] = useState(0);
 
@@ -66,9 +68,10 @@ export function usePitchScoring(
     bufferRef.current.reset();
 
     const reference = getReferenceBuffer();
-    const singable = reference ? computeSingableTime(reference) : duration;
-    singableRef.current = singable;
-    scoringRef.current = new PitchScoring(singable);
+    const track = reference ? analyzeReferencePitches(reference) : null;
+    bufferRef.current.setOctaveAnchor(track?.octaveAnchorSemitone ?? null);
+    referenceTrackRef.current = track;
+    scoringRef.current = new PitchScoring(track?.singableTime ?? duration);
 
     setSeries(bufferRef.current.snapshot());
     setScore(0);
@@ -89,6 +92,7 @@ export function usePitchScoring(
       if (appliedEpochRef.current !== epoch) {
         appliedEpochRef.current = epoch;
         bufferRef.current.reset();
+        bufferRef.current.setOctaveAnchor(referenceTrackRef.current?.octaveAnchorSemitone ?? null);
         scoringRef.current.reset();
         setSeries(bufferRef.current.snapshot());
         setScore(0);
@@ -99,23 +103,24 @@ export function usePitchScoring(
       }
 
       const reference = getReferenceBuffer();
+      const track = referenceTrackRef.current;
       const mp = micPitchRef.current;
+      const referenceTime = Math.max(0, t - latencyRef.current);
+      const refHz =
+        reference && sampleVocalsWindow(reference, t, scratchRef.current, latencyRef.current)
+          ? detectPitchFromSamples(refDetector.current, scratchRef.current, reference.sampleRate)
+          : null;
+      const sim =
+        refHz !== null && mp !== null ? pitchSimilarity(refHz, mp, toleranceRef.current) : 0;
 
-      if (!reference || !sampleVocalsWindow(reference, t, scratchRef.current, latencyRef.current)) {
-        bufferRef.current.tryPush(null, mp, 0, t);
-      } else {
-        const refHz = detectPitchFromSamplesRef(
-          refDetector.current,
-          scratchRef.current,
-          reference.sampleRate,
-        );
-        const sim =
-          refHz !== null && mp !== null ? pitchSimilarity(refHz, mp, toleranceRef.current) : 0;
-        bufferRef.current.tryPush(refHz, mp, sim, t);
-        scoringRef.current.accumulate(t, refHz, mp, sim);
-      }
+      bufferRef.current.tryPush(refHz, mp, sim, t);
+      scoringRef.current.accumulate(t, refHz, mp, sim);
 
-      setSeries(bufferRef.current.snapshot());
+      const snapshot = bufferRef.current.snapshot();
+      snapshot.referenceTrack = track;
+      snapshot.referenceTime = referenceTime;
+      snapshot.currentTime = t;
+      setSeries(snapshot);
       setScore(scoringRef.current.score());
     };
 

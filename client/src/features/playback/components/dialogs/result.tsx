@@ -1,13 +1,16 @@
 import { TrophyIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type { PlaybackPlayer } from '@/bridge/playback-session';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
 import { MultiplayerSetupDialog } from '@/features/playback/components/dialogs/multiplayer-setup';
 import type { PlaybackPlayerResult } from '@/features/playback/hooks/use-playback-result';
+import { playerDisplayName } from '@/features/playback/utils/player-display-name';
 import { topScoresForSong } from '@/features/playback/utils/result';
+import { t } from '@/i18n';
 import { Stars } from '@/shared/components/shared/stars';
 import { Button } from '@/shared/components/ui/button';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -25,17 +28,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table';
+import { useLatestRef } from '@/shared/hooks/use-latest-ref';
+import { defaultPlayerColor, playerColorOption } from '@/shared/player-colors';
 import { cn } from '@/shared/utils/cn';
 import type { ScoreRecord } from '@/types/ScoreRecord';
 import type { Song } from '@/types/Song';
 
 const TOP_LIMIT = 5;
+const AUTO_CONTINUE_SECONDS = 5;
 const RING = 'ring-2 ring-primary';
 const NO_FOCUS_RING = 'focus-visible:ring-0 focus-visible:border-transparent';
-const PLAYER_COLORS = ['bg-rose-400', 'bg-fuchsia-400', 'bg-amber-400', 'bg-emerald-400'];
 const EMPTY_RESULT: PlaybackPlayerResult = {
   id: 'solo',
   profile: null,
+  color: defaultPlayerColor(0),
   score: 0,
 };
 
@@ -43,11 +49,14 @@ function NextSongLabel({ pending, autoNextIn }: { pending: boolean; autoNextIn: 
   if (pending) {
     return (
       <>
-        <Spinner className="size-4" /> Preparing…
+        <Spinner className="size-4" />
+        {t('playback.dialogs.result.preparing')}
       </>
     );
   }
-  return autoNextIn === null ? 'Next Song' : `Next Song (${autoNextIn})`;
+  return autoNextIn === null
+    ? t('playback.result.nextSong')
+    : `${t('playback.result.nextSong')} (${autoNextIn})`;
 }
 
 type Props = {
@@ -59,8 +68,10 @@ type Props = {
   /** Seconds left before auto-play starts the next song; null when it is off. */
   autoNextIn: number | null;
   exitLabel: string;
+  autoContinue: boolean;
+  onAutoContinueChange: (next: boolean) => void;
   onBack: () => void;
-  onNext: (players?: readonly PlaybackPlayer[]) => void;
+  onNext?: (players?: readonly PlaybackPlayer[]) => void;
   /** Stops the auto-advance countdown, so picking new players is not cut short. */
   onStopAutoNext: () => void;
 };
@@ -68,39 +79,32 @@ type Props = {
 const resultDialogWidth = (multiplayer: boolean): string =>
   multiplayer ? 'sm:max-w-md' : 'sm:max-w-sm';
 
-const playerNumber = (id: string, fallback: number): number => {
-  const parsed = Number(id.slice('player-'.length));
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-};
-
 function MultiplayerResults({ results }: { results: PlaybackPlayerResult[] }) {
   return (
-    <Table aria-label="Multiplayer results">
+    <Table aria-label={t('playback.dialogs.result.multiplayerResults')}>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
           <TableHead className="w-12">#</TableHead>
-          <TableHead>Player</TableHead>
-          <TableHead className="text-right">Score</TableHead>
+          <TableHead>{t('playback.dialogs.result.player')}</TableHead>
+          <TableHead className="text-right">{t('playback.dialogs.result.score')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {results.map((result, index) => {
-          const number = playerNumber(result.id, index + 1);
           return (
             <TableRow key={result.id} className={cn(index === 0 && 'bg-primary/10')}>
               <TableCell className="tabular-nums">{index + 1}</TableCell>
               <TableCell>
                 <div className="flex min-w-0 items-center gap-2">
                   <span
-                    className={`size-2.5 shrink-0 rounded-full ${PLAYER_COLORS[number - 1]}`}
+                    className={`size-2.5 shrink-0 rounded-full ${playerColorOption(result.color).className}`}
                     aria-hidden="true"
                   />
-                  <span className="truncate font-medium">
-                    {result.profile ?? `Guest ${number}`}
-                  </span>
+                  <span className="truncate font-medium">{playerDisplayName(result, results)}</span>
                   {index === 0 ? (
                     <span className="flex shrink-0 items-center gap-1 text-xs text-primary">
-                      <TrophyIcon className="size-3" /> Winner
+                      <TrophyIcon className="size-3" />
+                      {t('playback.dialogs.result.winner')}
                     </span>
                   ) : null}
                 </div>
@@ -127,7 +131,7 @@ function SoloResults({ result, board }: { result: PlaybackPlayerResult; board: S
       <div className="flex flex-col items-center gap-1">
         <p
           className="text-4xl font-semibold text-primary tabular-nums"
-          aria-label={`Score ${result.score}`}
+          aria-label={t('playback.result.scoreLabel', { score: result.score })}
         >
           {result.score}
         </p>
@@ -138,14 +142,18 @@ function SoloResults({ result, board }: { result: PlaybackPlayerResult; board: S
         <>
           <div className="h-px w-full bg-border" />
           <p className="text-center text-[11px] font-medium tracking-wide text-muted-foreground">
-            BEST SCORES
+            {t('playback.dialogs.result.bestScores')}
           </p>
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="h-8 text-xs">#</TableHead>
-                <TableHead className="h-8 text-xs">Profile</TableHead>
-                <TableHead className="h-8 text-right text-xs">Score</TableHead>
+                <TableHead className="h-8 text-xs">
+                  {t('playback.dialogs.result.profile')}
+                </TableHead>
+                <TableHead className="h-8 text-right text-xs">
+                  {t('playback.dialogs.result.score')}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -180,7 +188,15 @@ function SoloResults({ result, board }: { result: PlaybackPlayerResult; board: S
 
 type ResultActionsProps = Pick<
   Props,
-  'open' | 'nextPending' | 'autoNextIn' | 'exitLabel' | 'onBack' | 'onNext' | 'onStopAutoNext'
+  | 'open'
+  | 'nextPending'
+  | 'exitLabel'
+  | 'autoContinue'
+  | 'onAutoContinueChange'
+  | 'onBack'
+  | 'onNext'
+  | 'autoNextIn'
+  | 'onStopAutoNext'
 > & {
   multiplayer: boolean;
 };
@@ -211,7 +227,7 @@ function ChangePlayersButton({
       disabled={props.nextPending}
       onClick={onClick}
     >
-      Change players
+      {t('playback.dialogs.result.changePlayers')}
     </Button>
   );
 }
@@ -224,7 +240,7 @@ function NextSongButton({
 }: ActionButtonProps & {
   nextIndex: number;
   autoNextIn: number | null;
-  onNext: Props['onNext'];
+  onNext: () => void;
 }) {
   return (
     <Button
@@ -243,6 +259,103 @@ function NextSongButton({
   );
 }
 
+function AutoContinueToggle({
+  show,
+  autoContinue,
+  disabled,
+  focused,
+  counter,
+  onToggle,
+}: {
+  show: boolean;
+  autoContinue: boolean;
+  disabled: boolean;
+  focused: boolean;
+  counter: ReactNode;
+  onToggle: (next: boolean) => void;
+}) {
+  if (!show) {
+    return null;
+  }
+  return (
+    <label className="flex items-center justify-center gap-2 text-sm">
+      <Checkbox
+        checked={autoContinue}
+        disabled={disabled}
+        className={cn(NO_FOCUS_RING, focused && RING)}
+        onCheckedChange={(checked) => onToggle(checked === true)}
+      />
+      <span className="text-muted-foreground">{t('playback.dialogs.result.autoContinue')}</span>
+      {counter}
+    </label>
+  );
+}
+
+function AutoContinueCountdown({ onElapsed }: { onElapsed: () => void }) {
+  const [secondsLeft, setSecondsLeft] = useState(AUTO_CONTINUE_SECONDS);
+  const onElapsedRef = useLatestRef(onElapsed);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setSecondsLeft((left) => Math.max(0, left - 1)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (secondsLeft > 0 || firedRef.current) {
+      return;
+    }
+
+    firedRef.current = true;
+    onElapsedRef.current();
+  }, [onElapsedRef, secondsLeft]);
+
+  return (
+    <span className="font-medium text-primary tabular-nums" aria-live="polite">
+      {t('playback.dialogs.result.autoContinueIn', { count: secondsLeft })}
+    </span>
+  );
+}
+
+function isCounting(options: {
+  open: boolean;
+  autoContinue: boolean;
+  hasNext: boolean;
+  setupOpen: boolean;
+  nextPending: boolean;
+}): boolean {
+  const { open, autoContinue, hasNext, setupOpen, nextPending } = options;
+  return open && autoContinue && hasNext && !setupOpen && !nextPending;
+}
+
+function navIndices(canChangePlayers: boolean, hasNext: boolean) {
+  const nextIndex = canChangePlayers ? 2 : 1;
+  return {
+    nextIndex,
+    autoContinueIndex: hasNext ? nextIndex + 1 : null,
+    itemCount: hasNext ? nextIndex + 2 : 1,
+  };
+}
+
+type Action = 'exit' | 'players' | 'autoContinue' | 'next';
+
+function actionAt(
+  index: number,
+  canChangePlayers: boolean,
+  autoContinueIndex: number | null,
+): Action {
+  if (index === 0) {
+    return 'exit';
+  }
+  if (canChangePlayers && index === 1) {
+    return 'players';
+  }
+  if (index === autoContinueIndex) {
+    return 'autoContinue';
+  }
+  return 'next';
+}
+
 function NextSongSetup({
   show,
   open,
@@ -252,7 +365,7 @@ function NextSongSetup({
   show: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStart: Props['onNext'];
+  onStart: NonNullable<Props['onNext']>;
 }) {
   if (!show) {
     return null;
@@ -263,7 +376,7 @@ function NextSongSetup({
       onOpenChange={onOpenChange}
       onStart={onStart}
       queuePlayback
-      submitLabel="Start next song"
+      submitLabel={t('playback.result.startNextSong')}
     />
   );
 }
@@ -274,29 +387,41 @@ function ResultActions({
   nextPending,
   autoNextIn,
   exitLabel,
+  autoContinue,
+  onAutoContinueChange,
   onBack,
   onNext,
   onStopAutoNext,
 }: ResultActionsProps) {
   const [setupOpen, setSetupOpen] = useState(false);
-  const canChangePlayers = multiplayer;
-  const nextIndex = canChangePlayers ? 2 : 1;
+  // One automatic attempt per results screen: a failed start must not retry on
+  // a loop, and a blocked playback window must not leave a countdown at zero.
+  // The dialog unmounts when it closes, so this resets with the next result.
+  const [autoContinueFired, setAutoContinueFired] = useState(false);
+  const canChangePlayers = multiplayer && onNext !== undefined;
+  const hasNext = onNext !== undefined;
+  const { nextIndex, autoContinueIndex, itemCount } = navIndices(canChangePlayers, hasNext);
+  const startNext = onNext ?? (() => {});
+  const counting = isCounting({ open, autoContinue, hasNext, setupOpen, nextPending });
+  const advanced = (): void => {
+    setAutoContinueFired(true);
+    startNext();
+  };
   const openSetup = () => {
     onStopAutoNext();
     setSetupOpen(true);
   };
+  const actions: Record<Action, () => void> = {
+    exit: onBack,
+    players: openSetup,
+    autoContinue: () => onAutoContinueChange(!autoContinue),
+    next: startNext,
+  };
+
   const { focusedIndex } = useDialogNav({
     open: open && !setupOpen && !nextPending,
-    itemCount: nextIndex + 1,
-    onConfirm: (index) => {
-      if (index === 0) {
-        onBack();
-      } else if (canChangePlayers && index === 1) {
-        openSetup();
-      } else {
-        onNext();
-      }
-    },
+    itemCount,
+    onConfirm: (index) => actions[actionAt(index, canChangePlayers, autoContinueIndex)](),
     onBack,
   });
 
@@ -325,15 +450,26 @@ function ResultActions({
           nextPending={nextPending}
           nextIndex={nextIndex}
           autoNextIn={autoNextIn}
-          onNext={onNext}
+          onNext={startNext}
         />
       </DialogFooter>
+
+      <AutoContinueToggle
+        show={hasNext}
+        autoContinue={autoContinue}
+        disabled={nextPending}
+        focused={open && focusedIndex === autoContinueIndex}
+        counter={
+          counting && !autoContinueFired ? <AutoContinueCountdown onElapsed={advanced} /> : null
+        }
+        onToggle={onAutoContinueChange}
+      />
 
       <NextSongSetup
         show={canChangePlayers}
         open={setupOpen}
         onOpenChange={setSetupOpen}
-        onStart={onNext}
+        onStart={startNext}
       />
     </>
   );
@@ -347,6 +483,8 @@ export const ResultDialog = ({
   nextPending,
   autoNextIn,
   exitLabel,
+  autoContinue,
+  onAutoContinueChange,
   onBack,
   onNext,
   onStopAutoNext,
@@ -381,6 +519,8 @@ export const ResultDialog = ({
             nextPending={nextPending}
             autoNextIn={autoNextIn}
             exitLabel={exitLabel}
+            autoContinue={autoContinue}
+            onAutoContinueChange={onAutoContinueChange}
             onBack={onBack}
             onNext={onNext}
             onStopAutoNext={onStopAutoNext}

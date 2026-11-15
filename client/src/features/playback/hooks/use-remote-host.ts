@@ -15,7 +15,7 @@
 import { useEffect, useMemo } from 'react';
 
 import { connectRemote, type RemoteCommand, type RemoteSnapshot } from '@/bridge/remote';
-import { themeName } from '@/features/playback/components/theme';
+import { themeKey, themeName } from '@/features/playback/components/theme';
 import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
 import { usePlaybackCommandDeps } from '@/features/playback/hooks/use-playback-command-deps';
 import {
@@ -49,7 +49,8 @@ const toMs = (seconds: number): number =>
 export function useRemoteHost(song: Song, config: AppConfig | null, playNext: () => void): void {
   const deps = usePlaybackCommandDeps(config, playNext);
   const { paused, duration, guideVolume, guideAvailable } = usePlaybackTransportState();
-  const { themeIndex, videoFlavor } = usePlaybackThemeState();
+  const { theme, themes, videoFlavor } = usePlaybackThemeState();
+  const themeIndex = themes.findIndex((candidate) => themeKey(candidate) === themeKey(theme));
   const { micUserEnabled, micMonitorUserEnabled, micName, rawScore } = usePlaybackMicState();
   const { lyricOffsetSec } = usePlaybackTranscriptState();
   const [lyricsHidden] = useLyricsHidden();
@@ -74,6 +75,7 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
       guideVolume,
       guideAvailable,
       themeIndex,
+      theme,
       videoFlavor,
       micUserEnabled,
       micMonitorUserEnabled,
@@ -91,6 +93,7 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
       guideVolume,
       guideAvailable,
       themeIndex,
+      theme,
       videoFlavor,
       micUserEnabled,
       micMonitorUserEnabled,
@@ -127,7 +130,7 @@ export function useRemoteHost(song: Song, config: AppConfig | null, playNext: ()
         guide_available: current.guideAvailable,
         lyrics_hidden: current.lyricsHidden,
         theme_index: current.themeIndex,
-        theme_name: themeName(current.themeIndex, current.videoFlavor),
+        theme_name: themeName(current.theme, current.videoFlavor),
         flavor_name: current.videoFlavor,
         score: Math.max(0, Math.round(current.rawScore)),
         mic_enabled: current.micUserEnabled,

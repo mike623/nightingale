@@ -1,4 +1,5 @@
 mod analyzer;
+mod backgrounds;
 mod cache;
 mod config;
 mod error;
@@ -10,14 +11,17 @@ mod logs;
 mod lrc;
 mod lyrics;
 pub mod media_server;
+pub mod nge_format;
 mod play_history;
 mod playback;
 mod playback_queue;
 mod playback_session;
 mod profile;
+mod remote_control;
 mod scanner;
 mod secret;
 mod song;
+mod song_export;
 mod source;
 mod usdx;
 mod vendor;
@@ -29,12 +33,18 @@ pub use analyzer::{
     reanalyze_force_transcribe, reanalyze_full, reanalyze_transcript, refresh_metadata,
     shutdown_server,
 };
+pub use backgrounds::{
+    BackgroundSelection, CustomBackground, CustomBackgroundKind, CustomBackgroundSource,
+    MAX_BACKGROUND_UPLOAD_BYTES, add_custom_background_url, custom_background_kind_for_name,
+    custom_background_max_bytes, import_custom_background_file, load_custom_background_shader,
+    remove_custom_background, resolve_custom_background_path,
+};
 pub use cache::{
     CacheDir, CachePaths, CacheStats, SweepReport, cache_roots, change_app_data_path, clear_models,
     clear_songs, clear_videos, default_nightingale_dir, nightingale_dir, normalized_target_path,
     same_path, set_default_data_path, sweep_orphan_cache,
 };
-pub use config::{AppConfig, LibrarySource};
+pub use config::{AppConfig, LibrarySource, WindowState};
 pub use import::{
     ImportEntry, ImportEntryProgress, ImportEntryStatus, ImportEvent, ImportFailure, ImportPreview,
     ImportProgress, ImportQueueRow, ImportReport, ImportSubmitter, clear_finished_imports,
@@ -49,9 +59,9 @@ pub use library_model::{
 };
 pub use logs::{LogTail, log_path, read_log_tail};
 pub use lyrics::{
-    LrclibCandidate, LyricsFile, SidecarLrc, SidecarLrcKind, apply_timed_lyrics, clear_lyrics,
-    load_lyrics_file, load_sidecar_lrc, lyric_lines, provide_lrc, save_lyrics_and_realign,
-    search_lrclib_for_hash, search_lrclib_terms,
+    LineWindow, LrclibCandidate, LyricsFile, SidecarLrc, SidecarLrcKind, align_lrc_lyrics,
+    apply_timed_lyrics, clear_lyrics, load_lyrics_file, load_sidecar_lrc, lyric_lines, provide_lrc,
+    save_lyrics_and_realign, search_lrclib_for_hash, search_lrclib_terms,
 };
 pub use media_server::{MediaEndpoint, local_media_roots};
 pub use play_history::{pick_next_song, record_song_play};
@@ -65,8 +75,10 @@ pub use playback::{
 pub use playback_queue::{PlaybackQueue, PlaybackQueueEntry};
 pub use playback_session::{PlaybackPlayer, PlaybackSession, PlaybackSessionStore};
 pub use profile::ProfileStore;
+pub use remote_control::{REMOTE_PORT, RemoteControl, RemoteInfo, lan_base, lan_ip};
 pub use scanner::{CacheReconcileSummary, reconcile_cache, start_scan};
 pub use song::{Song, SongOrigin, rename_song};
+pub use song_export::{export_song_nge, exports_dir};
 pub use source::{
     JellyfinAuth, JellyfinSource, MediaSource, NavidromeAuth, NavidromeSource, PlexAuth,
     PlexSource, SourceKind, active_source,

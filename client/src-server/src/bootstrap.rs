@@ -31,6 +31,6 @@ pub(crate) async fn handle(State(state): State<AppState>) -> Json<Bootstrap> {
         songs_meta,
         data_path_pinned: state.data_path_pinned,
         library_pinned: state.library_pinned,
-        remote_url: remote::lan_url(state.bind_port),
+        remote_url: ::remote::lan_url(state.bind_port()),
     })
 }

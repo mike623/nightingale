@@ -14,19 +14,29 @@ import {
   usePlaybackTransportState,
 } from '@/features/playback/providers';
 import { computeLyricGapCaption, findCurrentSegment } from '@/features/playback/utils/lyrics-gap';
+import { playerDisplayName } from '@/features/playback/utils/player-display-name';
 import { transcriptLabel } from '@/features/playback/utils/transcript-label';
+import { t, useTranslation } from '@/i18n';
+import { playerColorOption } from '@/shared/player-colors';
 import type { AppConfig } from '@/types/AppConfig';
 
+import { LiveStars } from './live-stars';
 import { ABOVE_PLAYBACK_BAR_CLASS } from './playback-bar';
-import { isPixabayTheme, themeName } from './theme';
+import { PlaybackTransportControls } from './playback-transport-controls';
+import { isPixabayTheme, themeName, type PlaybackTheme } from './theme';
 
 function formatGuideText(volume: number): string {
   const pct = Math.round(volume * 100);
-  return pct === 0 ? 'Guide: OFF' : `Guide: ${pct}% [G +/-]`;
+  return pct === 0
+    ? t('playback.hud.guideOffShortcut')
+    : t('playback.hud.guidePercentShortcut', { percent: pct });
 }
 
-function formatThemeText(themeIndex: number, videoFlavor: VideoFlavor): string {
-  return `Theme: ${themeName(themeIndex, videoFlavor)} [T${isPixabayTheme(themeIndex) ? '/F' : ''}]`;
+function formatThemeText(theme: PlaybackTheme, videoFlavor: VideoFlavor): string {
+  return t('playback.hud.themeShortcut', {
+    theme: themeName(theme, videoFlavor),
+    shortcut: isPixabayTheme(theme) ? 'T/F' : 'T',
+  });
 }
 
 const SkipButton = forwardRef<HTMLButtonElement, { label: string; onClick: () => void }>(
@@ -94,29 +104,6 @@ function TouchButton({
   );
 }
 
-function MicHint({
-  multiplayer,
-  micUserEnabled,
-  micName,
-  showShortcuts,
-}: {
-  multiplayer: boolean;
-  micUserEnabled: boolean;
-  micName: string;
-  showShortcuts: boolean;
-}) {
-  // Each multiplayer seat has its own mic, so the single-mic line does not apply.
-  if (multiplayer) {
-    return null;
-  }
-  return (
-    <HintText>
-      Mic: {micUserEnabled ? micName : 'OFF'}
-      {showShortcuts ? ' [M/N]' : ''}
-    </HintText>
-  );
-}
-
 function SettingsInfo({
   lyrics,
   guideVolume,
@@ -125,7 +112,7 @@ function SettingsInfo({
   micName,
   micMonitorUserEnabled,
   multiplayer,
-  themeIndex,
+  theme,
   videoFlavor,
   showShortcuts,
 }: {
@@ -136,7 +123,7 @@ function SettingsInfo({
   micName: string;
   micMonitorUserEnabled: boolean;
   multiplayer: boolean;
-  themeIndex: number;
+  theme: PlaybackTheme;
   videoFlavor: VideoFlavor;
   showShortcuts: boolean;
 }) {
@@ -147,26 +134,34 @@ function SettingsInfo({
         <HintText>
           {showShortcuts
             ? formatGuideText(guideVolume)
-            : `Guide: ${Math.round(guideVolume * 100)}%`}
+            : t('playback.hud.guidePercent', { percent: Math.round(guideVolume * 100) })}
         </HintText>
       )}
-      <MicHint
-        multiplayer={multiplayer}
-        micUserEnabled={micUserEnabled}
-        micName={micName}
-        showShortcuts={showShortcuts}
-      />
+      {!multiplayer && (
+        <HintText>
+          {t('playback.hud.micStatus', {
+            status: micUserEnabled ? micName : t('common.states.off'),
+            shortcut: showShortcuts ? ' [M/N]' : '',
+          })}
+        </HintText>
+      )}
       <HintText>
-        Monitor: {micMonitorUserEnabled ? 'ON' : 'OFF'}
-        {showShortcuts ? ' [R]' : ''}
+        {t('playback.hud.monitorStatus', {
+          status: t(micMonitorUserEnabled ? 'common.states.on' : 'common.states.off'),
+          shortcut: showShortcuts ? ' [R]' : '',
+        })}
       </HintText>
       <HintText>
         {showShortcuts
-          ? formatThemeText(themeIndex, videoFlavor)
-          : `Theme: ${themeName(themeIndex, videoFlavor)}`}
+          ? formatThemeText(theme, videoFlavor)
+          : t('playback.hud.theme', { theme: themeName(theme, videoFlavor) })}
       </HintText>
-      {showShortcuts && <HintText>[&rarr;] Next song</HintText>}
-      {showShortcuts && <HintText>[ESC] Back</HintText>}
+      {showShortcuts && (
+        <>
+          <HintText>[&rarr;] Next song</HintText>
+          <HintText>{t('playback.playbackHud.escBack')}</HintText>
+        </>
+      )}
     </div>
   );
 }
@@ -185,7 +180,7 @@ function TouchControls({
   const { setGuideVolume, handlePause } = usePlaybackTransportActions();
   const { micUserEnabled, micName, micMonitorUserEnabled, multiplayer } = usePlaybackMicState();
   const { handleToggleMic, handleCycleMic, handleToggleMicMonitor } = usePlaybackMicActions();
-  const { themeIndex, videoFlavor } = usePlaybackThemeState();
+  const { theme, videoFlavor } = usePlaybackThemeState();
   const { cycleTheme, cycleFlavor } = usePlaybackThemeActions();
   const { segments, transcriptSource } = usePlaybackTranscriptState();
   const persistConfig = usePlaybackConfigPersist(config);
@@ -216,7 +211,7 @@ function TouchControls({
           micName={micName}
           micMonitorUserEnabled={micMonitorUserEnabled}
           multiplayer={multiplayer}
-          themeIndex={themeIndex}
+          theme={theme}
           videoFlavor={videoFlavor}
           showShortcuts={false}
         />
@@ -228,24 +223,24 @@ function TouchControls({
         onClick={() => setOpen((prev) => !prev)}
         className="pointer-events-auto rounded-sm border-2 border-white/70 bg-black/10 px-2.5 py-1 text-sm text-white/90 transition-colors hover:bg-black/20 active:bg-black/30"
       >
-        {open ? 'Hide controls' : 'Playback controls'}
+        {t(open ? 'playback.hud.hideControls' : 'playback.hud.showControls')}
       </button>
 
       {open && (
         <div className="grid w-full grid-cols-3 gap-2 text-center">
-          <TouchButton label="Pause" onClick={handlePause} />
+          <TouchButton label={t('common.actions.pause')} onClick={handlePause} />
           {guideAvailable && (
             <>
               <TouchButton
-                label={guideVolume === 0 ? 'Guide On' : 'Guide Off'}
+                label={t(guideVolume === 0 ? 'playback.hud.guideOn' : 'playback.hud.guideOff')}
                 onClick={() => setPersistedGuideVolume(guideVolume > 0 ? 0 : 0.3)}
               />
               <TouchButton
-                label="Guide +"
+                label={t('playback.playbackHud.guide')}
                 onClick={() => setPersistedGuideVolume(guideVolume + 0.1)}
               />
               <TouchButton
-                label="Guide -"
+                label={t('playback.playbackHud.guide2')}
                 onClick={() => setPersistedGuideVolume(guideVolume - 0.1)}
               />
             </>
@@ -253,21 +248,21 @@ function TouchControls({
           {!multiplayer && (
             <>
               <TouchButton
-                label={micUserEnabled ? 'Mic Off' : 'Mic On'}
+                label={t(micUserEnabled ? 'playback.hud.micOff' : 'playback.hud.micOn')}
                 onClick={handleToggleMic}
               />
-              <TouchButton label="Mic Select" onClick={handleCycleMic} />
+              <TouchButton label={t('playback.playbackHud.micSelect')} onClick={handleCycleMic} />
             </>
           )}
           <TouchButton
-            label={micMonitorUserEnabled ? 'Monitor Off' : 'Monitor On'}
+            label={t(micMonitorUserEnabled ? 'playback.hud.monitorOff' : 'playback.hud.monitorOn')}
             onClick={handleToggleMicMonitor}
           />
-          <TouchButton label="Theme" onClick={cycleTheme} />
+          <TouchButton label={t('playback.playbackHud.theme')} onClick={cycleTheme} />
           <TouchButton
-            label="Flavor"
+            label={t('playback.playbackHud.flavor')}
             onClick={cycleFlavor}
-            disabled={!isPixabayTheme(themeIndex)}
+            disabled={!isPixabayTheme(theme)}
           />
         </div>
       )}
@@ -292,7 +287,7 @@ function Disclaimer({
   if (noStems && micActive) {
     return (
       <DisclaimerNote position={position}>
-        Original mix is used, so pitch scoring will likely be inaccurate
+        {t('playback.playbackHud.originalMixIsUsedSoDescription')}
       </DisclaimerNote>
     );
   }
@@ -304,8 +299,8 @@ function Disclaimer({
 
   const text =
     source === 'lyrics'
-      ? 'Timing is AI-generated and may not be perfectly accurate'
-      : 'Lyrics and timing are AI-generated and may not be perfectly accurate';
+      ? t('playback.hud.aiTimingDisclaimer')
+      : t('playback.hud.aiLyricsTimingDisclaimer');
 
   return <DisclaimerNote position={position}>{text}</DisclaimerNote>;
 }
@@ -345,25 +340,45 @@ function creditPositionClass(position: PlaybackHudPosition, windowControls: bool
   return windowControls && position === 'bottom' ? 'top-12' : notePositionClass(position);
 }
 
-const PLAYER_COLORS = ['bg-rose-400', 'bg-fuchsia-400', 'bg-amber-400', 'bg-emerald-400'];
-
 const scoreTextClass = (score: number | null): string =>
-  `text-base md:text-lg ${score !== null && score !== 0 ? 'text-white' : 'text-white/50'}`;
+  `text-sm md:text-base ${score !== null && score !== 0 ? 'text-white' : 'text-white/50'}`;
+
+function PlayerScore({
+  player,
+  players,
+}: {
+  player: PlaybackPlayerMicState;
+  players: PlaybackPlayerMicState[];
+}) {
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <LiveStars score={player.pitchScore} size="sm" />
+      <span className={`whitespace-nowrap ${scoreTextClass(player.pitchScore)}`}>
+        {playerDisplayName(player, players)}: {player.pitchScore ?? '--'}
+      </span>
+    </div>
+  );
+}
 
 function MultiplayerScores({ players }: { players: PlaybackPlayerMicState[] }) {
   return (
-    <div className="grid justify-items-end gap-0.5" aria-label="Player scores">
-      {players.map((player, index) => (
-        <div
-          key={player.id}
-          className={`flex items-center justify-end gap-2 ${scoreTextClass(player.pitchScore)}`}
-        >
-          <span className="whitespace-nowrap">
-            {player.profile ?? `Guest ${index + 1}`}: {player.pitchScore ?? '--'}
-          </span>
-          <span className={`size-2 rounded-full ${PLAYER_COLORS[index]}`} aria-hidden="true" />
+    <div
+      className="grid justify-items-end gap-1"
+      aria-label={t('playback.playbackHud.playerScores')}
+    >
+      {players.map((player) => (
+        <div key={player.id} className="flex items-center justify-end gap-2">
+          <PlayerScore player={player} players={players} />
+          <span
+            className={`size-2 rounded-full ${playerColorOption(player.color).className}`}
+            aria-hidden="true"
+          />
           <span className="sr-only">
-            {player.micReady ? 'Microphone ready' : 'Microphone unavailable'}
+            {t(
+              player.micReady
+                ? 'playback.hud.microphoneReady'
+                : 'playback.hud.microphoneUnavailable',
+            )}
           </span>
         </div>
       ))}
@@ -386,9 +401,10 @@ function PlaybackHudImpl({
   position = 'top',
   windowControls = false,
 }: PlaybackHudProps) {
-  const { guideVolume, guideAvailable } = usePlaybackTransportState();
+  useTranslation();
+  const { duration, guideVolume, guideAvailable } = usePlaybackTransportState();
   const { subscribe, getCurrentTime } = usePlaybackTransportActions();
-  const { themeIndex, videoFlavor } = usePlaybackThemeState();
+  const { theme, videoFlavor } = usePlaybackThemeState();
   const { firstSegmentStart, lastSegmentEnd, introSkipLeadSec, segments, transcriptSource } =
     usePlaybackTranscriptState();
   const { handleSkipIntro, handleSkipOutro } = usePlaybackTranscriptActions();
@@ -400,7 +416,7 @@ function PlaybackHudImpl({
   const gapCaptionRef = useRef<HTMLOutputElement>(null);
   const gapHintRef = useRef(0);
 
-  const showPixabayCredit = isPixabayTheme(themeIndex);
+  const showPixabayCredit = isPixabayTheme(theme);
   const hasTouch = useHasTouchInput();
 
   // Update playback text without triggering React renders every frame.
@@ -442,7 +458,7 @@ function PlaybackHudImpl({
 
   const hudPosition = hudPositionClass(position);
   const rightHudOffset = windowControlsOffsetClass(position, windowControls);
-  const hudFlowClass = position === 'bottom' ? 'flex-col-reverse' : 'flex-col';
+  const rightHudFlowClass = position === 'bottom' ? 'flex-col-reverse' : 'flex-col';
   const skipButtonsClass = position === 'bottom' ? 'mb-2' : 'mt-2';
 
   return (
@@ -450,15 +466,14 @@ function PlaybackHudImpl({
       <div
         className={`pointer-events-auto absolute inset-x-0 z-20 flex justify-between gap-3 px-3 md:px-4 ${hudPosition}`}
       >
-        <div
-          className={`flex min-w-0 max-w-[58%] overflow-hidden sm:max-w-[34%] lg:max-w-[40%] ${hudFlowClass}`}
-        >
+        <div className="flex w-[70vw] min-w-0 max-w-80 flex-col sm:max-w-[48%] lg:max-w-96">
           <h1 className="line-clamp-2 [overflow-wrap:anywhere] text-base leading-tight text-white md:text-[1.375rem]">
             {title}
           </h1>
           <p className="line-clamp-1 [overflow-wrap:anywhere] text-sm text-white/70 md:text-base">
             {artist}
           </p>
+          <PlaybackTransportControls duration={duration} segments={segments} />
           <output
             ref={gapCaptionRef}
             aria-live="polite"
@@ -466,18 +481,31 @@ function PlaybackHudImpl({
             style={{ display: 'none' }}
           />
           <div className={`flex gap-2 ${skipButtonsClass}`}>
-            <SkipButton ref={skipIntroRef} label="Skip Intro" onClick={handleSkipIntro} />
-            <SkipButton ref={skipOutroRef} label="Skip Outro" onClick={handleSkipOutro} />
+            <SkipButton
+              ref={skipIntroRef}
+              label={t('playback.playbackHud.skipIntro')}
+              onClick={handleSkipIntro}
+            />
+            <SkipButton
+              ref={skipOutroRef}
+              label={t('playback.playbackHud.skipOutro')}
+              onClick={handleSkipOutro}
+            />
           </div>
         </div>
 
-        <div className={`flex min-w-0 items-end ${hudFlowClass} ${rightHudOffset}`}>
-          {multiplayer ? (
-            <MultiplayerScores players={players} />
-          ) : (
-            <div className={scoreTextClass(pitchScore)}>Score: {pitchScore ?? '--'}</div>
-          )}
-          <div className="my-1.5 hidden h-px w-full bg-white/20 sm:block" aria-hidden="true" />
+        <div className={`flex min-w-0 items-end ${rightHudFlowClass} ${rightHudOffset}`}>
+          <div className={`flex ${rightHudFlowClass}`}>
+            {multiplayer ? (
+              <MultiplayerScores players={players} />
+            ) : (
+              <div className="flex flex-col items-end gap-0.5">
+                <LiveStars score={pitchScore} />
+                <div className={scoreTextClass(pitchScore)}>{pitchScore ?? '--'}</div>
+              </div>
+            )}
+            <div className="my-1.5 hidden h-px w-full bg-white/20 sm:block" aria-hidden="true" />
+          </div>
           <div className="hidden sm:block">
             <SettingsInfo
               lyrics={transcriptLabel(transcriptSource, segments)}
@@ -487,7 +515,7 @@ function PlaybackHudImpl({
               micName={micName}
               micMonitorUserEnabled={micMonitorUserEnabled}
               multiplayer={multiplayer}
-              themeIndex={themeIndex}
+              theme={theme}
               videoFlavor={videoFlavor}
               showShortcuts={!hasTouch}
             />
@@ -500,7 +528,7 @@ function PlaybackHudImpl({
         <p
           className={`${NOTE_BASE_CLASS} ${creditPositionClass(position, windowControls)} right-4`}
         >
-          Videos by Pixabay
+          {t('playback.playbackHud.videosByPixabay')}
         </p>
       )}
 

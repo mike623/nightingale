@@ -1,6 +1,6 @@
 [package]
 name = "server"
-version = "1.2.0"
+version = "1.4.1"
 description = "Nightingale self-hosted web server."
 authors = ["rzru <rzzzzru@gmail.com>"]
 license = "GPL-3.0"
@@ -10,12 +10,24 @@ edition = "2021"
 name = "server"
 path = "src/main.rs"
 
+[lib]
+name = "server"
+path = "src/lib.rs"
+
 [dependencies]
+app-api = { path = "../../app-api" }
 app-core = { path = "../../app-core" }
 remote = { path = "../src-remote", features = ["party"] }
 
-axum = { version = "0.7", features = ["ws", "macros"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "signal"] }
+axum = { version = "0.7", features = ["ws", "macros", "multipart"] }
+tokio = { version = "1", features = [
+  "macros",
+  "rt-multi-thread",
+  "sync",
+  "signal",
+  "fs",
+  "io-util",
+] }
 tokio-stream = "0.1"
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "fs", "set-header"] }

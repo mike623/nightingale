@@ -1,3 +1,4 @@
+import { t } from '@/i18n';
 import type { MicCaptureOptions } from '@/types/MicCaptureOptions';
 import type { MicrophoneInfo } from '@/types/MicrophoneInfo';
 import type { MicSampleFrame } from '@/types/MicSampleFrame';
@@ -54,6 +55,7 @@ type ActiveCapture = {
 };
 
 const activeCaptures = new Map<string, ActiveCapture>();
+let microphoneAccess: Promise<void> | null = null;
 let workletUrl: string | null = null;
 let liveMonitorGain = DEFAULT_MONITOR_GAIN;
 let captureOpChain: Promise<unknown> = Promise.resolve();
@@ -142,19 +144,34 @@ const browserMediaDevices = (): MediaDevices | undefined => {
   return navigator.mediaDevices;
 };
 
-const listDevices = async (): Promise<MicrophoneInfo[]> => {
+const ensureMicrophoneAccess = async (mediaDevices: MediaDevices): Promise<void> => {
+  microphoneAccess ??= mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    for (const track of stream.getTracks()) {
+      track.stop();
+    }
+    return undefined;
+  });
+  try {
+    await microphoneAccess;
+  } catch (error) {
+    microphoneAccess = null;
+    throw error;
+  }
+};
+
+const listDevices = async (_combineChannels: boolean): Promise<MicrophoneInfo[]> => {
   const mediaDevices = browserMediaDevices();
   if (!mediaDevices) {
-    throw new Error(
-      'Microphone discovery is unavailable. Open Nightingale over HTTPS or localhost.',
-    );
+    throw new Error(t('settings.microphone.discoveryUnavailable'));
   }
 
+  await ensureMicrophoneAccess(mediaDevices);
   const devices = await mediaDevices.enumerateDevices();
-  const inputs = devices.filter(
-    (device) =>
-      device.kind === 'audioinput' && device.deviceId !== '' && device.deviceId !== 'default',
+  const audioInputs = devices.filter(
+    (device) => device.kind === 'audioinput' && device.deviceId !== '',
   );
+  const namedInputs = audioInputs.filter((device) => device.deviceId !== 'default');
+  const inputs = namedInputs.length > 0 ? namedInputs : audioInputs;
 
   return inputs.map((device, index) => {
     const name = device.label.trim() || `Microphone ${index + 1}`;
@@ -162,6 +179,7 @@ const listDevices = async (): Promise<MicrophoneInfo[]> => {
       id: device.deviceId || name,
       name,
       host: 'Browser',
+      channel_count: 1,
     };
   });
 };
@@ -252,6 +270,23 @@ const stopCaptureInternal = async (captureId: string): Promise<void> => {
   teardown(captureId);
 };
 
+const setMonitoringInternal = (captureId: string, enabled: boolean): void => {
+  const active = activeCaptures.get(captureId);
+  if (!active || active.emitAudio === enabled) {
+    return;
+  }
+
+  if (enabled) {
+    active.monitorGain = active.context.createGain();
+    active.monitorGain.gain.value = liveMonitorGain;
+    active.source.connect(active.monitorGain).connect(active.context.destination);
+  } else {
+    active.monitorGain?.disconnect();
+    active.monitorGain = null;
+  }
+  active.emitAudio = enabled;
+};
+
 const startCapture = (
   captureId: string,
   preferred: string | null,
@@ -262,9 +297,13 @@ const startCapture = (
 const stopCapture = (captureId: string): Promise<void> =>
   enqueueCaptureOperation(() => stopCaptureInternal(captureId));
 
+const setMonitoring = (captureId: string, enabled: boolean): Promise<void> =>
+  enqueueCaptureOperation(() => Promise.resolve(setMonitoringInternal(captureId, enabled)));
+
 export const webMicrophoneAdapter: MicrophoneAdapter = {
   listDevices,
   startCapture,
   stopCapture,
+  setMonitoring,
   subscribe: async (captureId, callback) => subscribeMicSamples(captureId, callback),
 };

@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import { clearAll, clearModels, clearVideos, sweepOrphanCache } from '@/bridge/cache';
 import { formatBytes } from '@/features/library/utils/stats';
+import { t } from '@/i18n';
 import { ANALYSIS_QUEUE, CACHE_STATS, MENU, SONGS, SONGS_META } from '@/shared/query-keys';
 
 export const useClearCache = () => {
@@ -29,10 +30,12 @@ export const useClearCache = () => {
 
         invalidate(songsChanged);
 
-        toast.info(`Cache was successfully cleared`);
+        toast.info(t('library.useClearCache.cacheWasSuccessfullyCleared'));
       } catch (error: unknown) {
         toast.error(
-          `Error while deleting cache: ${error instanceof Error ? error.message : 'unknown error'}`,
+          t('library.useClearCache.errorWhileDeletingCache', {
+            value1: error instanceof Error ? error.message : 'unknown error',
+          }),
         );
       }
     };

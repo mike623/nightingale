@@ -6,8 +6,10 @@ use ts_rs::TS;
 
 use crate::secret;
 use crate::{
+    backgrounds::{BackgroundSelection, CustomBackground},
     cache::{CachePaths, config_path},
     library_model::SongSort,
+    playback_session::PlaybackPlayer,
 };
 
 /// Where the user wants Nightingale to source songs from. Persisted in
@@ -181,9 +183,18 @@ pub struct AppConfig {
     #[serde(default)]
     pub library_source: Option<LibrarySource>,
     pub last_theme: Option<usize>,
+    #[serde(default)]
+    pub custom_backgrounds: Vec<CustomBackground>,
+    pub last_background: Option<BackgroundSelection>,
     pub guide_volume: Option<f64>,
     pub master_volume: Option<f64>,
     pub fullscreen: Option<bool>,
+    #[serde(default)]
+    #[ts(skip)]
+    pub desktop_window: WindowState,
+    #[serde(default)]
+    #[ts(skip)]
+    pub playback_window: WindowState,
     pub playback_mode: Option<String>,
     pub dark_mode: Option<bool>,
     pub mic_active: Option<bool>,
@@ -195,7 +206,10 @@ pub struct AppConfig {
     #[serde(alias = "mic_mirror_gain")]
     pub mic_monitor_gain: Option<f64>,
     pub mic_latency_compensation_sec: Option<f64>,
+    pub combine_multi_channel: Option<bool>,
+    pub multiplayer_combine_multi_channel: Option<bool>,
     pub preferred_mic: Option<String>,
+    pub multiplayer_players: Option<Vec<PlaybackPlayer>>,
     pub whisper_model: Option<String>,
     pub beam_size: Option<u32>,
     pub batch_size: Option<u32>,
@@ -246,9 +260,15 @@ pub struct AppConfig {
     /// offset on the running song only; nothing on disk changes.
     #[serde(default)]
     pub party_lyric_shift: bool,
+    /// When `true`, the results screen starts the next queued song by itself
+    /// after a short countdown.
+    pub auto_continue_queue: Option<bool>,
     pub song_list_view: Option<String>,
     #[serde(default, deserialize_with = "deserialize_song_list_sort")]
     pub song_list_sort: Option<Vec<SongSort>>,
+    /// Interface language preference (`system` or a BCP 47 tag such as
+    /// `zh-cn`). `None` follows the system language.
+    pub language: Option<String>,
     pub language_overrides: Option<HashMap<String, String>>,
 }
 
@@ -283,16 +303,23 @@ impl Default for AppConfig {
             last_folder: None,
             library_source: None,
             last_theme: None,
+            custom_backgrounds: Vec::new(),
+            last_background: None,
             guide_volume: None,
             master_volume: None,
             fullscreen: None,
+            desktop_window: WindowState::default(),
+            playback_window: WindowState::default(),
             playback_mode: None,
             dark_mode: None,
             mic_active: None,
             mic_monitoring: None,
             mic_monitor_gain: None,
             mic_latency_compensation_sec: None,
+            combine_multi_channel: None,
+            multiplayer_combine_multi_channel: None,
             preferred_mic: None,
+            multiplayer_players: None,
             whisper_model: None,
             beam_size: None,
             batch_size: None,
@@ -315,11 +342,20 @@ impl Default for AppConfig {
             remote_control: false,
             party_import: false,
             party_lyric_shift: false,
+            auto_continue_queue: None,
             song_list_view: None,
             song_list_sort: None,
+            language: None,
             language_overrides: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WindowState {
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub maximized: bool,
 }
 
 impl AppConfig {

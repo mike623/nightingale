@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { type TranslationKey } from '@/i18n';
 import { Stars } from '@/shared/components/shared/stars';
 import { formatSeconds } from '@/shared/utils/format-duration';
 import type { QueuedStatus } from '@/types/QueuedStatus';
@@ -7,22 +8,31 @@ import type { Song } from '@/types/Song';
 import type { SongSortColumn } from '@/types/SongSortColumn';
 
 import { AlbumArt } from '../song/album-art';
-import { LanguageBadge } from '../song/language-badge';
+import { LanguageBadge, NgeBadge } from '../song/language-badge';
+import { SongQuickActions } from '../song/song-quick-actions';
 import { StatusBadge } from '../song/status-badge';
+import type { SongListActions } from './types';
 
 export type SongColumn = {
   id: string;
-  header: ReactNode;
+  header: TranslationKey;
+  headerClassName?: string;
   sortColumn?: SongSortColumn;
   thClassName: string;
   tdClassName: string;
-  cell: (song: Song, queueStatus?: QueuedStatus, bestScore?: number) => ReactNode;
+  cell: (
+    song: Song,
+    queueStatus?: QueuedStatus,
+    bestScore?: number,
+    actions?: SongListActions,
+  ) => ReactNode;
 };
 
 export const SONG_COLUMNS: SongColumn[] = [
   {
     id: 'thumbnail',
-    header: <span className="sr-only">Cover</span>,
+    header: 'library.songList.songColumns.cover',
+    headerClassName: 'sr-only',
     thClassName: 'song-table-thumbnail px-2 py-2 font-medium',
     tdClassName: 'song-table-thumbnail py-1.5 pr-2 pl-2',
     cell: (song) => (
@@ -36,7 +46,7 @@ export const SONG_COLUMNS: SongColumn[] = [
   },
   {
     id: 'song',
-    header: 'Song',
+    header: 'library.columns.song',
     sortColumn: 'title',
     thClassName: 'song-table-song px-2 py-2 font-medium',
     tdClassName: 'song-table-song px-2 py-2 align-middle font-medium',
@@ -45,6 +55,7 @@ export const SONG_COLUMNS: SongColumn[] = [
         <div className="flex h-5 min-w-0 items-center gap-2">
           <span className="min-w-0 truncate leading-5">{song.title}</span>
           <LanguageBadge language={song.language} />
+          <NgeBadge song={song} />
         </div>
         {bestScore === undefined ? null : <Stars score={bestScore} size="sm" className="mt-0.5" />}
       </div>
@@ -52,7 +63,7 @@ export const SONG_COLUMNS: SongColumn[] = [
   },
   {
     id: 'band',
-    header: 'Artist',
+    header: 'library.columns.artist',
     sortColumn: 'artist',
     thClassName: 'song-table-band px-2 py-2 font-medium',
     tdClassName: 'song-table-band px-2 py-2 text-muted-foreground',
@@ -60,7 +71,7 @@ export const SONG_COLUMNS: SongColumn[] = [
   },
   {
     id: 'album',
-    header: 'Album',
+    header: 'library.columns.album',
     sortColumn: 'album',
     thClassName: 'song-table-album px-2 py-2 font-medium',
     tdClassName: 'song-table-album px-2 py-2 text-muted-foreground',
@@ -68,7 +79,7 @@ export const SONG_COLUMNS: SongColumn[] = [
   },
   {
     id: 'duration',
-    header: 'Duration',
+    header: 'library.columns.duration',
     sortColumn: 'duration',
     thClassName: 'song-table-duration px-2 py-2 font-medium',
     tdClassName:
@@ -77,10 +88,21 @@ export const SONG_COLUMNS: SongColumn[] = [
   },
   {
     id: 'status',
-    header: 'Analysis status',
+    header: 'library.columns.analysisStatus',
     sortColumn: 'status',
     thClassName: 'song-table-status px-2 py-2 text-right font-medium',
     tdClassName: 'song-table-status px-2 py-2 text-right',
     cell: (song, queueStatus) => <StatusBadge song={song} queueStatus={queueStatus} />,
+  },
+  {
+    id: 'actions',
+    header: 'common.actions.label',
+    headerClassName: 'sr-only',
+    thClassName: 'song-table-actions px-2 py-2',
+    tdClassName: 'song-table-actions px-2 py-2 text-right',
+    cell: (song, queueStatus, _bestScore, actions) =>
+      actions === undefined ? null : (
+        <SongQuickActions song={song} queueStatus={queueStatus} {...actions} />
+      ),
   },
 ];

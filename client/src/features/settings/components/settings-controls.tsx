@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { t, translateText, type TranslationKey } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
 import { ButtonGroup } from '@/shared/components/ui/button-group';
 import { FieldDescription } from '@/shared/components/ui/field';
@@ -14,14 +15,16 @@ import {
 } from '@/shared/components/ui/select';
 import { cn } from '@/shared/utils/cn';
 
-import { NUMBER_PICKER_SIZE, type SettingsOption } from './constants';
+import { NUMBER_PICKER_SIZE } from './constants';
+
+type SettingsSelectOption = { value: string; label: string; description?: string };
 
 type SettingsSelectProps = {
   id?: string;
   label: string;
   placeholder: string;
   value: string;
-  options: SettingsOption[];
+  options: readonly SettingsSelectOption[];
   disabled?: boolean;
   triggerClassName?: string;
   onValueChange: (value: string) => void;
@@ -46,8 +49,14 @@ export function SettingsSelect({
         <SelectGroup>
           <SelectLabel>{label}</SelectLabel>
           {options.map((option) => (
-            <SelectItem key={option.value} value={option.value} description={option.description}>
-              {option.label}
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              description={
+                option.description !== undefined ? translateText(option.description) : undefined
+              }
+            >
+              {translateText(option.label)}
             </SelectItem>
           ))}
         </SelectGroup>
@@ -58,7 +67,7 @@ export function SettingsSelect({
 
 type SettingsButtonGroupOption<T> = {
   value: T;
-  label: string;
+  label: TranslationKey;
 };
 
 type SettingsButtonGroupProps<T> = {
@@ -85,7 +94,7 @@ export function SettingsButtonGroup<T>({
           onClick={() => onChange(option.value)}
           className={getFocusClassName(segment, index)}
         >
-          {option.label}
+          {t(option.label)}
         </Button>
       ))}
     </ButtonGroup>
@@ -163,10 +172,9 @@ export function OnOffButtonGroup({
 export function PageHeader() {
   return (
     <div className="space-y-1">
-      <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Settings</h1>
+      <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{t('common.settings')}</h1>
       <p className="text-sm text-muted-foreground">
-        Set how Nightingale looks and sounds during playback, and control how it separates vocals,
-        transcribes lyrics, and syncs them to the music when analyzing songs.
+        {t('settings.settingsControls.setHowNightingaleLooksAndDescription')}
       </p>
     </div>
   );

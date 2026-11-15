@@ -9,6 +9,7 @@ import { MultiplayerSetupDialog } from '@/features/playback/components/dialogs/m
 import { usePlaybackLauncher } from '@/features/playback/hooks/use-playback-launcher';
 import { usePreparePlaybackMutation } from '@/features/playback/mutations/use-prepare-playback-mutation';
 import { useBestScoresBySongForActiveProfile } from '@/features/profiles/hooks/use-best-scores-by-song';
+import { t } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
 import { Separator } from '@/shared/components/ui/separator';
 import { Spinner } from '@/shared/components/ui/spinner';
@@ -28,6 +29,23 @@ type SongDetailsSidebarProps = {
   onClose: () => void;
 };
 
+function deriveAnalysisCaps(
+  song: Song,
+  isReady: boolean,
+  keyPending: boolean,
+): { supportsShifts: boolean; supportsAnalysisActions: boolean } {
+  if (song.path.toLowerCase().endsWith('.nge')) {
+    return {
+      supportsShifts: song.is_analyzed && song.transcript_source !== 'Usdx' && !keyPending,
+      supportsAnalysisActions: false,
+    };
+  }
+  return {
+    supportsShifts: song.is_analyzed && song.transcript_source !== 'Usdx' && !keyPending,
+    supportsAnalysisActions: isReady && song.transcript_source !== 'Usdx',
+  };
+}
+
 type AddToQueueButtonProps = {
   song: Song;
   tempo: number;
@@ -45,8 +63,8 @@ function AddToQueueButton({ song, tempo, keyOffset, ready, preparing }: AddToQue
       size="icon-lg"
       disabled={!ready || preparing || isLoading}
       onClick={() => addToQueue({ song, tempo, keyOffset })}
-      aria-label={`Add ${song.title} to playback queue`}
-      title="Add to queue"
+      aria-label={t('library.songDetails.addToQueueLabel', { title: song.title })}
+      title={t('library.songDetails.songDetailsSidebar.addToQueue')}
     >
       <ListPlusIcon />
     </Button>
@@ -71,8 +89,11 @@ export const SongDetailsSidebar = ({ song, queueStatus, onClose }: SongDetailsSi
   // key/tempo section as pending rather than showing controls.
   const keyPending =
     song.is_analyzed && song.transcript_source === 'Lrc' && song.no_stems && song.key === null;
-  const supportsShifts = song.is_analyzed && song.transcript_source !== 'Usdx' && !keyPending;
-  const supportsAnalysisActions = status.isReady === true && song.transcript_source !== 'Usdx';
+  const { supportsShifts, supportsAnalysisActions } = deriveAnalysisCaps(
+    song,
+    status.isReady === true,
+    keyPending,
+  );
   const playbackDisabled = status.isReady !== true || preparingPlayback;
 
   // Off-queue key detection doesn't invalidate any query, so poll the song list
@@ -114,7 +135,7 @@ export const SongDetailsSidebar = ({ song, queueStatus, onClose }: SongDetailsSi
     <aside
       ref={detailsRef}
       className="flex min-h-0 min-w-0 flex-1 flex-col border-l bg-background [&_[data-song-details-focused=true]]:z-10 [&_[data-song-details-focused=true]]:ring-2 [&_[data-song-details-focused=true]]:ring-primary xl:w-96 xl:flex-none"
-      aria-label="Song details"
+      aria-label={t('library.songDetails.songDetailsSidebar.songDetails')}
     >
       <SongDetailsHeader
         song={song}
@@ -159,11 +180,13 @@ export const SongDetailsSidebar = ({ song, queueStatus, onClose }: SongDetailsSi
         >
           {preparingPlayback ? (
             <>
-              <Spinner className="size-4" /> Preparing playback…
+              <Spinner className="size-4" />
+              {t('library.songDetails.songDetailsSidebar.preparingPlayback')}
             </>
           ) : (
             <>
-              <PlayIcon /> Play
+              <PlayIcon />
+              {t('common.actions.play')}
             </>
           )}
         </Button>
@@ -172,8 +195,8 @@ export const SongDetailsSidebar = ({ song, queueStatus, onClose }: SongDetailsSi
           size="icon-lg"
           disabled={playbackDisabled}
           onClick={() => setMultiplayerOpen(true)}
-          aria-label={`Play ${song.title} in multiplayer`}
-          title="Play multiplayer"
+          aria-label={t('library.songDetails.multiplayerLabel', { title: song.title })}
+          title={t('library.songDetails.songDetailsSidebar.playMultiplayer')}
         >
           <UsersIcon />
         </Button>

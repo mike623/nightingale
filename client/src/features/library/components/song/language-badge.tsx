@@ -1,6 +1,24 @@
 import { getLanguageName } from '@/features/lyrics/lib/languages';
+import { t } from '@/i18n';
+import type { Song } from '@/types/Song';
 
 const UNKNOWN_LANGUAGE_CODES = new Set(['un', 'und', 'unk', 'unknown']);
+
+export function NgeBadge({ song }: { song: Song }) {
+  if (!song.path.toLowerCase().endsWith('.nge')) {
+    return null;
+  }
+
+  return (
+    <span
+      className="inline-grid h-5 min-w-5 shrink-0 place-items-center rounded-sm bg-blue-500/12 px-1 text-center font-mono text-[0.5625rem] leading-none font-semibold tracking-tight text-blue-600 ring-1 ring-blue-500/30 ring-inset dark:text-blue-400 dark:ring-blue-400/30"
+      title={t('library.song.languageBadge.nightingaleBundleNge')}
+      aria-label={t('library.song.languageBadge.nightingaleBundleFile')}
+    >
+      NGE
+    </span>
+  );
+}
 
 /** Whether a language is concrete enough to surface in the UI. Provided LRC
  * songs default to "unknown", which we hide rather than show as "UN". */
@@ -23,7 +41,7 @@ export function LanguageBadge({ language }: { language?: string | null }) {
     <span
       className="inline-grid size-5 shrink-0 place-items-center rounded-sm bg-foreground/8 p-0 text-center font-mono text-[0.5625rem] leading-none font-semibold tracking-tight text-muted-foreground ring-1 ring-foreground/10 ring-inset"
       title={getLanguageName(language)}
-      aria-label={`Language: ${getLanguageName(language)}`}
+      aria-label={t('library.song.languageLabel', { language: getLanguageName(language) })}
     >
       {shortCode}
     </span>

@@ -1,19 +1,9 @@
-mod bootstrap;
-mod commands;
-mod events;
-mod media;
-mod state;
-mod static_files;
-mod ws;
-
 use std::net::SocketAddr;
+use std::sync::Arc;
 
-use axum::routing::{any, get, post};
-use axum::Router;
 use clap::Parser;
+use server::{AppState, EventBus};
 use tracing_subscriber::EnvFilter;
-
-use crate::state::AppState;
 
 #[derive(Debug, Parser)]
 #[command(name = "server", about = "Nightingale self-hosted web server.")]
@@ -32,6 +22,13 @@ struct Args {
     /// be picked in the browser (ideal for Docker / headless installs).
     #[arg(long, env = "NIGHTINGALE_LIBRARY_PATH")]
     library: Option<String>,
+
+    /// Base URL phones should use for the queue QR, e.g.
+    /// `http://192.168.1.10:8080`. Equivalent to `NIGHTINGALE_REMOTE_URL=...`.
+    /// Overrides LAN address detection, which cannot see a container port
+    /// mapping or a proxy forwarding to a loopback bind.
+    #[arg(long, env = "NIGHTINGALE_REMOTE_URL")]
+    remote_url: Option<String>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -79,22 +76,31 @@ async fn main() -> Result<(), String> {
     };
 
     // Bind first: with `:0` the configured port is not the one phones must
-    // dial, and the bootstrap response carries that URL.
-    let bind_port = match listener.local_addr() {
-        Ok(addr) => addr.port(),
+    // dial, and both remote surfaces hand out a URL built from it.
+    let bound = match listener.local_addr() {
+        Ok(addr) => addr,
         Err(e) => {
             tracing::error!("bound listener has no local address: {e}");
             std::process::exit(1);
         }
     };
 
-    let state = AppState::new(data.is_some(), library.is_some(), bind_port);
+    let events = Arc::new(EventBus::new());
+    let commands = app_api::CommandState::new(events.clone());
+    let state = AppState::new(
+        commands.clone(),
+        events.clone(),
+        app_core::RemoteControl::load(),
+        server::RemoteAddress::new(bound, args.remote_url.clone()),
+        data.is_some(),
+        library.is_some(),
+    );
 
     // The import worker is the same one the desktop runs; only the way it
     // announces itself differs. `run_import_worker` never returns, so it owns a
     // blocking thread rather than a task on the async runtime.
     {
-        let events = state.events.clone();
+        let events = events.clone();
         std::thread::spawn(move || {
             app_core::run_import_worker(|event| match event {
                 app_core::ImportEvent::Progress(progress) => {
@@ -107,21 +113,13 @@ async fn main() -> Result<(), String> {
     }
 
     let party = {
-        let events = state.events.clone();
-        remote::party::PartyState::new(state.playback_queue.clone(), move |entries| {
+        let events = events.clone();
+        remote::party::PartyState::new(commands.playback_queue(), move |entries| {
             events.emit("playback-queue-changed", &entries);
         })
     };
 
-    let app = Router::new()
-        .route("/api/bootstrap", get(bootstrap::handle))
-        .route("/api/cmd/:name", post(commands::handle_cmd))
-        .route("/api/asset", get(media::handle_asset))
-        .route("/media/:hash/:kind", get(media::handle_hashed))
-        .route("/ws", any(ws::handle_upgrade))
-        .fallback(static_files::handle)
-        .with_state(state.clone())
-        .merge(remote::party::router(party));
+    let app = server::router(state).merge(remote::party::router(party));
 
     tracing::info!(addr = %args.bind, "Nightingale self-hosted server listening");
 

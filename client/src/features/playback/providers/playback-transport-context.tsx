@@ -28,6 +28,7 @@ import {
   type TimeSubscriber,
   useAudioPlayer,
 } from '@/features/playback/hooks/use-audio-player';
+import { t } from '@/i18n';
 
 export type PlaybackTransportState = {
   isReady: boolean;
@@ -50,6 +51,7 @@ export type PlaybackTransportActions = {
   getVocalsBuffer: AudioPlayer['getVocalsBuffer'];
   getScoringBuffer: AudioPlayer['getScoringBuffer'];
   getAudioContext: AudioPlayer['getAudioContext'];
+  startPlayback: () => void;
   /** Raw audio-engine pause; does NOT raise the `paused` UI flag. */
   pauseAudio: () => void;
   handlePause: () => void;
@@ -98,7 +100,9 @@ export function PlaybackTransportProvider({
         return;
       }
       if (typeof event.error === 'string' && event.error !== '') {
-        toast.error(`Stem conversion failed: ${event.error}`);
+        toast.error(
+          t('playback.playbackTransportContext.stemConversionFailed', { value1: event.error }),
+        );
         void navigate('/', { replace: true });
       } else {
         setStemsReady(true);
@@ -184,6 +188,7 @@ export function PlaybackTransportProvider({
       getVocalsBuffer: audio.getVocalsBuffer,
       getScoringBuffer: audio.getScoringBuffer,
       getAudioContext: audio.getAudioContext,
+      startPlayback: audio.play,
       pauseAudio: audio.pause,
       handlePause,
       handleContinue,
@@ -198,6 +203,7 @@ export function PlaybackTransportProvider({
       audio.getVocalsBuffer,
       audio.getScoringBuffer,
       audio.getAudioContext,
+      audio.play,
       audio.pause,
       handlePause,
       handleContinue,

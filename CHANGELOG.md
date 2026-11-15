@@ -38,14 +38,10 @@ below.
 - A song imported from YouTube has a Re-download video action in its details panel, for a download that arrived broken or in a codec the player cannot decode. It fetches the video again and replaces the file. Lyrics, timing, and stems are kept when the new video runs the same length as the old one, and are rebuilt when it does not. The song's name, scores, and play history follow it either way, and nothing is offered for songs that did not come from an import.
 - A finished import that had failures offers a Retry button next to New import, so songs whose download failed can be tried again without pasting the link back in. The retry re-runs the same batch: tracks already on disk are skipped without downloading, and a playlist keeps its full membership.
 - The playback overlay's top-right readout now names the lyrics the song is playing with: `UltraStar`, `Enhanced LRC`, `LRC`, `Aligned (AI)`, `Generated (AI)`, or `none` when the song has no lyrics at all. Plain and Enhanced LRC stay distinct because they carry line-level and word-level timing respectively.
-- Added a master volume control to Playback settings.
-- Added local multiplayer playback for two to four singers, with per-player microphone and profile selection, editable queue lineups, keyboard and gamepad navigation, live scores, and ranked results.
-- **Rescan library** now also picks up analyses that another machine left in a shared cache folder: songs already in the library whose stems and transcript exist in the cache are marked ready without re-running analysis, and a toast summarizes how many were updated.
-- The lyrics editor pre-fills from a `.lrc` / `.elrc` file next to a local song's audio when the song has no lyrics yet, and offers a **Use local .lrc** action otherwise; nothing is written until Save.
-- Added the ability to toggle the display of romanized lyrics for CJK languages in Settings.
 
 ### Improvements
 
+- Merged upstream 1.4.1. Upstream's token-paired phone queue link (port 64449) and this fork's party remote (port 51737) now ship side by side so the two can be compared before one is adopted. Commands shared by the desktop and self-hosted builds now live in `app-api`, which also gives the web build song delete, rename, play history, orphan cache cleanup, manual LRCLIB search, and lyric clearing.
 - The phone remote's Library tab now scrolls the whole library in one list instead of ending each page with a Show more button. The host says how many songs match and the list reserves the room for all of them, keeping only the rows near the screen in the page, so a library of any size stays as quick to scroll near the end as at the start. Songs are fetched a page at a time for wherever the list has been scrolled to rather than one page after another from the top, and a row whose song has not arrived holds its place rather than shifting the list when it does. The search box now stays in reach above the list rather than scrolling away with it.
 - Adding a song from the phone now confirms it by name. The queue can be on another tab and the host screen is across the room, so a tap that changed nothing visible looked like a tap that did nothing.
 - The phone remote page now scrolls when its controls are taller than the screen. The page previously relied on the window scrolling, which the application window deliberately does not do, so anything below the fold was unreachable on a short phone screen.
@@ -62,9 +58,6 @@ below.
 - Pushes to `dev-port` now publish a signed release the desktop updater picks up, versioned `<next-minor>-mike.<run>` so each dev build supersedes the last without outranking a real release of that version.
 - YouTube imports now prefer H.264 video and AAC audio, so downloaded videos play in the desktop webview without conversion.
 - Added `scripts/repair-videos.sh`, which converts already-imported videos the webview cannot decode into cached playable copies. Source files, song identity, and existing analysis are left untouched.
-- Migrated library persistence from handwritten runtime SQL to Diesel's typed SQLite query builder without changing existing databases or library behavior.
-- Playback queue songs can now be reordered by dragging or with Alt+Arrow keys.
-- The playback screen now shows the song's cover art, title, and artist on a loading screen while audio is still downloading/decoding, instead of a blank/shader background.
 
 ### Fixes
 
@@ -76,11 +69,90 @@ below.
 - Saving lyrics while a song is playing now updates the running playback. The transcript was loaded once per song, so new timing only appeared after a restart.
 - A cached playable copy of a video is now used ahead of the original, so an MP4 holding codecs the webview cannot decode no longer plays as a black or silent screen.
 - Intel Mac analyzer setup now uses a Numba release with prebuilt binaries, avoiding an LLVM-dependent source build failure.
+
+## [1.4.1] - 2026-11-09
+
+### Fixes
+
+- Song titles and other Latin text no longer show a wide gap around typographic quotes and dashes.
+- Song covers are visible again in installed desktop builds, where they had been blocked from loading.
+
+## [1.4.0] - 2026-11-06
+
+### Features
+
+- Added an interface language selector with English, German, and Simplified Chinese, plus contributor-friendly translation catalogs for the whole app. The choice is saved with your Nightingale settings, so it follows you to the playback window and self-hosted sessions. Switching language updates every surface, including the separate playback window and later system changes, and counted text follows each language's own plural rules.
+- Quickly analyze, play, or queue songs from the song list and card menus.
+- Added a full-screen pitch graph with scrolling target notes, stable live pitch tracking, octave guidance, audio-reactive visuals, and color-coded multiplayer trails.
+- Added playback scrubbing and controls to jump by one second or one lyric line.
+- Added `.nge` song bundles that play directly without unpacking, with clear read-only actions.
+- Added `.nge` export for analyzed songs from local folders, Jellyfin, Navidrome, and Plex on desktop and self-hosted web.
+- Playback now shows your score as five stars that fill in as you sing, with the score as a plain number beneath them.
+- Added a phone queue link: scan the QR code in the sidebar header and control the queue, playback, and playback settings from a phone on the same network.
+- The results screen now offers **Auto-continue**, which starts the next queued song after a five-second countdown. Your choice is remembered, so a queue keeps running hands-free.
+
+### Fixes
+
+- The phone now hides the playback transport, seek bar, and settings once the playback window or browser tab closes, instead of leaving controls for a playback that is gone.
+- The phone no longer offers **Skip Outro** while the results screen is already showing on the host.
+- The analysis status badge now names the lyrics source on its own instead of appending it in parentheses, so long labels no longer spill over the actions column in the song list.
+- Session mode now opens browser playback directly so audio can start, and desktop playback windows show cover art while loading.
+- Playback now waits for the background, lyrics, and HUD to finish loading before the music starts, with a smooth loading backdrop that stays responsive while playback prepares.
+- Multiplayer guest names now number only guest singers, while a single guest is simply labeled **Guest**.
+- Singer trails now follow the song's octave from the first note, and singers sharing a room no longer appear in separate octaves.
+- The playback score divider now matches the score width instead of the settings block beneath it.
+- Seeking backward during playback now rewinds the pitch graph and removes score earned after the new position.
+- Microphone monitoring now pauses with playback and toggles without restarting the microphone stream, preventing buffer underrun warning floods.
+- Desktop cover thumbnails now load through the authenticated local media server instead of a custom URL scheme that some webviews block as cross-origin.
+
+## [1.3.0] - 2026-10-15
+
+### Features
+
+- Desktop and Playback windows now remember their size and whether they were maximized between launches.
+- Added independent **Combine multi-channel** controls for solo and multiplayer scoring, shown when a multi-channel desktop input is available.
+- Added custom playback backgrounds from uploaded files or HTTPS links, automatically recognizing supported static image, Nightingale GLSL shader, and silent looping video extensions.
+- Added a master volume control to Playback settings.
+- Added local multiplayer playback for two to four singers, with per-player microphone and profile selection, editable queue lineups, keyboard and gamepad navigation, live scores, and ranked results.
+- Multiplayer setup now lets each player choose a color used in the playback HUD, pitch graph, and results.
+- Multiplayer setup now remembers player profile and microphone assignments in app settings and closes after starting playback.
+- **Rescan library** now also picks up analyses that another machine left in a shared cache folder: songs already in the library whose stems and transcript exist in the cache are marked ready without re-running analysis, and a toast summarizes how many were updated.
+- The lyrics editor pre-fills from a `.lrc` / `.elrc` file next to a local song's audio when the song has no lyrics yet, and offers a **Use local .lrc** action otherwise; nothing is written until Save.
+- Added the ability to toggle the display of romanized lyrics for CJK languages in Settings.
+- Added a **Folders** section to the sidebar for local folder libraries: it keeps the library's subfolder hierarchy, subfolders open and close with their chevron (or by selecting the folder again), and selecting a folder shows its songs and those of its subfolders.
+- Lyrics can carry a note above any word with `{word|note}` in the lyrics editor, in every language: it replaces the automatic reading (romaji, pinyin, Jyutping, romanization) of the characters it covers or adds one (e.g. `{君|kimi}`, `{行|háng}`, `{colour|color}`). For Japanese, a kana note (`{彷徨|さまよ}って`) also guides alignment.
+- Line-timed LRC can now guide alignment: the lyrics editor's new **Align words** timing keeps each line's LRC timing and has the AI time only the words inside it, so one misheard passage can no longer shift the rest of the song. Each word stays lit until the next one starts and a line stays on screen until its LRC end, unless the singing stops for a long pause.
+
+### Improvements
+
+- Albums now appear beneath expandable artists in the sidebar, while both artist and album rows remain selectable.
+- Desktop IPC and self-hosted HTTP commands now use one shared backend dispatcher, keeping command behavior and validation consistent across both runtimes.
+- Migrated library persistence from handwritten runtime SQL to Diesel's typed SQLite query builder without changing existing databases or library behavior.
+- Playback queue songs can now be reordered by dragging or with Alt+Arrow keys.
+- The playback screen now shows the song's cover art, title, and artist on a loading screen while audio is still downloading/decoding, instead of a blank/shader background.
+- The lyrics editor shows the LRC timing syntax (`[mm:ss.xx]` per line, `<mm:ss.xx>` per word) under the text box.
+
+### Fixes
+
+- Desktop drag-resizing no longer performs macOS window queries or renderer IPC; dimensions are captured from native resize events and persisted when the window closes.
+- Audio-reactive backgrounds in multiplayer now respond to the merged microphone waveform from every player instead of only Player 1.
+- Self-hosted web mode now requests microphone permission before enumerating inputs, so browsers expose the available devices.
+- Closing the main desktop window now exits after its native webview is destroyed, preventing a lingering event loop and WebView2 window-class cleanup errors.
+- Fixed the Docker image's frontend build by matching the Node 22 and pnpm 11 versions that `client/package.json` requires.
+- Whisper now falls back to CPU when CTranslate2 has no CUDA support (for example the CPU-only aarch64 wheels), instead of failing analysis.
+- Multiplayer setup now retains a remembered microphone assignment when that device is disconnected, so it can be restored when it returns.
+- Multiplayer channels on the same audio interface now share one hardware input stream, preventing duplicate device opens and buffer underruns while reporting stream startup failures instead of silently reusing a stopped worker.
+- Playback windows now restore their saved size and maximized state without delaying their appearance.
+- Updated desktop microphone capture to CPAL 0.18.2, which fixes Windows ASIO device enumeration and stream creation from worker threads.
 - Song details now open without re-rendering every loaded song or initializing multiplayer devices.
 - Song selections now remain active while searching and after clearing the search field.
 - Song search is now case- and accent-insensitive for Unicode metadata and paths.
 - Stems, source videos, and background videos now play when the songs or videos cache has been moved to a separate folder (for example a network share): the desktop and self-hosted media servers only allowed files under the data folder and library folder, so a relocated cache failed with "Failed to fetch instrumental: 404".
 - Analysis status sorting now orders ready songs by the transcript source shown in their status badge.
+- Japanese romaji now reads kanji in sentence context (彷徨って → samayotte, 君 → kimi instead of hōkō / kun), romanizes the particles は / へ as wa / e, handles small っ across word boundaries, treats half-width spaces as word breaks (街 家 → machi ie, not machi ka), and fixes fixed words the dictionary splits or lacks (三日月, 駆く). Readings for display and alignment come from the same contextual kana.
+- Lyrics now follow the song at a changed tempo after the lyrics were edited or re-aligned: the tempo-scaled lyric timings are rebuilt when missing instead of falling back to the original-speed timings.
+- Qwen lyrics alignment no longer shifts words onto the wrong lines after a token that spans two lyric lines (金の塔 / 北の丘 aligned as "塔北").
+- Lyrics alignment no longer keeps a word highlighted through instrumental breaks or long pauses: words stretched over a vocal silence are trimmed to their sung part.
 
 ## [1.2.0] - 2026-09-02
 

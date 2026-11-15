@@ -1,6 +1,6 @@
 [package]
 name = "Nightingale"
-version = "1.2.0"
+version = "1.4.1"
 description = "Nightingale — Karaoke from your music library."
 authors = ["rzru <rzzzzru@gmail.com>"]
 license = "GPL-3.0"
@@ -20,8 +20,10 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # App Core
+app-api = { path = "../../app-api" }
 app-core = { path = "../../app-core" }
 remote = { path = "../src-remote", features = ["listener"] }
+server = { path = "../src-server" }
 
 # Dependencies
 tauri = { version = "2", features = ["protocol-asset"] }
@@ -33,12 +35,13 @@ tauri-plugin-updater = "2"
 tauri-plugin-clipboard-manager = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+axum = "0.7"
+tokio = { version = "1", features = ["io-util", "net", "rt-multi-thread", "sync", "time"] }
 base64 = "0.22"
 ts-rs = { version = "12", features = ["no-serde-warnings"] }
 dotenvy = "0.15.7"
-cpal = { version = "0.17", features = ["asio"] }
+cpal = { version = "0.18.2", features = ["asio"] }
 once_cell = "1"
-tokio = { version = "1", features = ["sync", "io-util", "net", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 dirs = "6"

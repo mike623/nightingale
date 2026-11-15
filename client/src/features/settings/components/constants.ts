@@ -3,6 +3,7 @@ import {
   DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
   MAX_MIC_LATENCY_COMPENSATION_SEC,
 } from '@/features/playback/lib/pitch/constants';
+import type { TranslationKey } from '@/i18n';
 import type { AppConfig } from '@/types/AppConfig';
 
 export { PLAYBACK_SCALE_MAX, PLAYBACK_SCALE_MIN } from '@/features/playback/lib/display-scale';
@@ -10,61 +11,57 @@ export { PLAYBACK_SCALE_MAX, PLAYBACK_SCALE_MIN } from '@/features/playback/lib/
 export type SettingsTab = 'general' | 'playback' | 'analysis';
 export type SettingsOption = {
   value: string;
-  label: string;
-  description?: string;
+  label: TranslationKey;
+  description?: TranslationKey;
 };
 
-export const SETTINGS_TABS: { value: SettingsTab; label: string }[] = [
-  { value: 'general', label: 'General' },
-  { value: 'playback', label: 'Playback' },
-  { value: 'analysis', label: 'Analysis' },
+export const SETTINGS_TABS: { value: SettingsTab; label: TranslationKey }[] = [
+  { value: 'general', label: 'settings.constants.general' },
+  { value: 'playback', label: 'settings.constants.playback' },
+  { value: 'analysis', label: 'settings.constants.analysis' },
 ];
 
 export const SEPARATORS: SettingsOption[] = [
   {
     value: 'karaoke',
-    label: 'UVR Karaoke',
-    description: 'Usually separates more cleanly, but can occasionally slip on tricky parts.',
+    label: 'settings.constants.uvrKaraoke',
+    description: 'settings.constants.usuallySeparatesMoreCleanlyButDescription',
   },
   {
     value: 'demucs',
-    label: 'Demucs',
-    description:
-      'Smoother and more consistent with fewer abrupt artifacts, though slightly less crisp overall.',
+    label: 'settings.constants.demucs',
+    description: 'settings.constants.smootherAndMoreConsistentWithDescription',
   },
 ];
 
 export const ASR_ENGINES: SettingsOption[] = [
   {
     value: 'whisper',
-    label: 'Whisper',
-    description: 'Works in any language and lets you pick a model size below.',
+    label: 'settings.constants.whisper',
+    description: 'settings.constants.worksInAnyLanguageAndDescription',
   },
   {
     value: 'parakeet',
-    label: 'Parakeet v3 (Experimental)',
-    description:
-      'Much faster and produces its own word timings (skipping alignment), but only covers 25 European languages. Whisper takes over for anything else.',
+    label: 'settings.constants.parakeetV3Experimental',
+    description: 'settings.constants.muchFasterAndProducesItsDescription',
   },
 ];
 
 export const ALIGN_BACKENDS: SettingsOption[] = [
   {
     value: 'whisperx',
-    label: 'WhisperX',
-    description: 'The reliable default, timing words with a proven decoder.',
+    label: 'settings.constants.whisperx',
+    description: 'settings.constants.theReliableDefaultTimingWordsDescription',
   },
   {
     value: 'ctc',
-    label: 'CTC Forced Alignment (Experimental)',
-    description:
-      'Calculates word start/end points with a different algorithm, and runs much faster on GPU and Apple Silicon. Falls back to WhisperX if a line trips it up.',
+    label: 'settings.constants.ctcForcedAlignmentExperimental',
+    description: 'settings.constants.calculatesWordStartEndPointsDescription',
   },
   {
     value: 'qwen',
-    label: 'Qwen Forced Alignment (Experimental)',
-    description:
-      'A fast AI model covering 11 languages. Timing quality varies song to song, but it can do better on Chinese, Japanese, and Korean. Falls back to WhisperX otherwise.',
+    label: 'settings.constants.qwenForcedAlignmentExperimental',
+    description: 'settings.constants.aFastAiModelCoveringDescription',
   },
 ];
 
@@ -73,31 +70,31 @@ export const MODELS = ['large-v3', 'large-v3-turbo', 'medium', 'small', 'base', 
 export const PLAYBACK_MODES: SettingsOption[] = [
   {
     value: 'classic',
-    label: 'Classic mode',
-    description: 'Playback replaces the menu in the current window.',
+    label: 'settings.constants.classicMode',
+    description: 'settings.constants.playbackReplacesTheMenuInDescription',
   },
   {
     value: 'session',
-    label: 'Session mode',
-    description: 'Playback uses a separate window while the menu manages the queue.',
+    label: 'settings.constants.sessionMode',
+    description: 'settings.constants.playbackUsesASeparateWindowDescription',
   },
 ];
 
 export const LYRICS_VERTICAL_POSITIONS: SettingsOption[] = [
-  { value: 'bottom', label: 'Bottom' },
-  { value: 'center', label: 'Center' },
-  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'settings.constants.bottom' },
+  { value: 'center', label: 'settings.constants.center' },
+  { value: 'top', label: 'settings.constants.top' },
 ];
 
 export const LYRICS_HORIZONTAL_POSITIONS: SettingsOption[] = [
-  { value: 'left', label: 'Left' },
-  { value: 'center', label: 'Center' },
-  { value: 'right', label: 'Right' },
+  { value: 'left', label: 'settings.constants.left' },
+  { value: 'center', label: 'settings.constants.center' },
+  { value: 'right', label: 'settings.constants.right' },
 ];
 
 export const LYRICS_ROMANIZATION_MODES: SettingsOption[] = [
-  { value: 'enabled', label: 'Enabled' },
-  { value: 'disabled', label: 'Disabled' },
+  { value: 'enabled', label: 'settings.constants.enabled' },
+  { value: 'disabled', label: 'settings.constants.disabled' },
 ];
 
 export const DEFAULTS = {
@@ -110,9 +107,12 @@ export const DEFAULTS = {
   batch_size: 8,
   mic_monitor_gain: 0.65,
   mic_latency_compensation_sec: DEFAULT_MIC_LATENCY_COMPENSATION_SEC,
+  combine_multi_channel: true,
+  multiplayer_combine_multi_channel: true,
   auto_analyze: false,
   auto_play_next: false,
   master_volume: 1,
+  last_background: { kind: 'built_in_shader', id: 'plasma' },
   playback_mode: 'classic',
   lyrics_vertical_position: 'bottom',
   lyrics_horizontal_position: 'center',
@@ -130,9 +130,12 @@ export const DEFAULTS = {
   | 'batch_size'
   | 'mic_monitor_gain'
   | 'mic_latency_compensation_sec'
+  | 'combine_multi_channel'
+  | 'multiplayer_combine_multi_channel'
   | 'auto_analyze'
   | 'auto_play_next'
   | 'master_volume'
+  | 'last_background'
   | 'playback_mode'
   | 'lyrics_vertical_position'
   | 'lyrics_horizontal_position'
@@ -157,24 +160,26 @@ export const NAV = {
   tabSegment: 0,
   general: {
     window: 1,
-    microphone: 2,
-    micMonitorGain: 3,
-    micLatency: 4,
-    micTest: 5,
+    language: 2,
+    microphone: 3,
+    micMonitorGain: 4,
+    micLatency: 5,
+    micTest: 6,
   },
   playback: {
-    mode: 1,
-    masterVolume: 2,
-    lyricsVerticalPosition: 3,
-    lyricsHorizontalPosition: 4,
-    lyricsScale: 5,
-    pitchGraphScale: 6,
-    lyricsRomanizationMode: 7,
-    scoringTolerance: 8,
-    autoPlayNext: 9,
-    remoteControl: 10,
-    partyImport: 11,
-    partyLyricShift: 12,
+    background: 1,
+    mode: 2,
+    masterVolume: 3,
+    lyricsVerticalPosition: 4,
+    lyricsHorizontalPosition: 5,
+    lyricsScale: 6,
+    pitchGraphScale: 7,
+    lyricsRomanizationMode: 8,
+    scoringTolerance: 9,
+    autoPlayNext: 10,
+    remoteControl: 11,
+    partyImport: 12,
+    partyLyricShift: 13,
   },
 } as const;
 
@@ -210,14 +215,18 @@ export function getAnalysisNav(isParakeet: boolean) {
       };
 }
 
-export function getSettingsStops(tab: SettingsTab, isParakeet: boolean) {
+export function getSettingsStops(
+  tab: SettingsTab,
+  isParakeet: boolean,
+  hasMultiChannelInput: boolean,
+) {
   if (tab === 'general') {
-    return [3, 2, 1, 1, 2, 2, 2];
+    return [3, 2, 2, hasMultiChannelInput ? 2 : 1, 1, 2, 2, 2];
   }
   if (tab === 'playback') {
-    // tabs, mode, master volume, lyrics v/h, lyrics scale, graph scale,
-    // romanization, tolerance, auto-next, remote control, footer
-    return [3, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2];
+    // tabs, background, mode, master volume, lyrics v/h, lyrics scale, graph
+    // scale, romanization, tolerance, auto-next, remote control, footer
+    return [3, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2];
   }
 
   return isParakeet

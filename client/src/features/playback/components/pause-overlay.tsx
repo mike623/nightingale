@@ -1,10 +1,9 @@
-import { useCallback } from 'react';
-
-import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
+import type { PlaybackCommand } from '@/bridge/playback-status';
+import { PlaybackActionButtons } from '@/features/playback/components/playback-action-buttons';
+import type { PlaybackAction } from '@/features/playback/lib/playback-actions';
+import { t } from '@/i18n';
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -12,87 +11,50 @@ import {
   AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
 import { Button } from '@/shared/components/ui/button';
-import { cn } from '@/shared/utils/cn';
-
-const RING = 'ring-2 ring-primary';
-const NO_FOCUS_RING = 'focus-visible:ring-0 focus-visible:border-transparent';
 
 type PauseOverlayProps = {
   open: boolean;
-  exitLabel: string;
-  onExit: () => void;
-  onContinue: () => void;
-  onNext: () => void;
-  onEditLyrics: () => void;
+  actions: PlaybackAction[];
+  onCommand: (command: PlaybackCommand) => void;
+  /** Host-only: opens the lyrics editor over the paused song. */
+  onEditLyrics?: () => void;
 };
 
-export const PauseOverlay = ({
-  open,
-  exitLabel,
-  onExit,
-  onContinue,
-  onNext,
-  onEditLyrics,
-}: PauseOverlayProps) => {
-  const onConfirm = useCallback(
-    (index: number) => {
-      if (index === 0) {
-        onContinue();
-      } else if (index === 1) {
-        onNext();
-      } else if (index === 2) {
-        onEditLyrics();
-      } else {
-        onExit();
-      }
-    },
-    [onContinue, onEditLyrics, onExit, onNext],
-  );
-
-  const { focusedIndex } = useDialogNav({
-    open,
-    itemCount: 4,
-    onConfirm,
-    onBack: onContinue,
-  });
+export const PauseOverlay = ({ open, actions, onCommand, onEditLyrics }: PauseOverlayProps) => {
+  const onContinue = () => onCommand('resume');
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => !v && onContinue()}>
-      <AlertDialogContent onEscapeKeyDown={(e) => e.preventDefault()}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Paused</AlertDialogTitle>
-          <AlertDialogDescription>Exiting now won&apos;t save your progress</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel
-            onClick={onContinue}
-            className={cn(NO_FOCUS_RING, open && focusedIndex === 0 && RING)}
-          >
-            Continue
-          </AlertDialogCancel>
-          <Button
-            variant="secondary"
-            onClick={onNext}
-            className={cn(NO_FOCUS_RING, open && focusedIndex === 1 && RING)}
-          >
-            Next Song
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={onEditLyrics}
-            className={cn(NO_FOCUS_RING, open && focusedIndex === 2 && RING)}
-          >
-            Edit Lyrics
-          </Button>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={onExit}
-            className={cn(NO_FOCUS_RING, open && focusedIndex === 3 && RING)}
-          >
-            {exitLabel}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      {open && <div className="fixed inset-0 z-40 bg-black/80" aria-hidden />}
+      <AlertDialog open={open} onOpenChange={(value) => !value && onContinue()}>
+        <AlertDialogContent
+          style={{ animation: 'none' }}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('playback.pauseOverlay.paused')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('playback.pauseOverlay.exitingNowWonAposTDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <PlaybackActionButtons
+              actions={actions}
+              onCommand={onCommand}
+              open={open}
+              onBack={onContinue}
+              className="w-full justify-end"
+              trailing={
+                onEditLyrics === undefined ? undefined : (
+                  <Button type="button" variant="outline" onClick={onEditLyrics}>
+                    {t('library.songDetails.songActions.editLyrics')}
+                  </Button>
+                )
+              }
+            />
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };

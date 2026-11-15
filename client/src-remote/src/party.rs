@@ -225,7 +225,7 @@ async fn enqueue(
         .ok_or_else(|| bad_request("song not found"))?;
     let entries = state
         .queue
-        .add(file_hash, song.tempo, song.key_offset)
+        .add(file_hash, song.tempo, song.key_offset, false)
         .map_err(|error| bad_request(&error))?;
 
     (state.on_change)(&entries);

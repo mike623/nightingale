@@ -53,3 +53,7 @@ export const searchLrclibTerms = async (
 export const clearLyrics = async (fileHash: string): Promise<void> => {
   return await invoke<void>('clear_lyrics', { fileHash });
 };
+
+export const alignLrcLyrics = async (fileHash: string, lrcText: string): Promise<void> => {
+  return await invoke<void>('align_lrc_lyrics', { fileHash, lrcText });
+};

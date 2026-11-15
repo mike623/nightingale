@@ -10,32 +10,47 @@ import { useQuery } from '@tanstack/react-query';
 
 import { loadTranscript } from '@/bridge/playback';
 import { splitLongSegments } from '@/features/playback/utils/transcript-segments';
+import { t } from '@/i18n';
 import { TRANSCRIPT } from '@/shared/query-keys';
 import type { Segment, Transcript } from '@/types/Transcript';
 
 export type PlaybackTranscript = {
   segments: Segment[];
   transcriptSource: string;
+  isReady: boolean;
+  error: string | null;
 };
+
+type LoadedTranscript = Pick<PlaybackTranscript, 'segments' | 'transcriptSource'>;
 
 /**
  * Module-level so the query cache can memoize the result: playback consumers
  * re-render per frame and must not see a new `segments` array each time.
  */
-const toPlaybackTranscript = (transcript: Transcript): PlaybackTranscript => ({
+const toPlaybackTranscript = (transcript: Transcript): LoadedTranscript => ({
   segments: splitLongSegments(transcript.segments),
   transcriptSource: transcript.source ?? 'generated',
 });
 
-const NO_TRANSCRIPT: PlaybackTranscript = { segments: [], transcriptSource: 'generated' };
+const NO_SEGMENTS: Segment[] = [];
+
+const loadErrorMessage = (reason: unknown): string =>
+  t('playback.lyrics.loadError', {
+    error: reason instanceof Error ? reason.message : String(reason),
+  });
 
 export function usePlaybackTranscript(fileHash: string): PlaybackTranscript {
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: [...TRANSCRIPT, fileHash],
     queryFn: () => loadTranscript(fileHash),
     select: toPlaybackTranscript,
     staleTime: Infinity,
   });
 
-  return data ?? NO_TRANSCRIPT;
+  return {
+    segments: data?.segments ?? NO_SEGMENTS,
+    transcriptSource: data?.transcriptSource ?? 'generated',
+    isReady: data !== undefined,
+    error: error === null ? null : loadErrorMessage(error),
+  };
 }

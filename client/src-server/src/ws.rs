@@ -21,7 +21,7 @@ pub(crate) async fn handle_upgrade(
 /// frames. Inbound text is relay traffic, which the shared `remote` crate
 /// validates and routes — the server adds no frame handling of its own.
 async fn run(state: AppState, socket: WebSocket) {
-    let client = state.remote.connect().await;
+    let client = state.relay.connect().await;
     let client_id = client.id;
     let mut outbound = client.outbound;
     let mut events = state.events.subscribe();
@@ -58,7 +58,7 @@ async fn run(state: AppState, socket: WebSocket) {
             message = receiver.next() => {
                 let Some(Ok(message)) = message else { break };
                 match message {
-                    Message::Text(text) => state.remote.handle_text(client_id, &text).await,
+                    Message::Text(text) => state.relay.handle_text(client_id, &text).await,
                     Message::Close(_) => break,
                     _ => {}
                 }
@@ -66,6 +66,6 @@ async fn run(state: AppState, socket: WebSocket) {
         }
     }
 
-    state.remote.disconnect(client_id).await;
+    state.relay.disconnect(client_id).await;
     tracing::debug!(%client_id, "ws disconnected");
 }

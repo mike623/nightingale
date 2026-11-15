@@ -1,5 +1,6 @@
 import { XIcon } from 'lucide-react';
 
+import { t } from '@/i18n';
 import { Stars } from '@/shared/components/shared/stars';
 import { Button } from '@/shared/components/ui/button';
 import { formatSeconds } from '@/shared/utils/format-duration';
@@ -8,7 +9,7 @@ import type { QueuedStatus } from '@/types/QueuedStatus';
 import type { Song } from '@/types/Song';
 
 import { AlbumArt } from '../song/album-art';
-import { LanguageBadge, isDisplayableLanguage } from '../song/language-badge';
+import { LanguageBadge, NgeBadge, isDisplayableLanguage } from '../song/language-badge';
 import { StatusBadge } from '../song/status-badge';
 
 export type SongRename = { title?: string; artist?: string };
@@ -74,7 +75,7 @@ export const SongDetailsHeader = ({
       size="icon-sm"
       className="absolute right-2 top-2"
       onClick={onClose}
-      aria-label="Close song details"
+      aria-label={t('library.songDetails.songDetailsHeader.closeSongDetails')}
     >
       <XIcon />
     </Button>
@@ -95,13 +96,13 @@ export const SongDetailsHeader = ({
           <NameChips label="title" value={song.title} onPick={(title) => onRename({ title })} />
         ) : null}
         <p className="mt-1 truncate text-xs text-muted-foreground">
-          {song.artist || 'Unknown band'}
+          {song.artist || t('library.songDetails.unknownBand')}
         </p>
         {isRenameable(song) ? (
           <NameChips label="artist" value={song.artist} onPick={(artist) => onRename({ artist })} />
         ) : null}
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {song.album || 'Unknown album'}
+          {song.album || t('library.songDetails.unknownAlbum')}
         </p>
         {bestScore === undefined ? null : <Stars score={bestScore} size="sm" className="mt-1" />}
       </div>
@@ -113,6 +114,12 @@ export const SongDetailsHeader = ({
         <>
           <span aria-hidden="true">·</span>
           <LanguageBadge language={song.language} />
+        </>
+      ) : null}
+      {song.path.toLowerCase().endsWith('.nge') ? (
+        <>
+          <span aria-hidden="true">·</span>
+          <NgeBadge song={song} />
         </>
       ) : null}
       <span aria-hidden="true">·</span>

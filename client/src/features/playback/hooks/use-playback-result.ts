@@ -24,7 +24,9 @@ import {
   usePlaybackTransportState,
 } from '@/features/playback/providers';
 import { useProfiles } from '@/features/profiles/queries/use-profiles';
+import { t } from '@/i18n';
 import { useLatestRef } from '@/shared/hooks/use-latest-ref';
+import { defaultPlayerColor, type PlayerColor } from '@/shared/player-colors';
 import { PROFILES } from '@/shared/query-keys';
 import type { ScoreRecord } from '@/types/ScoreRecord';
 import type { Song } from '@/types/Song';
@@ -35,6 +37,7 @@ const AUTO_NEXT_SECONDS = 8;
 export type PlaybackPlayerResult = {
   id: string;
   profile: string | null;
+  color: PlayerColor;
   score: number;
 };
 
@@ -47,11 +50,19 @@ type FinalResultsInput = {
 
 function buildFinalResults(input: FinalResultsInput): PlaybackPlayerResult[] {
   if (!input.multiplayer) {
-    return [{ id: 'solo', profile: input.activeProfile, score: input.soloScore }];
+    return [
+      {
+        id: 'solo',
+        profile: input.activeProfile,
+        color: defaultPlayerColor(0),
+        score: input.soloScore,
+      },
+    ];
   }
   return input.players.map((player) => ({
     id: player.id,
     profile: player.profile,
+    color: player.color,
     score: player.rawScore,
   }));
 }
@@ -146,7 +157,9 @@ export function usePlaybackResult(
         }
       } catch (error) {
         toast.error(
-          `Could not save score: ${error instanceof Error ? error.message : String(error)}`,
+          t('playback.usePlaybackResult.couldNotSaveScore', {
+            value1: error instanceof Error ? error.message : String(error),
+          }),
         );
       }
       setResults(finalResults.toSorted((left, right) => right.score - left.score));

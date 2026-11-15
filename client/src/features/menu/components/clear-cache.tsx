@@ -7,6 +7,7 @@ import {
   type DialogMode,
 } from '@/features/menu/hooks/use-dialog';
 import { useDialogNav } from '@/features/menu/hooks/use-dialog-nav';
+import { t, type TranslationKey } from '@/i18n';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,30 +34,29 @@ const clearCacheTarget = (mode: DialogMode): ClearCacheTarget | null => {
 const focusClass = (open: boolean, focusedIndex: number, index: number): string =>
   cn(NO_FOCUS_RING, open && focusedIndex === index && RING);
 
-const COPY: Record<ClearCacheTarget, { title: string; description: string; confirm: string }> = {
+const COPY: Record<
+  ClearCacheTarget,
+  { title: TranslationKey; description: TranslationKey; confirm: TranslationKey }
+> = {
   all: {
-    title: 'Clear all cache?',
-    description:
-      'This will permanently delete every cached file: the stems, lyrics and timing generated for your songs, plus background videos and analysis models. Your original song files are not touched, but every song will have to be analyzed again.',
-    confirm: 'Clear cache',
+    title: 'menu.clearCache.clearAllCache',
+    description: 'menu.clearCache.thisWillPermanentlyDeleteEveryDescription',
+    confirm: 'menu.clearCache.clearCache',
   },
   videos: {
-    title: 'Clear videos cache?',
-    description:
-      "This will permanently delete all cached background videos. They will be re-downloaded the next time they're needed.",
-    confirm: 'Clear cache',
+    title: 'menu.clearCache.clearVideosCache',
+    description: 'menu.clearCache.thisWillPermanentlyDeleteAllDescription',
+    confirm: 'menu.clearCache.clearCache',
   },
   models: {
-    title: 'Clear models cache?',
-    description:
-      'This will permanently delete the cached analysis models. They will be re-downloaded the next time analysis runs.',
-    confirm: 'Clear cache',
+    title: 'menu.clearCache.clearModelsCache',
+    description: 'menu.clearCache.thisWillPermanentlyDeleteTheDescription',
+    confirm: 'menu.clearCache.clearCache',
   },
   orphans: {
-    title: 'Clean orphaned cache?',
-    description:
-      'This will permanently delete generated files left behind by songs that are no longer in your library. Songs still in the library keep everything they have.',
-    confirm: 'Clean up',
+    title: 'menu.clearCache.cleanOrphanedCache',
+    description: 'menu.clearCache.cleanOrphanedCacheDescription',
+    confirm: 'menu.clearCache.cleanUp',
   },
 };
 
@@ -99,19 +99,21 @@ export const ClearCacheDialog = () => {
     <AlertDialog open={open} onOpenChange={close}>
       <AlertDialogContent onEscapeKeyDown={(e) => e.preventDefault()}>
         <AlertDialogHeader>
-          <AlertDialogTitle>{copy?.title ?? 'Clear cache?'}</AlertDialogTitle>
-          <AlertDialogDescription>{copy?.description ?? ''}</AlertDialogDescription>
+          <AlertDialogTitle>
+            {copy ? t(copy.title) : t('menu.clearCache.fallbackTitle')}
+          </AlertDialogTitle>
+          <AlertDialogDescription>{copy ? t(copy.description) : ''}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={close} className={focusClass(open, focusedIndex, 0)}>
-            Cancel
+            {t('common.actions.cancel')}
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             onClick={runClear}
             className={focusClass(open, focusedIndex, 1)}
           >
-            {copy?.confirm ?? 'Clear cache'}
+            {t(copy?.confirm ?? 'menu.clearCache.clearCache')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

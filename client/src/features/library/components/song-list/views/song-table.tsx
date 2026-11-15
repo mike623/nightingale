@@ -1,6 +1,7 @@
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react';
 
 import { useBestScoresBySongForActiveProfile } from '@/features/profiles/hooks/use-best-scores-by-song';
+import { t } from '@/i18n';
 import { cn } from '@/shared/utils/cn';
 import type { Song } from '@/types/Song';
 import type { SongSort } from '@/types/SongSort';
@@ -8,7 +9,7 @@ import type { SongSortColumn } from '@/types/SongSortColumn';
 
 import { songKey } from '../../song/song-key';
 import { SONG_COLUMNS, type SongColumn } from '../song-columns';
-import type { SongItemProps } from '../types';
+import type { SongItemProps, SongListActions } from '../types';
 import { SongTableRow } from './song-table-row';
 
 type SongTableProps = {
@@ -17,6 +18,7 @@ type SongTableProps = {
   sortingDisabled: boolean;
   onSort: (column: SongSortColumn) => void;
   getItemProps: (song: Song, index: number) => SongItemProps;
+  actions: SongListActions;
 };
 
 type SongTableHeaderProps = {
@@ -28,8 +30,14 @@ type SongTableHeaderProps = {
 
 const SongTableHeader = ({ column, sort, sortingDisabled, onSort }: SongTableHeaderProps) => {
   const sortColumn = column.sortColumn;
+  const header =
+    column.headerClassName === undefined ? (
+      t(column.header)
+    ) : (
+      <span className={column.headerClassName}>{t(column.header)}</span>
+    );
   if (sortColumn === undefined) {
-    return <th className={column.thClassName}>{column.header}</th>;
+    return <th className={column.thClassName}>{header}</th>;
   }
 
   const sortIndex = sort.findIndex(({ column: sortedColumn }) => sortedColumn === sortColumn);
@@ -55,7 +63,7 @@ const SongTableHeader = ({ column, sort, sortingDisabled, onSort }: SongTableHea
         )}
         onClick={() => onSort(sortColumn)}
       >
-        {column.header}
+        {header}
         <span className="inline-flex items-start" aria-hidden="true">
           {icon}
           {activeDirection && (
@@ -64,7 +72,10 @@ const SongTableHeader = ({ column, sort, sortingDisabled, onSort }: SongTableHea
         </span>
         {activeDirection && (
           <span className="sr-only">
-            , sorted {activeDirection}, priority {priority}
+            {t('library.songList.songTable.sortedValue1PriorityValue2', {
+              value1: activeDirection,
+              value2: priority,
+            })}
           </span>
         )}
       </button>
@@ -78,11 +89,12 @@ export const SongTable = ({
   sortingDisabled,
   onSort,
   getItemProps,
+  actions,
 }: SongTableProps) => {
   const bestScores = useBestScoresBySongForActiveProfile();
 
   return (
-    <table className="w-full table-fixed border-separate border-spacing-0 text-xs">
+    <table className="w-full border-separate border-spacing-0 text-xs">
       <thead className="song-table-header">
         <tr className="text-left text-muted-foreground">
           {SONG_COLUMNS.map((column) => (
@@ -101,6 +113,7 @@ export const SongTable = ({
           <SongTableRow
             key={songKey(song)}
             {...getItemProps(song, index)}
+            actions={actions}
             bestScore={bestScores.get(song.file_hash)}
           />
         ))}

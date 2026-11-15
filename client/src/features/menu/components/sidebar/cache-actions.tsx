@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 
 import { useDialog, type ClearCacheTarget } from '@/features/menu/hooks/use-dialog';
 import { useMenuFocus } from '@/features/menu/providers/menu-focus-context';
+import { t, type TranslationKey } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { useLatestRef } from '@/shared/hooks/use-latest-ref';
@@ -10,7 +11,7 @@ import { cn } from '@/shared/utils/cn';
 
 type CacheButton = {
   icon: LucideIcon;
-  label: string;
+  label: TranslationKey;
   target: ClearCacheTarget;
 };
 
@@ -25,10 +26,14 @@ export const CacheActions = ({ focusedSidebarIndex, registerCallback }: CacheAct
 
   const buttons = useMemo<CacheButton[]>(
     () => [
-      { icon: Trash2Icon, label: 'Clear all cache', target: 'all' },
-      { icon: BrushCleaningIcon, label: 'Clean orphaned cache', target: 'orphans' },
-      { icon: VideoIcon, label: 'Clear videos cache', target: 'videos' },
-      { icon: BoxIcon, label: 'Clear models cache', target: 'models' },
+      { icon: Trash2Icon, label: 'menu.sidebar.cacheActions.clearAllCache', target: 'all' },
+      {
+        icon: BrushCleaningIcon,
+        label: 'menu.sidebar.cacheActions.cleanOrphanedCache',
+        target: 'orphans',
+      },
+      { icon: VideoIcon, label: 'menu.sidebar.cacheActions.clearVideosCache', target: 'videos' },
+      { icon: BoxIcon, label: 'menu.sidebar.cacheActions.clearModelsCache', target: 'models' },
     ],
     [],
   );
@@ -69,7 +74,7 @@ export const CacheActions = ({ focusedSidebarIndex, registerCallback }: CacheAct
                 tabIndex={-1}
                 variant="ghost"
                 size="icon-xs"
-                aria-label={button.label}
+                aria-label={t(button.label)}
                 onClick={() => setMode({ mode: 'clear-cache', target: button.target })}
                 data-sidebar-sub-index={index}
                 className={cn(
@@ -80,7 +85,7 @@ export const CacheActions = ({ focusedSidebarIndex, registerCallback }: CacheAct
                 <Icon />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{button.label}</TooltipContent>
+            <TooltipContent>{t(button.label)}</TooltipContent>
           </Tooltip>
         );
       })}

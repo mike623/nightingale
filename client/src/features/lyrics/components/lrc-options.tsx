@@ -1,14 +1,14 @@
+import type { TimingChoice } from '@/features/lyrics/lib/timing-choice';
 import type { LrcLevel } from '@/features/lyrics/utils/edit-lyrics';
+import { t, type TranslationKey } from '@/i18n';
 import { cn } from '@/shared/utils/cn';
 
 import { ringFor } from './parts';
 
-export type TimingChoice = 'provided' | 'align';
-
 type RadioOption<T extends string> = {
   value: T;
-  title: string;
-  description: string;
+  title: TranslationKey;
+  description: TranslationKey;
 };
 
 type RadioRowProps<T extends string> = {
@@ -64,9 +64,9 @@ function RadioRow<T extends string>({
                 <span
                   className={cn('text-xs', selected ? 'text-foreground' : 'text-muted-foreground')}
                 >
-                  {option.title}
+                  {t(option.title)}
                 </span>
-                <span className="text-[11px] text-muted-foreground">{option.description}</span>
+                <span className="text-[11px] text-muted-foreground">{t(option.description)}</span>
               </span>
             </button>
           );
@@ -116,28 +116,49 @@ export const LrcOptions = ({
   return (
     <div className="mt-3 flex flex-col divide-y divide-border">
       <RadioRow<TimingChoice>
-        label="Timing"
+        label={t('lyrics.lrcOptions.timing')}
         value={displayTiming}
         disabled={timingDisabled}
         onSelect={onTimingChoiceChange}
         focusedSlot={timingFocusedSlot}
         onFocusSlot={(slot) => onFocusOption?.('timing', slot)}
         options={[
-          { value: 'provided', title: 'Use provided', description: 'Instant · no transcription' },
-          { value: 'align', title: 'Run alignment', description: 'Runs AI · takes a while' },
+          {
+            value: 'provided',
+            title: 'lyrics.lrcOptions.useProvided',
+            description: 'lyrics.lrcOptions.instantNoTranscription',
+          },
+          {
+            value: 'anchored',
+            title: 'lyrics.lrcOptions.alignWords',
+            description: 'lyrics.lrcOptions.keepsLineTimingRunsAi',
+          },
+          {
+            value: 'align',
+            title: 'lyrics.lrcOptions.runAlignment',
+            description: 'lyrics.lrcOptions.ignoresTimingRunsAi',
+          },
         ]}
       />
 
       <RadioRow<'separate' | 'skip'>
-        label="Audio"
+        label={t('lyrics.lrcOptions.audio')}
         value={displayAudio}
         disabled={audioDisabled}
         onSelect={(value) => onSeparateStemsChange(value === 'separate')}
         focusedSlot={audioFocusedSlot}
         onFocusSlot={(slot) => onFocusOption?.('audio', slot)}
         options={[
-          { value: 'skip', title: 'Play original', description: 'No separation · detects key' },
-          { value: 'separate', title: 'Separate stems', description: 'Runs AI · takes a while' },
+          {
+            value: 'skip',
+            title: 'lyrics.lrcOptions.playOriginal',
+            description: 'lyrics.lrcOptions.noSeparationDetectsKey',
+          },
+          {
+            value: 'separate',
+            title: 'lyrics.lrcOptions.separateStems',
+            description: 'lyrics.lrcOptions.runsAiTakesAWhile',
+          },
         ]}
       />
     </div>

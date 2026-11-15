@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 import { toast } from 'sonner';
 
 import { openUrl, revealPath } from '@/bridge/opener';
+import { exportSongNge } from '@/bridge/playback';
 import { isTauri } from '@/bridge/runtime';
 import { youtubeWatchUrl } from '@/features/import/lib/youtube-url';
 import { useAnalysis } from '@/features/library/hooks/use-analysis';
@@ -10,6 +11,7 @@ import { useRedownloadSong } from '@/features/library/hooks/use-redownload-song'
 import { useImportedVideoId } from '@/features/library/queries/use-imported-video-id';
 import { useDialog } from '@/features/menu/hooks/use-dialog';
 import { useProfiles } from '@/features/profiles/queries/use-profiles';
+import { t } from '@/i18n';
 import { Separator } from '@/shared/components/ui/separator';
 import type { Song } from '@/types/Song';
 
@@ -52,6 +54,25 @@ export const ActionsSection = ({
   const { data: profiles } = useProfiles();
   const hasScores = profiles?.scores.some((score) => score.song_hash === song.file_hash) ?? false;
 
+  const onExport = async (): Promise<void> => {
+    try {
+      const result = await exportSongNge(song.file_hash);
+      if (result?.delivery === 'filesystem') {
+        toast.success(t('library.songActions.exported', { title: song.title }), {
+          description: result.path,
+        });
+      } else if (result !== undefined) {
+        toast.success(t('library.songActions.exported', { title: song.title }));
+      }
+    } catch (error) {
+      toast.error(
+        t('library.songActions.exportFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  };
+
   const groups = buildActionGroups({
     song,
     status,
@@ -84,6 +105,10 @@ export const ActionsSection = ({
     onEditLyrics: () => setMode({ mode: 'edit-lyrics', song }),
     onChangeLanguage: () => setMode({ mode: 'language', song }),
     onDeleteSong: () => setMode({ mode: 'delete-song', song, onDeleted }),
+    onExport: () => {
+      void onExport();
+    },
+    onViewLyrics: () => setMode({ mode: 'view-lyrics', song }),
     run,
   });
 
@@ -91,8 +116,8 @@ export const ActionsSection = ({
     groups.unshift([
       {
         icon: TrophyIcon,
-        title: 'Leaderboard',
-        description: 'View the best score from each profile.',
+        title: 'library.songDetails.actionsSection.leaderboard',
+        description: 'library.songDetails.actionsSection.viewTheBestScoreFromEachProfile',
         onClick: () => setMode({ mode: 'song-leaderboard', song }),
       },
     ]);
@@ -100,8 +125,11 @@ export const ActionsSection = ({
 
   return (
     <section className="px-2 py-4" aria-labelledby="song-actions-heading">
-      <h3 id="song-actions-heading" className="mb-2 px-2 text-xs font-semibold">
-        Actions
+      <h3
+        id="library.songDetails.actionsSection.songActionsHeading"
+        className="mb-2 px-2 text-xs font-semibold"
+      >
+        {t('common.actions.label')}
       </h3>
       <div className="flex flex-col gap-1">
         {groups.map((group, groupIndex) => (

@@ -15,272 +15,138 @@
   <a href="https://ko-fi.com/nightingalekaraoke"><img alt="Ko-fi" src="https://img.shields.io/badge/Ko--fi-Buy_a_coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white"></a>
 </p>
 
+<p align="center">
+  <a href="https://nightingale.cafe/">Website</a> ·
+  <a href="https://github.com/rzru/nightingale/releases/latest">Downloads</a> ·
+  <a href="https://nightingale.cafe/docs/">Documentation</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="https://discord.gg/68Vgng9vYp">Discord</a>
+</p>
+
 ---
 
-Nightingale scans your music folder, Plex Media Server, Jellyfin server, Navidrome server, or self-hosted web library; separates lead vocals from instrumentals using the [UVR Karaoke model](https://github.com/Anjok07/ultimatevocalremovergui) (or [Demucs](https://github.com/facebookresearch/demucs)); transcribes lyrics with word-level timestamps via [WhisperX](https://github.com/m-bain/whisperX); and plays it all back with synchronized highlighting, pitch scoring, key/tempo controls, profiles, and dynamic backgrounds.
+Nightingale turns music you already have into karaoke. It can separate lead vocals, find or produce word-timed lyrics, and play tracks with synchronized highlighting, pitch scoring, key and tempo controls, multiplayer, and dynamic backgrounds. Use the native desktop app on Linux, macOS, or Windows, or run the same experience as a self-hosted web app.
 
-Ships as a single binary. No manual installation of Python, ffmpeg, or ML models required — everything is downloaded and bootstrapped automatically on first launch.
+## Highlights
 
-## Features
+- **Bring your library** — scan local audio, video, and UltraStar files, or connect Plex, Jellyfin, or Navidrome. Existing provider and folder playlists appear as read-only navigation.
+- **Prepare tracks locally** — separate vocals with UVR Karaoke or Demucs, then use LRCLIB, local or pasted LRC, or automatic transcription and alignment for lyrics.
+- **Sing your way** — follow synchronized lyrics, score microphone pitch, adjust key and tempo, mix guide vocals, monitor the microphone, and compensate for room latency.
+- **Run a karaoke night** — build a playback queue, keep managing it during Session mode, switch profiles, compare scoreboards, or assign separate microphones to two to four local players.
+- **Set the stage** — use source video, GPU shaders, Pixabay loops, or custom image, video, and shader backgrounds; reposition and scale lyrics and the pitch graph.
+- **Use the screen you have** — desktop and self-hosted modes share the same karaoke core, with keyboard, gamepad, touch, and layouts ranging from phones to 4K displays.
 
-### Library & sources
+Detailed behavior, supported media formats, controls, analyzer options, and current limitations live in the [user guide](https://nightingale.cafe/docs/).
 
-📁 **Folder library** — point at any folder and Nightingale scans supported audio, video, and UltraStar files inside.
+## Get Nightingale
 
-🟠 **Plex** — connect to a local, remote, or LAN-only Plex Media Server, select one or more music libraries, and import tracks, associated music video clips, covers, and read-only playlists. Hosted Plex sign-in discovers servers; an advanced PMS URL + token flow works without plex.tv during normal operation.
+| Mode | Start here |
+| --- | --- |
+| Desktop | [Download the latest release](https://github.com/rzru/nightingale/releases/latest) |
+| Self-hosted Linux | [Installation guide](https://nightingale.cafe/docs/self-hosted.html) |
+| Docker | [CPU and CUDA images](https://nightingale.cafe/docs/docker.html) |
 
-🎬 **Jellyfin** — play straight from your Jellyfin library. Songs cache locally on first play so karaoke runs the same as a folder library.
+Desktop releases support Linux x86_64/aarch64, macOS Apple Silicon/Intel, and Windows x86_64. Self-hosted release binaries support Linux x86_64/aarch64.
 
-💿 **Navidrome** — connect to Navidrome for audio libraries. Login details are kept encrypted on disk.
+First launch prepares an isolated copy of ffmpeg, Python, the analyzer packages, and required ML models. No system Python setup is needed, but the initial download is several gigabytes. GPU acceleration is optional; analysis falls back to CPU when CUDA or Apple Silicon acceleration is unavailable.
 
-🌐 **Self-hosted web mode** — run Nightingale on a Linux box on your home network and open it from phones, laptops, tablets, and TVs at `<hostname>.local`. See [docs/self-hosted](site/docs/src/self-hosted.md). Also runs in [Docker](site/docs/src/docker.md) (CPU or CUDA/GPU).
+See [Getting Started](https://nightingale.cafe/docs/getting-started.html) for setup, platform-specific notes, updates, and adding music. For failures, check [Troubleshooting](https://nightingale.cafe/docs/troubleshooting.html).
 
-🧭 **Sidebar + library filters** — browse by quick filters, metadata cleanup buckets, artists, albums, and existing playlists from Plex, Jellyfin, Navidrome, or folder-library `.m3u` / `.m3u8` / `.pls` files. **Analyze All** and optional auto-analysis help queue your library faster, and the sidebar/song list remember scroll position when you come back.
+## Documentation
 
-🗂️ **Flexible storage** — choose the main data folder during setup, then split cache, models, videos, and vendor tools into separate folders from Settings when needed. Point several machines at one shared cache folder and **Rescan library** picks up analyses done elsewhere without re-running them.
+- [Library sources](https://nightingale.cafe/docs/library-sources.html)
+- [Lyrics and transcription](https://nightingale.cafe/docs/lyrics.html)
+- [Controls](https://nightingale.cafe/docs/controls.html)
+- [Scoring](https://nightingale.cafe/docs/scoring.html) and [multiplayer](https://nightingale.cafe/docs/multiplayer.html)
+- [Backgrounds](https://nightingale.cafe/docs/backgrounds.html)
+- [Self-hosted web mode](https://nightingale.cafe/docs/self-hosted.html) and [Docker](https://nightingale.cafe/docs/docker.html)
+- [Building from source](https://nightingale.cafe/docs/building.html)
 
-📦 **Self-contained** — ffmpeg, uv, Python, PyTorch, and ML packages are downloaded automatically during setup. Video backgrounds are pre-downloaded so the first session is ready to go.
+## Architecture
 
-### Lyrics & audio
-
-🎤 **Stem separation** — isolates lead vocals from instrumentals using the UVR Karaoke model (default) or Demucs, with adjustable guide vocal volume. The karaoke model preserves backing vocals in the instrumental for a more natural sound.
-
-📝 **Word-level lyrics** — automatic transcription with alignment, or fetched from [LRCLIB](https://lrclib.net) when available.
-
-✏️ **Lyrics editor with LRCLIB browser** — edit lyrics, browse LRCLIB matches, paste your own **LRC / Enhanced LRC**, or load a `.lrc` / `.elrc` sitting beside the source audio, all from a song's Actions button. Timed LRC is used as-is (optionally skipping stem separation to sing over the original mix); plain lyrics run alignment.
-
-🈯 **CJK lyric support** — Japanese, Chinese, Cantonese, and Korean songs get per-character forced alignment and romanized readings (Hepburn / pinyin / Jyutping / Revised Romanization) shown above each token.
-
-🗣️ **Pluggable ASR engines** — choose Whisper (default, broad language coverage) or **Parakeet v3 (experimental)** for ~25 European languages, with NeMo on CUDA and ONNX Runtime everywhere else.
-
-⚡ **Pluggable forced alignment** — keep WhisperX's aligner (default) or switch on an experimental backend: **GPU forced alignment** (torchaudio `forced_align`) for faster word timestamps on CUDA and Apple Silicon, or the **Qwen aligner** (Qwen3-ForcedAligner-0.6B) which timestamps 11 languages incl. CJK in a single pass on CUDA/MPS/CPU. Both fall back to WhisperX automatically.
-
-🎼 **UltraStar Deluxe songs (experimental)** — drop USDX song folders (`.txt` or `.usdx` plus sibling audio/vocals/instrumental/video) into your library; pitch and lyric data come from the file directly, no analyzer pass needed. See [docs/usdx](site/docs/src/usdx.md).
-
-### Playback & visuals
-
-🎯 **Pitch scoring** — real-time microphone input with pitch detection, star ratings, and per-song scoreboards.
-
-🎚️ **Key & tempo shifts** — adjust song key and tempo after analysis, with cached playback variants for quick retries.
-
-🎬 **Video files** — drop video files (`.mp4`, `.mkv`, etc.) into your music folder; vocals are separated from the audio track and the original video plays as a synchronized background.
-
-🌌 **Audio-reactive backgrounds** — 10 GPU shaders that react to your microphone in real time (Plasma, Waves, Nebula, Starfield, Sonar, Voronoi, Vortex, Metaballs, Spectrum, Oscilloscope), Pixabay video loops in 5 flavors (Nature, Underwater, Space, City, Countryside), plus source-video playback for video files.
-
-🎙️ **Mic monitoring + latency test** — optionally route your live mic into playback, adjust monitor gain (0–200%), and run a beep-based latency test from Settings so scoring lines up with your room.
-
-### Quality of life
-
-👤 **Profiles** — create and switch between player profiles; scores are tracked per profile.
-
-🎮 **Gamepad support** — full navigation and control via gamepad (D-pad, sticks, face buttons).
-
-📺 **Adaptive + touch-friendly UI** — scales from phones/tablets to 4K TVs, with on-screen playback controls on touch devices.
-
-⬆️ **In-app updates** — on macOS and Windows, auto-checks for new releases at launch, badges the sidebar avatar when one is available, and downloads and installs signed updates with one click. Linux is manual: the **Update** entry opens GitHub Releases for you to grab the new build.
-
-## Quick start
-
-Download the latest release for your platform from the [Releases](../../releases) page and run it. On first launch, Nightingale shows setup steps, lets you pick a data folder, then installs the Python environment and ML models automatically.
-
-## Updates
-
-On macOS and Windows, Nightingale checks for new releases once at launch. When one is available, the sidebar avatar grows a small green dot and the **Update** entry in the dropdown menu opens a dialog with the release notes. Click **Install & Restart** and the app downloads the signed bundle, installs it, and relaunches. On Windows the installer runs in `passive` mode — a small progress window flashes and the app comes back automatically once the install finishes.
-
-### Linux
-
-Auto-update is **not supported on Linux** — the app ships without the updater plugin. The **Update** entry still appears in the sidebar menu, but it just opens a dialog explaining this with a one-click button to the [Releases](../../releases) page so you can grab the new `.deb` or `.rpm` and install it the usual way for your distro.
-
-### macOS
-
-macOS quarantines files downloaded from the internet. Since Nightingale isn't signed with an Apple Developer ID, Gatekeeper will block it with a message like _"app is damaged and can't be opened"_. To fix this, remove the quarantine attribute after moving the Nightingale.app to Applications:
-
-```bash
-xattr -cr /Applications/Nightingale.app
-```
-
-### Supported formats
-
-Audio: `.mp3`, `.flac`, `.ogg`, `.opus`, `.wav`, `.m4a`, `.aac`, `.wma`. Video: `.mp4`, `.mkv`, `.avi`, `.webm`, `.mov`, `.m4v`. UltraStar: `.usdx`, plus `.txt` files whose contents look like USDX.
-
-## Controls
-
-### Navigation
-
-| Action           | Keyboard       | Gamepad            |
-| ---------------- | -------------- | ------------------ |
-| Move             | Arrow keys     | D-pad / Left stick |
-| Confirm / Select | Enter          | A (South)          |
-| Back / Cancel    | Escape         | B (East) / Start   |
-| Switch panel     | Tab            | —                  |
-| Search songs     | Type to filter | —                  |
-
-### Playback
-
-| Action                  | Keyboard          | Gamepad   |
-| ----------------------- | ----------------- | --------- |
-| Pause / Resume          | Space             | Start     |
-| Exit to menu            | Escape            | B (East)  |
-| Toggle guide vocals     | G                 | —         |
-| Guide volume up/down    | + / -             | —         |
-| Cycle background theme  | T                 | —         |
-| Cycle video flavor      | F                 | —         |
-| Toggle microphone       | M                 | —         |
-| Next microphone         | N                 | —         |
-| Toggle mic monitoring   | R                 | —         |
-| Toggle fullscreen       | F11               | —         |
-| Skip Intro / Skip Outro | On-screen buttons | A (South) |
-
-## How it works
+Desktop and self-hosted delivery share one Rust application core and one React frontend. Transport adapters stay thin so karaoke behavior does not diverge between Tauri and the web server.
 
 ```mermaid
-flowchart TD
-    A["Audio or video file"] --> B["UVR Karaoke / Demucs"]
-    A2["USDX bundle (.txt / .usdx)"] --> E["Tauri App (Rust + React)"]
-    B -->|"vocals + instrumental"| C["LRCLIB"]
-    C -->|"synced lyrics if available"| D["WhisperX or Parakeet v3 (exp.)"]
-    D -->|"word-level alignment, CJK reading"| E
-    E --> F["Plays instrumental + synced lyrics with pitch scoring, key/tempo, mic monitoring, audio-reactive backgrounds"]
+flowchart LR
+    UI["React UI"] --> Bridge["Typed bridge / client"]
+    Bridge --> Tauri["Tauri IPC adapter"]
+    Bridge --> Web["HTTP + WebSocket adapter"]
+    Tauri --> API["app-api command contract"]
+    Web --> API
+    API --> Core["app-core"]
+    Core --> Sources["Folder / Plex / Jellyfin / Navidrome"]
+    Core --> Storage["SQLite library + cache"]
+    Core --> Analyzer["Local Python analyzer"]
 ```
 
-The analyzer runs as a persistent local process: Nightingale starts it once and talks to it over a token-authenticated loopback TCP socket using newline-delimited JSON, so per-song startup overhead (model load, CUDA init) is paid only once.
+The analyzer runs as a persistent local process over token-authenticated loopback IPC, avoiding model startup cost for every song. Analysis artifacts are cached by BLAKE3 source hash, so unchanged tracks reuse stems, transcripts, lyrics, and shifted playback variants.
 
-Analysis results are cached using blake3 file hashes. Re-analysis only happens if the source file changes, the user triggers it manually, or you choose to shift key/tempo and create playback variants. USDX songs skip stem separation entirely when `#VOCALS` and `#INSTRUMENTAL` are provided.
+### Repository layout
 
-## Hardware
+| Path | Responsibility |
+| --- | --- |
+| `app-core/` | Shared application behavior, source adapters, persistence, media serving, analyzer orchestration, and analyzer scripts |
+| `app-api/` | Shared command contract, dispatch, state, events, and error classification |
+| `client/src/` | React interface, feature modules, typed runtime bridge, playback, and microphone processing |
+| `client/src-tauri/` | Tauri desktop adapter and native capabilities |
+| `client/src-server/` | Axum HTTP/WebSocket adapter and embedded web bundle |
+| `site/` | Astro website and mdBook user guide |
+| `docker/`, `scripts/` | Container and bare-metal self-hosted distribution |
 
-The Python analyzer uses PyTorch and auto-detects the best backend:
-
-| Backend | Device        | Notes                                       |
-| ------- | ------------- | ------------------------------------------- |
-| CUDA    | NVIDIA GPU    | Fastest                                     |
-| MPS     | Apple Silicon | macOS; WhisperX alignment falls back to CPU |
-| CPU     | Any           | Slowest but always works                    |
-
-The UVR Karaoke model uses ONNX Runtime and enables CUDA acceleration automatically on NVIDIA GPUs, or CoreML on Apple Silicon.
-
-A song typically takes 2–5 minutes on GPU, 10–20 minutes on CPU.
-
-## Data storage
-
-During setup, you can choose where Nightingale stores data (default: `~/.nightingale`). Most runtime data is stored in that selected data folder, while `config.json` and `nightingale.log` remain in `~/.nightingale`.
-
-Typical selected data folder layout:
-
-```
-<selected-data-folder>/
-├── cache/               # Stems, transcripts, lyrics, shifted variants, covers, playable videos
-├── songs.db             # SQLite song library and analysis metadata
-├── profiles.json        # Player profiles and scores
-├── videos/              # Cached Pixabay video backgrounds
-├── sounds/              # Sound effects (celebration)
-├── vendor/
-│   ├── ffmpeg           # Downloaded ffmpeg binary
-│   ├── uv               # Downloaded uv binary
-│   ├── python/          # Python 3.10 installed via uv
-│   ├── venv/            # Virtual environment with ML packages
-│   ├── analyzer/        # Extracted analyzer Python scripts
-│   └── .ready           # Marker indicating setup is complete
-└── models/
-    ├── torch/           # Demucs model cache
-    ├── huggingface/     # WhisperX model cache
-    └── audio_separator/ # UVR Karaoke model cache
-```
-
-`~/.nightingale/config.json` stores app settings, including the selected data folder path.
-
-### Video backgrounds
-
-Pixabay video backgrounds use the [Pixabay API](https://pixabay.com/api/docs/). The API key is embedded in release builds. For development, create a `.env` file at the project root:
-
-```
-PIXABAY_API_KEY=your_key_here
-```
-
-## Building from source
+## Development
 
 ### Prerequisites
 
-| Tool       | Version                                                                                                               |
-| ---------- | --------------------------------------------------------------------------------------------------------------------- |
-| Rust       | 1.85+ (workspace uses edition 2024)                                                                                   |
-| Node.js    | 20+                                                                                                                   |
-| pnpm       | latest                                                                                                                |
-| Linux only | `libwebkit2gtk-4.1-dev`, `libssl-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `libxdo-dev`, `libasound2-dev` |
+| Tool | Version |
+| --- | --- |
+| Rust | 1.94.1, pinned by `rust-toolchain.toml` |
+| Node.js | 22.12 or newer |
+| pnpm | 11.2.2 |
 
-### Development
+Platform build packages, including Windows ASIO and Linux WebKit requirements, are listed in the [building guide](https://nightingale.cafe/docs/building.html).
+
+### Run the desktop app
 
 ```bash
-git clone <repo-url> nightingale
+git clone https://github.com/rzru/nightingale.git
 cd nightingale
+pnpm --dir client install --frozen-lockfile
 cargo desktop dev
 ```
 
-### Release build
+Create a production bundle for the current platform with:
 
 ```bash
 cargo desktop build
 ```
 
-## Supported platforms
+Before submitting application changes, run the repository checks:
 
-| Platform       | Target                      |
-| -------------- | --------------------------- |
-| Linux x86_64   | `x86_64-unknown-linux-gnu`  |
-| Linux aarch64  | `aarch64-unknown-linux-gnu` |
-| macOS ARM      | `aarch64-apple-darwin`      |
-| macOS Intel    | `x86_64-apple-darwin`       |
-| Windows x86_64 | `x86_64-pc-windows-msvc`    |
+```bash
+pnpm --dir client format
+pnpm --dir client quality
+```
+
+Website and guide tooling runs separately from `site/`; use `pnpm --dir site build` to validate those changes.
+
+## Contributing
+
+Nightingale follows a discussion-first workflow. Before implementing a feature or behavior change, open a [GitHub Discussion](https://github.com/rzru/nightingale/discussions) and wait for it to be approved. Small documentation corrections and obvious bug fixes can go directly to a pull request. Read [CONTRIBUTING.md](CONTRIBUTING.md) before starting.
 
 ## Releasing
 
-Releases are cut by [`.github/workflows/release.yml`](.github/workflows/release.yml) on any `v*` tag push. The workflow:
-
-1. Verifies the tag matches the `version` in [`client/src-tauri/tauri.conf.json`](client/src-tauri/tauri.conf.json), [`client/src-tauri/Cargo.toml`](client/src-tauri/Cargo.toml), and [`client/package.json`](client/package.json).
-2. Extracts the matching `## [<version>]` section from [`CHANGELOG.md`](CHANGELOG.md) as the release body.
-3. Creates a draft release and, in parallel, builds and uploads:
-   - Linux x86_64: `.deb`, `.rpm` (on `ubuntu-22.04`)
-   - Linux aarch64: `.deb`, `.rpm` (on `ubuntu-24.04-arm`)
-   - macOS ARM / Intel: `.dmg` + `.app.tar.gz` (+ `.sig`) for the in-app updater
-   - Windows x86_64: `*-setup.exe` (NSIS, + `.sig`), `*_en-US.msi` (+ `.sig`)
-   - `latest.json` covering `darwin-aarch64`, `darwin-x86_64`, and `windows-x86_64` — Linux is intentionally absent since the updater plugin isn't compiled in for Linux.
-4. Leaves the release as a draft. Smoke-test the artifacts from the draft, then flip it to **Published** with the "Set as the latest release" checkbox in the GitHub Releases UI to make `https://github.com/rzru/nightingale/releases/latest/download/latest.json` (the URL hard-coded in [`tauri.conf.json`](client/src-tauri/tauri.conf.json)) resolve to it and start rolling out the in-app update.
-
-Cutting a release:
+Tags matching `v*` trigger [the release workflow](.github/workflows/release.yml). It verifies the tag against the desktop manifests, extracts release notes from [CHANGELOG.md](CHANGELOG.md), and creates a draft containing desktop installers, updater artifacts, and self-hosted server archives. Smoke-test the draft artifacts, then publish the release through GitHub.
 
 ```bash
-# bump versions in client/src-tauri/tauri.conf.json, client/src-tauri/Cargo.toml, client/package.json
-# add a `## [<version>] - YYYY-MM-DD` section to CHANGELOG.md
 git tag v<version>
 git push origin v<version>
 ```
 
-Required repository secrets:
-
-| Secret                                | Purpose                                                                                                                            |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `TAURI_SIGNING_PRIVATE_KEY`           | Minisign private key whose public counterpart is the `pubkey` in [`tauri.conf.json`](client/src-tauri/tauri.conf.json). Generate once with `pnpm tauri signer generate`. |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`  | Password for the signing key. Omit the secret entirely if the key was generated passwordless — GitHub rejects empty-string secrets, and a missing one resolves to empty at workflow runtime, which is what `minisign` expects. |
-| `PIXABAY_API_KEY`                     | Embedded at compile time so release builds can fetch video backgrounds.                                                            |
-
-## Contributing
-
-Contributions are welcome, but Nightingale follows a **discussion-first** process:
-before writing any code for a new feature or change, please
-[start a discussion thread](https://github.com/rzru/nightingale/discussions) so we
-can agree on whether it fits the app. Only once a discussion reaches **approved**
-status will a corresponding pull request be accepted.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+The workflow and its helper scripts are the canonical source for artifact and signing details.
 
 ## Support the project
 
-Nightingale is open-source, free, and built by one person in their spare time. If it brings you joy and you want to help keep development going, you can chip in:
-
-- [Patreon](https://www.patreon.com/cw/nightingalekaraoke) — recurring monthly support.
-- [Ko-fi](https://ko-fi.com/nightingalekaraoke) — one-off tip, no account required.
-
-Every bit helps cover site hosting, hardware for testing, and the time spent shipping new features. Thank you.
+Nightingale is free, open source, and maintained in spare time. Support ongoing development through [Patreon](https://www.patreon.com/cw/nightingalekaraoke) or [Ko-fi](https://ko-fi.com/nightingalekaraoke).
 
 ## License
 

@@ -50,8 +50,10 @@ function segmentSlotFromFlatIndex(segmentSizes: readonly number[], flatIndex: nu
 
 type UseSettingsNavigationOptions = {
   containerRef: RefObject<HTMLDivElement | null>;
+  enabled: boolean;
   tab: SettingsTab;
   isParakeet: boolean;
+  hasMultiChannelInput: boolean;
   micMonitorGain: number;
   micLatencySec: number;
   masterVolume: number;
@@ -72,8 +74,10 @@ type UseSettingsNavigationOptions = {
 
 export function useSettingsNavigation({
   containerRef,
+  enabled,
   tab,
   isParakeet,
+  hasMultiChannelInput,
   micMonitorGain,
   micLatencySec,
   masterVolume,
@@ -91,12 +95,15 @@ export function useSettingsNavigation({
   onScoringToleranceChange,
   onVocalThresholdChange,
 }: UseSettingsNavigationOptions) {
-  const stops = useMemo(() => getSettingsStops(tab, isParakeet), [tab, isParakeet]);
+  const stops = useMemo(
+    () => getSettingsStops(tab, isParakeet, hasMultiChannelInput),
+    [hasMultiChannelInput, isParakeet, tab],
+  );
   const itemCount = useMemo(() => stops.reduce((sum, size) => sum + size, 0), [stops]);
   const footerSegment = stops.length - 1;
 
   const { isFocused, focusSegment } = useDialogNav({
-    open: true,
+    open: enabled,
     itemCount,
     stops,
     onBack,

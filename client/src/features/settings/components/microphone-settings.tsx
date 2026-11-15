@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useMicDevicesQuery, type MicDevice } from '@/features/microphone/queries/use-mic-devices';
+import { t } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Field } from '@/shared/components/ui/field';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
@@ -17,20 +19,25 @@ const DEFAULT_MIC_ID = '__default__';
 
 type MicrophoneSettingsProps = {
   savedMicId: string | null;
+  combineMultiChannel: boolean;
   monitorGain: number;
   latencySec: number;
   getFocusClassName: (segment: number, slot?: number) => string;
+  onMultiChannelAvailabilityChange: (available: boolean) => void;
   onMonitorGainChange: (gain: number) => void;
   onLatencyChange: (latencySec: number) => void;
 };
 
 const microphoneOptions = (devices: MicDevice[], preferred: string | null) => {
   const options = [
-    { value: DEFAULT_MIC_ID, label: 'Default' },
+    { value: DEFAULT_MIC_ID, label: 'settings.microphoneSettings.default' },
     ...devices.map(({ deviceId, label }) => ({ value: deviceId, label })),
   ];
   if (preferred !== null && !options.some((option) => option.value === preferred)) {
-    options.push({ value: preferred, label: `Selected microphone: ${preferred}` });
+    options.push({
+      value: preferred,
+      label: t('settings.microphone.selected', { id: preferred }),
+    });
   }
   return options;
 };
@@ -40,12 +47,12 @@ type MicDevicesQuery = ReturnType<typeof useMicDevicesQuery>;
 const microphoneDiscoveryHint = (query: MicDevicesQuery): string => {
   if (query.isError) {
     const detail = query.error instanceof Error ? query.error.message : String(query.error);
-    return `Could not list microphones: ${detail}`;
+    return t('settings.microphone.listError', { error: detail });
   }
   if (query.isFetching) {
-    return 'Looking for available microphones…';
+    return t('settings.microphone.searching');
   }
-  return 'Select which microphone to use for pitch scoring';
+  return t('settings.microphone.description');
 };
 
 const MicrophoneRetryButton = ({ query }: { query: MicDevicesQuery }) => {
@@ -54,7 +61,7 @@ const MicrophoneRetryButton = ({ query }: { query: MicDevicesQuery }) => {
   }
   return (
     <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
-      Retry microphone discovery
+      {t('settings.microphoneSettings.retryMicrophoneDiscovery')}
     </Button>
   );
 };
@@ -79,15 +86,20 @@ const useLegacyMicrophoneMigration = (
 
 export function MicrophoneSettings({
   savedMicId,
+  combineMultiChannel,
   monitorGain,
   latencySec,
   getFocusClassName,
+  onMultiChannelAvailabilityChange,
   onMonitorGainChange,
   onLatencyChange,
 }: MicrophoneSettingsProps) {
   const { mutate } = useConfigMutation();
-  const micDevicesQuery = useMicDevicesQuery();
+  const micDevicesQuery = useMicDevicesQuery(undefined, true, combineMultiChannel);
+  const capabilityQuery = useMicDevicesQuery(undefined, !combineMultiChannel, true);
   const micDevices = micDevicesQuery.data;
+  const capabilityDevices = combineMultiChannel ? micDevices : capabilityQuery.data;
+  const hasMultiChannelInput = capabilityDevices.some((device) => device.channelCount > 1);
   const [preferredMicInput, setPreferredMic] = useState<string | null | undefined>(undefined);
   const preferredMic = preferredMicInput === undefined ? savedMicId : preferredMicInput;
   const [micTestBusy, setMicTestBusy] = useState(false);
@@ -100,19 +112,32 @@ export function MicrophoneSettings({
   const controlsDisabled = micTestBusy || latencyMeasuring;
 
   useLegacyMicrophoneMigration(preferredMic, micDevices, mutate);
+  useEffect(() => {
+    onMultiChannelAvailabilityChange(hasMultiChannelInput);
+  }, [hasMultiChannelInput, onMultiChannelAvailabilityChange]);
 
   return (
     <>
       <Field>
-        <Label>Microphone</Label>
+        <Label>{t('settings.microphoneSettings.microphone')}</Label>
+        {hasMultiChannelInput ? (
+          <Label className="gap-1.5 text-xs/relaxed font-normal text-muted-foreground">
+            <Checkbox
+              checked={combineMultiChannel}
+              className={getFocusClassName(NAV.general.microphone, 0)}
+              onCheckedChange={(checked) => mutate({ combine_multi_channel: checked === true })}
+            />
+            {t('settings.microphoneSettings.combineMultiChannel')}
+          </Label>
+        ) : null}
         <Hint>{microphoneDiscoveryHint(micDevicesQuery)}</Hint>
         <SettingsSelect
-          label="Microphone"
-          placeholder="Default microphone"
+          label={t('settings.microphoneSettings.microphone')}
+          placeholder={t('settings.microphoneSettings.defaultMicrophone')}
           value={preferredMic ?? DEFAULT_MIC_ID}
           options={micOptions}
           disabled={controlsDisabled}
-          triggerClassName={getFocusClassName(NAV.general.microphone)}
+          triggerClassName={getFocusClassName(NAV.general.microphone, hasMultiChannelInput ? 1 : 0)}
           onValueChange={(value) => {
             const next = value === DEFAULT_MIC_ID ? null : value;
             setPreferredMic(next);
@@ -123,10 +148,11 @@ export function MicrophoneSettings({
       </Field>
 
       <Field>
-        <Label>Mic monitor gain</Label>
+        <Label>{t('settings.microphoneSettings.micMonitorGain')}</Label>
         <Hint>
-          Volume of your microphone played back through the speakers while monitoring (
-          {monitorGainPct}%)
+          {t('settings.microphoneSettings.volumeOfYourMicrophonePlayedDescription', {
+            value1: monitorGainPct,
+          })}
         </Hint>
         <Slider
           min={0}

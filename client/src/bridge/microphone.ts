@@ -11,13 +11,14 @@ export type { MicSamplesCallback, StopListening } from './microphone-samples';
 export type { MicCaptureOptions, MicSampleFrame };
 
 export type MicrophoneAdapter = {
-  listDevices(): Promise<MicrophoneInfo[]>;
+  listDevices(combineChannels: boolean): Promise<MicrophoneInfo[]>;
   startCapture(
     captureId: string,
     preferred: string | null,
     options: MicCaptureOptions,
   ): Promise<string>;
   stopCapture(captureId: string): Promise<void>;
+  setMonitoring(captureId: string, enabled: boolean): Promise<void>;
   subscribe(captureId: string, cb: MicSamplesCallback): Promise<StopListening>;
 };
 
@@ -27,7 +28,8 @@ export const microphoneAdapter: MicrophoneAdapter = isTauri
   ? tauriMicrophoneAdapter
   : webMicrophoneAdapter;
 
-export const listMicrophones = (): Promise<MicrophoneInfo[]> => microphoneAdapter.listDevices();
+export const listMicrophones = (combineChannels = true): Promise<MicrophoneInfo[]> =>
+  microphoneAdapter.listDevices(combineChannels);
 
 const DEFAULT_CAPTURE_ID = 'default';
 

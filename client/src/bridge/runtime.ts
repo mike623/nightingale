@@ -30,6 +30,33 @@ class WebChannel {
   onmessage: ((message: unknown) => void) | null = null;
 }
 
+const nativeCommands = new Set([
+  'frontend_ready',
+  'window_immersive',
+  'minimize_window',
+  'load_window_state',
+  'track_window_state',
+  'import_custom_background',
+  'get_media_endpoint',
+  'remote_control_info',
+  'list_microphones',
+  'start_mic_capture',
+  'set_mic_monitoring',
+  'stop_mic_capture',
+  // Fork: desktop-only diagnostics, YouTube import, and the party remote.
+  'read_log',
+  'remote_diagnostics',
+  'import_available',
+  'imported_video_ids',
+  'probe_import',
+  'start_import',
+  'imported_video_id',
+  'redownload_song',
+  'remote_start',
+  'remote_stop',
+  'remote_status',
+]);
+
 const apiCall = async (name: string, args: InvokeArgs): Promise<unknown> => {
   const res = await fetch(`/api/cmd/${name}`, {
     method: 'POST',
@@ -186,8 +213,31 @@ const webListen = async (event: string, cb: EventCallback<unknown>): Promise<Unl
 
 export function invoke<T>(name: string, args?: InvokeArgs): Promise<T>;
 export function invoke(name: string, args?: InvokeArgs): Promise<unknown> {
-  return isTauri ? tauriInvoke(name, args) : apiCall(name, args);
+  if (!isTauri) {
+    return apiCall(name, args);
+  }
+  if (nativeCommands.has(name)) {
+    return tauriInvoke(name, args);
+  }
+  return tauriInvoke('dispatch_command', { name, payload: args ?? {} });
 }
+
+/**
+ * Command that must still reach the server while the page is being torn down.
+ * A plain `fetch` is dropped when the tab closes, so the web transport uses a
+ * beacon instead. Only for small bodies (browsers cap beacons at 64 KiB).
+ */
+export const invokeOnUnload = (name: string, args?: InvokeArgs): void => {
+  if (isTauri) {
+    void invoke(name, args).catch(() => undefined);
+    return;
+  }
+
+  const body = new Blob([JSON.stringify(args ?? {})], { type: 'application/json' });
+  if (!navigator.sendBeacon(`/api/cmd/${name}`, body)) {
+    void invoke(name, args).catch(() => undefined);
+  }
+};
 
 export function listen<T>(event: string, cb: EventCallback<T>): Promise<UnlistenFn>;
 export function listen(event: string, cb: EventCallback<unknown>): Promise<UnlistenFn> {
