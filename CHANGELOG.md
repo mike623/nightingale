@@ -61,6 +61,7 @@ below.
 
 ### Fixes
 
+- Realign and saving edited lyrics now time the lyrics again. Since word-level timing became opt-in, these explicit requests were treated like a plain analysis pass and left the song with no lyric timing at all.
 - The phone remote's search box no longer zooms the page in on iOS. Mobile Safari zooms when a focused field's text is under 16px and does not zoom back out, which left the rest of the page off-screen after one tap on search.
 - Advancing to the next song now plays the queue. The Next button, the keyboard and remote next command, and the end of a song took a random analyzed song even when songs were lined up, so a queue built from the phone or the library sidebar was only ever reachable by starting an entry by hand. Advancing now starts the queue's head and removes it from the queue; the weighted random draw stays as the fallback for an empty queue.
 - Restart, and any other seek, now clears the pitch graph and the score instead of leaving both frozen. Their positions were tracked as the song advanced and never moved back, so after a restart the graph kept the previous pass's points and stopped taking new ones, and the score stayed at its old value until playback passed the point it was interrupted at.

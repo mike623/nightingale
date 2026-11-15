@@ -342,6 +342,16 @@ static ANALYZER: LazyLock<Mutex<AnalyzerState>> = LazyLock::new(|| {
 static FORCE_TRANSCRIBE: LazyLock<Mutex<HashSet<String>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
+/// Hashes whose next analysis pass must align the known lyrics even when
+/// word-level timing is off: the user explicitly asked to re-time them.
+static ALIGN_REQUESTED: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
+/// Mark a hash so its next analysis pass aligns its lyrics file.
+pub(crate) fn mark_align_requested(file_hash: &str) {
+    lock_unpoisoned(&ALIGN_REQUESTED).insert(file_hash.to_string());
+}
+
 /// Hashes whose queued job should only run stem separation (key detect +
 /// separation) and keep the already-written LRC-provided transcript.
 static STEMS_ONLY: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
@@ -381,6 +391,8 @@ fn discard_cancelled_job(initial_hash: &str, file_hash: &str) -> bool {
     remove_from_queue(file_hash);
     lock_unpoisoned(&FORCE_TRANSCRIBE).remove(initial_hash);
     lock_unpoisoned(&FORCE_TRANSCRIBE).remove(file_hash);
+    lock_unpoisoned(&ALIGN_REQUESTED).remove(initial_hash);
+    lock_unpoisoned(&ALIGN_REQUESTED).remove(file_hash);
     lock_unpoisoned(&STEMS_ONLY).remove(initial_hash);
     lock_unpoisoned(&STEMS_ONLY).remove(file_hash);
     info!("[analyzer] Analysis cancelled for {file_hash}");
@@ -566,6 +578,7 @@ pub fn cancel_analysis(target: SongTarget) -> Result<usize, String> {
     for hash in &affected {
         remove_from_queue(hash);
         lock_unpoisoned(&FORCE_TRANSCRIBE).remove(hash);
+        lock_unpoisoned(&ALIGN_REQUESTED).remove(hash);
         lock_unpoisoned(&STEMS_ONLY).remove(hash);
     }
 
@@ -722,6 +735,7 @@ fn realign_one(file_hash: &str, language: Option<String>) -> bool {
         None,
         None,
     );
+    mark_align_requested(file_hash);
     enqueue_one(file_hash);
     true
 }
@@ -887,7 +901,9 @@ fn process_song(initial_hash: &str, cache: &CacheDir) {
     //   - lookup on, no synced match -> separate stems, NO transcription.
     // WhisperX runs only when word-level is enabled globally or forced per-song.
     let prefs = AppConfig::load();
+    let align_requested = lock_unpoisoned(&ALIGN_REQUESTED).remove(initial_hash);
     if !prefs.word_level_lyrics()
+        && !align_requested
         && !lock_unpoisoned(&STEMS_ONLY).contains(initial_hash)
         && !lock_unpoisoned(&FORCE_TRANSCRIBE).contains(initial_hash)
     {

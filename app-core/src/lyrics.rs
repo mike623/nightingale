@@ -5,7 +5,8 @@ use tracing::{info, warn};
 use ts_rs::TS;
 
 use crate::analyzer::{
-    enqueue_one, is_usdx_song, mark_stems_only, prepare_lrc_no_stems, update_song_analyzed,
+    enqueue_one, is_usdx_song, mark_align_requested, mark_stems_only, prepare_lrc_no_stems,
+    update_song_analyzed,
 };
 use crate::cache::CacheDir;
 use crate::library_db;
@@ -403,6 +404,7 @@ fn store_lyrics_and_realign(file_hash: &str, lyrics: &LyricsFile) -> Result<(), 
     cache.delete_transcript_variants(file_hash);
 
     update_song_analyzed(file_hash, false, previous_language, None, None, None);
+    mark_align_requested(file_hash);
     enqueue_one(file_hash);
     Ok(())
 }
