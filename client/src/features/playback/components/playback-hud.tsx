@@ -21,7 +21,6 @@ import { playerColorOption } from '@/shared/player-colors';
 import type { AppConfig } from '@/types/AppConfig';
 
 import { LiveStars } from './live-stars';
-import { ABOVE_PLAYBACK_BAR_CLASS } from './playback-bar';
 import { PlaybackTransportControls } from './playback-transport-controls';
 import { isPixabayTheme, themeName, type PlaybackTheme } from './theme';
 
@@ -129,7 +128,7 @@ function SettingsInfo({
 }) {
   return (
     <div className="flex flex-col items-end">
-      <HintText>Lyrics: {lyrics}</HintText>
+      <HintText>{t('playback.hud.lyrics', { source: lyrics })}</HintText>
       {guideAvailable && (
         <HintText>
           {showShortcuts
@@ -158,7 +157,7 @@ function SettingsInfo({
       </HintText>
       {showShortcuts && (
         <>
-          <HintText>[&rarr;] Next song</HintText>
+          <HintText>{t('playback.playbackHud.nextSongShortcut')}</HintText>
           <HintText>{t('playback.playbackHud.escBack')}</HintText>
         </>
       )}
@@ -204,7 +203,7 @@ function TouchControls({
     <div className={`flex w-[min(18rem,80vw)] items-end gap-2 ${touchLayoutClass}`}>
       <div className="sm:hidden">
         <SettingsInfo
-          lyrics={transcriptLabel(transcriptSource, segments)}
+          lyrics={t(transcriptLabel(transcriptSource, segments))}
           guideVolume={guideVolume}
           guideAvailable={guideAvailable}
           micUserEnabled={micUserEnabled}
@@ -325,10 +324,9 @@ function notePositionClass(hudPosition: PlaybackHudPosition): string {
   return hudPosition === 'bottom' ? 'top-2' : 'bottom-2';
 }
 
-// The playback bar owns the bottom strip, so a bottom HUD clears its height.
 function hudPositionClass(position: PlaybackHudPosition): string {
   return position === 'bottom'
-    ? `${ABOVE_PLAYBACK_BAR_CLASS} items-end`
+    ? 'bottom-[calc(2rem+env(safe-area-inset-bottom))] items-end md:bottom-3'
     : 'top-[4.25rem] items-start md:top-3';
 }
 
@@ -392,6 +390,7 @@ type PlaybackHudProps = {
   config: AppConfig | null;
   position?: PlaybackHudPosition;
   windowControls?: boolean;
+  onNext: () => void;
 };
 
 function PlaybackHudImpl({
@@ -400,6 +399,7 @@ function PlaybackHudImpl({
   config,
   position = 'top',
   windowControls = false,
+  onNext,
 }: PlaybackHudProps) {
   useTranslation();
   const { duration, guideVolume, guideAvailable } = usePlaybackTransportState();
@@ -473,7 +473,7 @@ function PlaybackHudImpl({
           <p className="line-clamp-1 [overflow-wrap:anywhere] text-sm text-white/70 md:text-base">
             {artist}
           </p>
-          <PlaybackTransportControls duration={duration} segments={segments} />
+          <PlaybackTransportControls duration={duration} segments={segments} onNext={onNext} />
           <output
             ref={gapCaptionRef}
             aria-live="polite"
@@ -508,7 +508,7 @@ function PlaybackHudImpl({
           </div>
           <div className="hidden sm:block">
             <SettingsInfo
-              lyrics={transcriptLabel(transcriptSource, segments)}
+              lyrics={t(transcriptLabel(transcriptSource, segments))}
               guideVolume={guideVolume}
               guideAvailable={guideAvailable}
               micUserEnabled={micUserEnabled}

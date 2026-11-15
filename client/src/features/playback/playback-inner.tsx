@@ -20,7 +20,6 @@ import { LoadingScreen } from '@/features/playback/components/loading-screen';
 import { LyricsDisplay } from '@/features/playback/components/lyrics-display';
 import { PauseOverlay } from '@/features/playback/components/pause-overlay';
 import { PitchGraph } from '@/features/playback/components/pitch-graph';
-import { PlaybackBar } from '@/features/playback/components/playback-bar';
 import { PlaybackHud } from '@/features/playback/components/playback-hud';
 import {
   isPitchGuideTheme,
@@ -299,13 +298,13 @@ function PlaybackLayout({
   return (
     <div className="fixed inset-0 overflow-hidden bg-black" style={{ contain: 'strict' }}>
       <Background />
-      {started && <PlaybackBar onNext={playNext} />}
       <PlaybackHud
         title={song.title}
         artist={song.artist}
         config={config}
         position={hudPosition}
         windowControls={sessionWindowControls}
+        onNext={playNext}
       />
       {!isPitchGuideTheme(theme) && (
         <PitchGraph series={mic.series} position={hudPosition} scale={pitchGraphScale} />

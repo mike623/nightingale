@@ -10,8 +10,6 @@ import type { PitchSeries } from '@/features/playback/lib/pitch/state';
 import { usePlaybackMicState } from '@/features/playback/providers';
 import { playerColorOption } from '@/shared/player-colors';
 
-import { ABOVE_PLAYBACK_BAR_CLASS } from './playback-bar';
-
 type StableNoteState = {
   displayed: number | null;
   candidate: number | null;
@@ -162,8 +160,7 @@ export function PitchGraph({ series, position = 'top', scale = 1 }: PitchGraphPr
     return null;
   }
 
-  // A bottom graph clears the playback bar the same way the bottom HUD does.
-  const positionClass = position === 'bottom' ? ABOVE_PLAYBACK_BAR_CLASS : 'top-2 sm:top-3';
+  const positionClass = position === 'bottom' ? 'bottom-2 sm:bottom-3' : 'top-2 sm:top-3';
 
   return (
     <div

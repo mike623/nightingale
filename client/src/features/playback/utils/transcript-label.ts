@@ -8,27 +8,27 @@
  * word-level.
  */
 
+import type { TranslationKey } from '@/i18n';
 import type { Segment } from '@/types/Transcript';
-
-/** Shown when the song plays with no lyrics at all. */
-const NONE = 'none';
 
 const hasWordTimings = (segments: readonly Segment[]): boolean =>
   segments.some((segment) => segment.words.some((word) => word.word.trim().length > 0));
 
-export function transcriptLabel(source: string, segments: readonly Segment[]): string {
+export function transcriptLabel(source: string, segments: readonly Segment[]): TranslationKey {
   if (segments.length === 0) {
-    return NONE;
+    return 'playback.transcriptLabel.none';
   }
 
   switch (source) {
     case 'usdx':
-      return 'UltraStar';
+      return 'playback.transcriptLabel.ultrastar';
     case 'lrc':
-      return hasWordTimings(segments) ? 'Enhanced LRC' : 'LRC';
+      return hasWordTimings(segments)
+        ? 'playback.transcriptLabel.enhancedLrc'
+        : 'playback.transcriptLabel.lrc';
     case 'lyrics':
-      return 'Aligned (AI)';
+      return 'playback.transcriptLabel.aligned';
     default:
-      return 'Generated (AI)';
+      return 'playback.transcriptLabel.generated';
   }
 }

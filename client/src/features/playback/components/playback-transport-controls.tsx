@@ -1,11 +1,14 @@
 import {
+  ListRestartIcon,
+  PauseIcon,
   RotateCcwIcon,
   RotateCwIcon,
   SkipBackIcon,
   SkipForwardIcon,
+  StepForwardIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 
 import { usePlaybackTransportActions } from '@/features/playback/providers';
 import { findCurrentSegment } from '@/features/playback/utils/lyrics-gap';
@@ -63,6 +66,8 @@ export type TransportControlsProps = {
   getCurrentTime: () => number;
   seek: (seconds: number) => void;
   lines: TransportLines;
+  /** Buttons placed before the seek buttons, for the surface that owns them. */
+  leading?: ReactNode;
   className?: string;
 };
 
@@ -76,6 +81,7 @@ export function TransportControls({
   getCurrentTime,
   seek,
   lines,
+  leading,
   className,
 }: TransportControlsProps) {
   const timerRef = useRef<HTMLParagraphElement>(null);
@@ -138,6 +144,7 @@ export function TransportControls({
           0:00 / {formatSeconds(duration)}
         </p>
         <div className="flex shrink-0 items-center gap-0.5">
+          {leading}
           <TransportButton
             icon={SkipBackIcon}
             label={t('playback.playbackTransportControls.previousLyricLine')}
@@ -190,11 +197,13 @@ export function TransportControls({
 export function PlaybackTransportControls({
   duration,
   segments,
+  onNext,
 }: {
   duration: number;
   segments: Segment[];
+  onNext: () => void;
 }) {
-  const { subscribe, getCurrentTime, seek } = usePlaybackTransportActions();
+  const { subscribe, getCurrentTime, seek, handlePause } = usePlaybackTransportActions();
   const hintRef = useRef(0);
 
   const lines = useMemo<TransportLines>(() => {
@@ -229,6 +238,25 @@ export function PlaybackTransportControls({
       getCurrentTime={getCurrentTime}
       seek={seek}
       lines={lines}
+      leading={
+        <>
+          <TransportButton
+            icon={ListRestartIcon}
+            label={t('playback.playbackTransportControls.restartSong')}
+            onClick={() => seek(0)}
+          />
+          <TransportButton
+            icon={PauseIcon}
+            label={t('playback.playbackTransportControls.pause')}
+            onClick={handlePause}
+          />
+          <TransportButton
+            icon={StepForwardIcon}
+            label={t('playback.playbackTransportControls.nextSong')}
+            onClick={onNext}
+          />
+        </>
+      }
     />
   );
 }
