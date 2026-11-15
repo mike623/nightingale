@@ -167,6 +167,13 @@ pub struct PlaybackProgress {
     /// Song the host is playing, so a remote can ask for its lyrics. Opaque id.
     #[serde(default)]
     pub file_hash: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub artist: Option<String>,
+    /// Solo live score (0-100 scale the HUD shows); 0 in multiplayer.
+    #[serde(default)]
+    pub score: f64,
     /// Absolute targets so remotes never guess a lyric boundary themselves.
     pub previous_line_ms: Option<u64>,
     pub next_line_ms: Option<u64>,

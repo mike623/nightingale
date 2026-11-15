@@ -211,6 +211,9 @@ function PlaybackLayout({
       skipIntro: position < transcript.firstSegmentStart - transcript.introSkipLeadSec,
       skipOutro: !result.open && position > transcript.lastSegmentEnd + 1,
       fileHash: song.file_hash,
+      title: song.title,
+      artist: song.artist,
+      score: mic.multiplayer ? 0 : mic.rawScore,
       previousLineMs: line > 0 ? Math.round(segments[line - 1].start * 1000) : null,
       nextLineMs:
         line >= 0 && line < segments.length - 1

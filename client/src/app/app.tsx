@@ -11,7 +11,7 @@ import { LibraryPage } from '@/features/library/library-page';
 import { MenuLayout } from '@/features/menu/menu';
 import { MenuFocusProvider } from '@/features/menu/providers/menu-focus-context';
 import { Playback } from '@/features/playback/playback';
-import { RemoteQueuePage } from '@/features/remote/remote-queue';
+import { RemotePage } from '@/features/remote/remote';
 import { SettingsPage } from '@/features/settings/settings';
 import { useUpdate } from '@/features/updates/queries/use-update';
 import { syncLanguagePreference, useTranslation } from '@/i18n';
@@ -84,7 +84,7 @@ const RemoteShell = () => (
     <TooltipProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/q" element={<RemoteQueuePage />} />
+          <Route path="/q" element={<RemotePage />} />
         </Routes>
       </BrowserRouter>
       <Toaster />

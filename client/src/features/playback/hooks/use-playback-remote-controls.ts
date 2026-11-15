@@ -33,6 +33,9 @@ const IDLE_PROGRESS: PlaybackProgress = {
   skipIntro: false,
   skipOutro: false,
   fileHash: null,
+  title: null,
+  artist: null,
+  score: 0,
   previousLineMs: null,
   nextLineMs: null,
 };

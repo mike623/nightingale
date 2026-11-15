@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 
-import type { PlaybackControl, PlaybackOptions } from '@/bridge/playback-remote';
 import { loadRemoteLyrics } from '@/bridge/remote-control';
 import { shiftStepLabel, shiftSteps } from '@/features/lyrics/utils/lrc-shift';
 import { errorMessage } from '@/features/remote/lib/error-message';
+import type { RemoteCommand, RemoteSnapshot } from '@/features/remote/lib/remote-model';
 import { TOUCH_TARGET } from '@/features/remote/lib/touch-target';
 import { t } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
@@ -14,7 +14,7 @@ import { cn } from '@/shared/utils/cn';
 const MS_PER_SEC = 1000;
 const REMOTE_LYRICS = ['remote-lyrics'];
 
-type Send = (control: PlaybackControl) => void;
+type Send = (command: RemoteCommand) => void;
 
 const formatOffset = (offsetMs: number): string =>
   `${offsetMs > 0 ? '+' : ''}${(offsetMs / MS_PER_SEC).toFixed(1)}s`;
@@ -23,7 +23,15 @@ const formatOffset = (offsetMs: number): string =>
  * The lyrics editor's shift steps. Here they move only what is on the shared
  * screen, for as long as this song plays; nothing on disk changes.
  */
-const ShiftControls = ({ offsetMs, send }: { offsetMs: number; send: Send }) => (
+const ShiftControls = ({
+  offsetMs,
+  disabled,
+  send,
+}: {
+  offsetMs: number;
+  disabled: boolean;
+  send: Send;
+}) => (
   <fieldset className="space-y-2">
     <legend className="flex w-full items-baseline justify-between gap-3 text-sm font-medium">
       <span>{t('remote.lyrics.shiftTiming')}</span>
@@ -33,8 +41,9 @@ const ShiftControls = ({ offsetMs, send }: { offsetMs: number; send: Send }) => 
       {shiftSteps.map((step) => (
         <Button
           className={cn(TOUCH_TARGET, 'w-full font-mono')}
+          disabled={disabled}
           key={step}
-          onClick={() => send({ type: 'shift-lyrics', deltaMs: step * MS_PER_SEC })}
+          onClick={() => send({ action: 'shift_lyrics', delta_ms: step * MS_PER_SEC })}
           type="button"
           variant="outline"
         >
@@ -85,8 +94,8 @@ const LyricsLines = ({ fileHash }: { fileHash: string }) => {
 };
 
 type LyricsSectionProps = {
-  fileHash: string | null;
-  options: PlaybackOptions | undefined;
+  snapshot: RemoteSnapshot | null;
+  locked: boolean;
   send: Send;
 };
 
@@ -94,8 +103,10 @@ type LyricsSectionProps = {
  * The playing song's words to read along with. Static lines: the shared screen
  * owns the timing, and a phone following it would only add its own lag.
  */
-export const LyricsSection = ({ fileHash, options, send }: LyricsSectionProps) => {
-  if (fileHash === null) {
+export const LyricsSection = ({ snapshot, locked, send }: LyricsSectionProps) => {
+  const fileHash = snapshot?.song?.file_hash ?? null;
+
+  if (snapshot === null || fileHash === null) {
     return (
       <Empty>
         <EmptyHeader>
@@ -108,19 +119,8 @@ export const LyricsSection = ({ fileHash, options, send }: LyricsSectionProps) =
 
   return (
     <section aria-label={t('remote.tabs.lyrics')} className="min-w-0 space-y-4">
-      <Button
-        aria-pressed={options?.lyricsHidden === true}
-        className={cn(TOUCH_TARGET, 'w-full')}
-        onClick={() => send({ type: 'toggle-lyrics' })}
-        type="button"
-        variant="outline"
-      >
-        {options?.lyricsHidden === true
-          ? t('remote.lyrics.showOnScreen')
-          : t('remote.lyrics.hideOnScreen')}
-      </Button>
-      {options?.lyricShiftAllowed === true && (
-        <ShiftControls offsetMs={options.lyricOffsetMs} send={send} />
+      {snapshot.lyric_shift_allowed && (
+        <ShiftControls disabled={locked} offsetMs={snapshot.lyric_offset_ms} send={send} />
       )}
       <LyricsLines fileHash={fileHash} />
     </section>

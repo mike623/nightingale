@@ -15,6 +15,9 @@ const playbackProgressSchema = z.object({
   skipIntro: z.boolean(),
   skipOutro: z.boolean(),
   fileHash: z.string().nullable().default(null),
+  title: z.string().nullable().default(null),
+  artist: z.string().nullable().default(null),
+  score: z.number().default(0),
   previousLineMs: z.number().nullable(),
   nextLineMs: z.number().nullable(),
 });
