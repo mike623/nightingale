@@ -24,7 +24,7 @@ ARG RUNTIME_BASE=debian:bookworm-slim
 # ── Stage 1: frontend bundle ──────────────────────────────────────────────
 # rust-embed slurps client/dist/ at compile time, so the React bundle must be
 # built before the server binary.
-FROM node:22-bookworm-slim AS frontend
+FROM node:22.23.4-bookworm-slim AS frontend
 
 RUN npm install -g pnpm@11.2.2
 
