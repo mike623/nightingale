@@ -1,43 +1,46 @@
 import { DownloadIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import type { PartyImport } from '@/bridge/party';
-import { errorMessage } from '@/features/remote/lib/error-message';
+import type { RemoteImport } from '@/bridge/remote-control';
 import { TOUCH_FIELD, TOUCH_TARGET } from '@/features/remote/lib/touch-target';
-import { usePartyImports, useSubmitPartyImport } from '@/features/remote/queries/use-party';
+import {
+  useRemoteImports,
+  useSubmitRemoteImport,
+} from '@/features/remote/queries/use-remote-imports';
+import { t, type TranslationKey } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/components/ui/empty';
 import { Input } from '@/shared/components/ui/input';
 import { Progress } from '@/shared/components/ui/progress';
-import { Spinner } from '@/shared/components/ui/spinner';
 import { cn } from '@/shared/utils/cn';
 
-const STATUS_LABELS: Record<PartyImport['status'], string> = {
-  draft: 'Waiting',
-  queued: 'Waiting',
-  downloading: 'Downloading',
-  imported: 'Added to the library',
-  skipped: 'Already in the library',
-  failed: 'Could not be downloaded',
+const STATUS_LABELS: Record<RemoteImport['status'], TranslationKey> = {
+  Draft: 'remote.import.status.waiting',
+  Queued: 'remote.import.status.waiting',
+  Downloading: 'remote.import.status.downloading',
+  Imported: 'remote.import.status.imported',
+  Skipped: 'remote.import.status.skipped',
+  Failed: 'remote.import.status.failed',
 };
 
-/** As much as a guest is told. The host keeps the download tool's own words. */
-const PROBLEM_LABELS: Record<NonNullable<PartyImport['problem']>, string> = {
-  unavailable: 'This video cannot be downloaded',
-  network: 'The network dropped — try again',
-  failed: 'Could not be downloaded',
+/** As much as a guest is told; the host keeps the download tool's own words. */
+const PROBLEM_LABELS: Record<NonNullable<RemoteImport['problem']>, TranslationKey> = {
+  unavailable: 'remote.import.problem.unavailable',
+  network: 'remote.import.problem.network',
+  failed: 'remote.import.status.failed',
 };
 
-const statusLine = (item: PartyImport) =>
-  item.status === 'failed' && item.problem !== null
-    ? PROBLEM_LABELS[item.problem]
-    : STATUS_LABELS[item.status];
+const statusLine = (item: RemoteImport): string =>
+  t(
+    item.status === 'Failed' && item.problem !== null
+      ? PROBLEM_LABELS[item.problem]
+      : STATUS_LABELS[item.status],
+  );
 
-const ImportRow = ({ item }: { item: PartyImport }) => (
+const ImportRow = ({ item }: { item: RemoteImport }) => (
   <li className="min-w-0 border-b py-2 last:border-b-0">
     <p className="truncate text-sm font-medium">{item.title}</p>
-
-    {item.status === 'downloading' ? (
+    {item.status === 'Downloading' ? (
       <span className="mt-1 flex items-center gap-2">
         <Progress className="flex-1" max={100} value={Math.round(item.pct * 100)} />
         <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
@@ -50,35 +53,13 @@ const ImportRow = ({ item }: { item: PartyImport }) => (
   </li>
 );
 
-const ImportList = () => {
-  const { data, isLoading, error } = usePartyImports();
-
-  if (isLoading) {
-    return (
-      <output aria-live="polite" className="flex justify-center py-6">
-        <Spinner />
-      </output>
-    );
-  }
-
-  if (error !== null) {
-    return (
-      <p aria-live="polite" className="text-sm text-destructive">
-        The imports could not be read: {errorMessage(error)}
-      </p>
-    );
-  }
-
-  const items = data ?? [];
-
+const ImportList = ({ items }: { items: readonly RemoteImport[] }) => {
   if (items.length === 0) {
     return (
       <Empty>
         <EmptyHeader>
-          <EmptyTitle>Nothing downloading</EmptyTitle>
-          <EmptyDescription>
-            Paste a YouTube link above and it will be added to the library.
-          </EmptyDescription>
+          <EmptyTitle>{t('remote.import.empty')}</EmptyTitle>
+          <EmptyDescription>{t('remote.import.emptyDescription')}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -94,13 +75,13 @@ const ImportList = () => {
 };
 
 /**
- * Submitting a link, and watching what the host does with it. A guest has no
- * screen to come back to, so the wait has to be visible here or the tap looks
- * like it did nothing.
+ * Submit a YouTube link and watch the host work through it. A guest has no
+ * other screen to come back to, so the wait is visible here.
  */
 export const ImportSection = () => {
   const [url, setUrl] = useState('');
-  const { mutate: submit, isLoading } = useSubmitPartyImport();
+  const { data: items = [] } = useRemoteImports();
+  const { mutate: submit, isLoading } = useSubmitRemoteImport();
 
   const send = () => {
     const link = url.trim();
@@ -111,7 +92,7 @@ export const ImportSection = () => {
   };
 
   return (
-    <section aria-label="Import" className="min-w-0 space-y-3">
+    <section aria-label={t('remote.tabs.import')} className="min-w-0 space-y-3">
       <form
         className="flex min-w-0 items-center gap-2"
         onSubmit={(event) => {
@@ -120,12 +101,12 @@ export const ImportSection = () => {
         }}
       >
         <Input
-          aria-label="YouTube link"
+          aria-label={t('remote.import.linkLabel')}
           className={cn(TOUCH_FIELD, 'min-w-0 flex-1')}
           enterKeyHint="go"
           inputMode="url"
           onChange={(event) => setUrl(event.target.value)}
-          placeholder="Paste a YouTube link"
+          placeholder={t('remote.import.linkLabel')}
           type="url"
           value={url}
         />
@@ -136,15 +117,11 @@ export const ImportSection = () => {
           variant="outline"
         >
           <DownloadIcon />
-          <span className="sr-only sm:not-sr-only">Add</span>
+          <span className="sr-only sm:not-sr-only">{t('remote.library.add')}</span>
         </Button>
       </form>
-
-      <p className="text-xs text-muted-foreground">
-        One video at a time. It is downloaded and analysed on the host, then appears in the library.
-      </p>
-
-      <ImportList />
+      <p className="text-xs text-muted-foreground">{t('remote.import.hint')}</p>
+      <ImportList items={items} />
     </section>
   );
 };

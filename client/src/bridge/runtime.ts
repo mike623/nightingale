@@ -43,7 +43,7 @@ const nativeCommands = new Set([
   'start_mic_capture',
   'set_mic_monitoring',
   'stop_mic_capture',
-  // Fork: desktop-only diagnostics, YouTube import, and the party remote.
+  // Desktop-only: diagnostics and the YouTube import page.
   'read_log',
   'remote_diagnostics',
   'import_available',
@@ -52,9 +52,6 @@ const nativeCommands = new Set([
   'start_import',
   'imported_video_id',
   'redownload_song',
-  'remote_start',
-  'remote_stop',
-  'remote_status',
 ]);
 
 const apiCall = async (name: string, args: InvokeArgs): Promise<unknown> => {

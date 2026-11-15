@@ -17,7 +17,6 @@ path = "src/lib.rs"
 [dependencies]
 app-api = { path = "../../app-api" }
 app-core = { path = "../../app-core" }
-remote = { path = "../src-remote", features = ["party"] }
 
 axum = { version = "0.7", features = ["ws", "macros", "multipart"] }
 tokio = { version = "1", features = [

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { toast } from 'sonner';
 
 import { setFullScreen, isFullScreen as tauriIsFullScreen } from '@/bridge/fullScreen';
 import { openUrl } from '@/bridge/opener';
@@ -10,8 +9,6 @@ import {
   MIN_SEMITONE_TOLERANCE,
   SEMITONE_TOLERANCE,
 } from '@/features/playback/lib/pitch/constants';
-import { RemoteQr } from '@/features/remote/components/remote-qr';
-import { useReleaseRemoteHost } from '@/features/remote/queries/use-remote-share-url';
 import { BackgroundSettings } from '@/features/settings/components/background-settings';
 import {
   ALIGN_BACKENDS,
@@ -91,7 +88,6 @@ const lyricsLayoutSettings = (config: AppConfig | undefined) => ({
 });
 
 const remoteSettings = (config: AppConfig | undefined) => ({
-  remoteControl: config?.remote_control === true,
   partyImport: config?.party_import === true,
   partyLyricShift: config?.party_lyric_shift === true,
 });
@@ -146,7 +142,6 @@ export const SettingsPage = () => {
   const navigate = useNavigate();
   const { data: config } = useConfig();
   const { mutate } = useConfigMutation();
-  const releaseRemoteHost = useReleaseRemoteHost();
   const { preference, setLanguage } = useTranslation();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -549,64 +544,26 @@ export const SettingsPage = () => {
                 </Field>
 
                 <Field>
-                  <Label>Remote control</Label>
-                  <Hint>
-                    Let a phone on this network control playback. Anyone who can reach the address
-                    below can take control, so leave it off on a network you do not trust
-                  </Hint>
+                  <Label>{t('settings.remote.importLabel')}</Label>
+                  <Hint>{t('settings.remote.importHint')}</Hint>
                   <OnOffButtonGroup
-                    value={playback.remoteControl}
-                    segment={NAV.playback.remoteControl}
+                    value={playback.partyImport}
+                    segment={NAV.playback.partyImport}
                     getFocusClassName={getFocusClassName}
-                    onChange={(remote_control) => {
-                      mutate({ remote_control });
-                      if (!remote_control) {
-                        void releaseRemoteHost().catch((error: unknown) => {
-                          toast.error(
-                            error instanceof Error
-                              ? error.message
-                              : 'Remote control could not be stopped.',
-                          );
-                        });
-                      }
-                    }}
+                    onChange={(party_import) => mutate({ party_import })}
                   />
-                  {playback.remoteControl && <RemoteQr className="mt-3" />}
                 </Field>
 
-                {playback.remoteControl && (
-                  <>
-                    <Field>
-                      <Label>Import from a phone</Label>
-                      <Hint>
-                        Let a phone paste a YouTube link to download into your library. Anyone who
-                        can reach the address can add to it and make this machine download, so leave
-                        it off unless you trust the room
-                      </Hint>
-                      <OnOffButtonGroup
-                        value={playback.partyImport}
-                        segment={NAV.playback.partyImport}
-                        getFocusClassName={getFocusClassName}
-                        onChange={(party_import) => mutate({ party_import })}
-                      />
-                    </Field>
-
-                    <Field>
-                      <Label>Shift lyrics from a phone</Label>
-                      <Hint>
-                        Let a phone move the playing song&apos;s lyrics earlier or later to match
-                        what the room hears. The change lasts for that song only and never reaches
-                        the stored lyrics
-                      </Hint>
-                      <OnOffButtonGroup
-                        value={playback.partyLyricShift}
-                        segment={NAV.playback.partyLyricShift}
-                        getFocusClassName={getFocusClassName}
-                        onChange={(party_lyric_shift) => mutate({ party_lyric_shift })}
-                      />
-                    </Field>
-                  </>
-                )}
+                <Field>
+                  <Label>{t('settings.remote.lyricShiftLabel')}</Label>
+                  <Hint>{t('settings.remote.lyricShiftHint')}</Hint>
+                  <OnOffButtonGroup
+                    value={playback.partyLyricShift}
+                    segment={NAV.playback.partyLyricShift}
+                    getFocusClassName={getFocusClassName}
+                    onChange={(party_lyric_shift) => mutate({ party_lyric_shift })}
+                  />
+                </Field>
               </FieldGroup>
             </div>
           </TabsContent>

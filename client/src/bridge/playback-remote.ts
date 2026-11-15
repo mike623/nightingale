@@ -14,6 +14,7 @@ const playbackProgressSchema = z.object({
   durationMs: z.number(),
   skipIntro: z.boolean(),
   skipOutro: z.boolean(),
+  fileHash: z.string().nullable().default(null),
   previousLineMs: z.number().nullable(),
   nextLineMs: z.number().nullable(),
 });
@@ -38,6 +39,9 @@ const playbackOptionsSchema = z.object({
   flavors: z.array(remoteOptionSchema),
   flavorKey: z.string(),
   flavorAvailable: z.boolean(),
+  lyricsHidden: z.boolean().default(false),
+  lyricOffsetMs: z.number().default(0),
+  lyricShiftAllowed: z.boolean().default(false),
 });
 
 export type PlaybackOptions = z.infer<typeof playbackOptionsSchema>;
@@ -53,6 +57,8 @@ const playbackControlSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('toggle-monitoring') }),
   z.object({ type: z.literal('select-theme'), key: z.string() }),
   z.object({ type: z.literal('select-flavor'), key: z.string() }),
+  z.object({ type: z.literal('toggle-lyrics') }),
+  z.object({ type: z.literal('shift-lyrics'), deltaMs: z.number() }),
 ]);
 
 export type PlaybackControl = z.infer<typeof playbackControlSchema>;

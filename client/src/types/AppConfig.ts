@@ -81,22 +81,17 @@ export type AppConfig = {
    */
   auto_play_next: boolean | null;
   /**
-   * Opt-in for the LAN remote-control listener. Defaults to false, and the
-   * listener still only starts when the UI asks for it.
-   */
-  remote_control: boolean;
-  /**
-   * Opt-in for letting a phone on the remote page submit a YouTube link to
-   * import. Off by default: the party surface is unauthenticated, and this
-   * is the one thing on it that runs a subprocess and writes to the library
-   * folder. Anyone who can reach the address can use it.
+   * Opt-in for letting a phone holding the queue link submit a YouTube link
+   * to import. Off by default: it is the one remote action that runs a
+   * subprocess and writes to the library folder, and anyone given the QR code
+   * can use it.
    */
   party_import: boolean;
   /**
-   * Opt-in for letting a phone on the remote page shift the playing song's
-   * lyric timing. Off by default: the party surface is unauthenticated, and
-   * a shift changes what everyone in the room reads. The shift is a display
-   * offset on the running song only; nothing on disk changes.
+   * Opt-in for letting a phone holding the queue link shift the playing
+   * song's lyric timing. Off by default: a shift changes what everyone in the
+   * room reads. The shift is a display offset on the running song only;
+   * nothing on disk changes.
    */
   party_lyric_shift: boolean;
   auto_continue_queue: boolean | null;

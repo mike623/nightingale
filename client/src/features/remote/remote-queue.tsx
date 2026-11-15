@@ -12,6 +12,7 @@ import {
   onPlaybackStatusChanged,
   requestPlaybackCommand,
   requestQueuePlayback,
+  requestRandomPlayback,
 } from '@/bridge/playback-status';
 import { loadSongs } from '@/bridge/songs';
 import { AlbumArt } from '@/features/library/components/song/album-art';
@@ -27,13 +28,18 @@ import {
 import { MultiplayerSetupDialog } from '@/features/playback/components/dialogs/multiplayer-setup';
 import { PlaybackActionButtons } from '@/features/playback/components/playback-action-buttons';
 import { playbackActions } from '@/features/playback/lib/playback-actions';
+import { ImportSection } from '@/features/remote/components/import-section';
+import { LibrarySection } from '@/features/remote/components/library-section';
+import { LyricsSection } from '@/features/remote/components/lyrics-section';
 import { useRemotePlayback, useRemoteTransport } from '@/features/remote/hooks/use-remote-playback';
+import { useRemoteImportAllowed } from '@/features/remote/queries/use-remote-imports';
 import { RemotePlaybackSettings } from '@/features/remote/remote-playback-settings';
 import { RemoteTransportBar } from '@/features/remote/remote-transport-bar';
 import { t } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Separator } from '@/shared/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { PLAYBACK_STATUS, SONGS } from '@/shared/query-keys';
 import type { LibraryMenuFilters } from '@/types/LibraryMenuFilters';
 import type { LoadSongsParams } from '@/types/LoadSongsParams';
@@ -68,12 +74,16 @@ function RemoteSkipButtons({
   const skipIntro = progress?.skipIntro === true;
   const skipOutro = progress?.skipOutro === true;
 
-  if (!skipIntro && !skipOutro) {
-    return null;
-  }
-
   return (
     <>
+      <Button
+        variant="outline"
+        disabled={disabled}
+        className="h-11 flex-1"
+        onClick={() => onControl({ type: 'seek', positionMs: 0 })}
+      >
+        {t('remote.playback.restart')}
+      </Button>
       {skipIntro ? (
         <Button
           variant="outline"
@@ -113,6 +123,7 @@ function PlaybackControl({ entryCount }: { entryCount: number }) {
     mutationFn: requestQueuePlayback,
   });
   const { mutate: clear, isLoading: clearing } = useClearPlaybackQueue();
+  const { mutate: draw, isLoading: drawing } = useMutation({ mutationFn: requestRandomPlayback });
   const [multiplayerOpen, setMultiplayerOpen] = useState(false);
   const runControl = (control: PlaybackControl) => sendControl(control);
   const transport = useRemoteTransport(progress, (seconds) =>
@@ -144,6 +155,16 @@ function PlaybackControl({ entryCount }: { entryCount: number }) {
     const disabled = starting || clearing || entryCount === 0 || status === undefined;
     return (
       <>
+        {entryCount === 0 ? (
+          <Button
+            className="mb-2 h-11 w-full"
+            variant="outline"
+            disabled={drawing || status === undefined}
+            onClick={() => draw()}
+          >
+            {t('remote.playback.playSomething')}
+          </Button>
+        ) : null}
         <div className="flex gap-2">
           <QueuePlaybackButtons
             label={t('remote.queue.play')}
@@ -301,6 +322,9 @@ export const RemoteQueuePage = () => {
   const { data: entries = [] } = usePlaybackQueueQuery();
   const { mutate: move, isLoading: reordering } = useMovePlaybackQueueEntry();
   const { mutate: remove, isLoading: removing } = useRemovePlaybackQueueEntry();
+  const { progress, options } = useRemotePlayback();
+  const { mutate: sendControl } = useMutation({ mutationFn: requestPlaybackControl });
+  const importAllowed = useRemoteImportAllowed();
 
   // The token only has to be in the URL once; the server turns it into a
   // cookie so it does not linger in the address bar or the browser history.
@@ -313,27 +337,55 @@ export const RemoteQueuePage = () => {
   }, []);
 
   return (
-    <div className="mx-auto flex h-dvh max-w-xl flex-col overflow-x-hidden">
-      <div className="flex flex-col gap-2 border-b px-4 py-3">
-        <header className="flex items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold">{t('remote.queue.title')}</h1>
-          <span className="text-xs text-muted-foreground">
-            {t('remote.queue.count', { value1: entries.length })}
-          </span>
-        </header>
+    <div className="mx-auto flex h-dvh max-w-3xl flex-col overflow-x-hidden">
+      <Tabs defaultValue="queue" className="flex min-h-0 flex-1 flex-col gap-0">
+        <div className="flex flex-col gap-2 border-b px-4 py-3">
+          <header className="flex items-center justify-between gap-3">
+            <h1 className="text-lg font-semibold">{t('remote.queue.title')}</h1>
+            <span className="text-xs text-muted-foreground">
+              {t('remote.queue.count', { value1: entries.length })}
+            </span>
+          </header>
+          <TabsList className="w-full">
+            <TabsTrigger value="queue">{t('remote.tabs.queue')}</TabsTrigger>
+            <TabsTrigger value="library">{t('remote.tabs.library')}</TabsTrigger>
+            <TabsTrigger value="lyrics">{t('remote.tabs.lyrics')}</TabsTrigger>
+            {importAllowed ? (
+              <TabsTrigger value="import">{t('remote.tabs.import')}</TabsTrigger>
+            ) : null}
+          </TabsList>
+        </div>
 
-        <RemoteSearch />
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        <QueueList
-          entries={entries}
-          disabled={reordering || removing}
-          onMove={move}
-          onRemove={remove}
-          dragFromRow
-        />
-      </div>
+        <TabsContent value="queue" className="flex min-h-0 flex-1 flex-col">
+          <div className="border-b px-4 py-2">
+            <RemoteSearch />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+            <QueueList
+              entries={entries}
+              disabled={reordering || removing}
+              onMove={move}
+              onRemove={remove}
+              dragFromRow
+            />
+          </div>
+        </TabsContent>
+        <TabsContent value="library" className="flex min-h-0 flex-1 flex-col px-4 py-3">
+          <LibrarySection />
+        </TabsContent>
+        <TabsContent value="lyrics" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <LyricsSection
+            fileHash={progress?.active === true ? progress.fileHash : null}
+            options={options}
+            send={(control) => sendControl(control)}
+          />
+        </TabsContent>
+        {importAllowed ? (
+          <TabsContent value="import" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            <ImportSection />
+          </TabsContent>
+        ) : null}
+      </Tabs>
 
       <div className="shrink-0 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <PlaybackControl entryCount={entries.length} />

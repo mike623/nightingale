@@ -177,9 +177,8 @@ export const NAV = {
     lyricsRomanizationMode: 8,
     scoringTolerance: 9,
     autoPlayNext: 10,
-    remoteControl: 11,
-    partyImport: 12,
-    partyLyricShift: 13,
+    partyImport: 11,
+    partyLyricShift: 12,
   },
 } as const;
 
@@ -225,8 +224,9 @@ export function getSettingsStops(
   }
   if (tab === 'playback') {
     // tabs, background, mode, master volume, lyrics v/h, lyrics scale, graph
-    // scale, romanization, tolerance, auto-next, remote control, footer
-    return [3, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2];
+    // scale, romanization, tolerance, auto-next, phone import, phone lyric
+    // shift, footer
+    return [3, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2, 2];
   }
 
   return isParakeet

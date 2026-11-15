@@ -3,7 +3,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use ::remote::Relay;
 use app_api::CommandState;
 use app_core::{RemoteControl, RemoteInfo};
 use axum::http::HeaderMap;
@@ -41,9 +40,6 @@ impl RemoteAddress {
 pub struct AppState {
     pub commands: CommandState,
     pub events: Arc<EventBus>,
-    /// The fork's party remote: an unauthenticated frame relay between the
-    /// host and phones, separate from the token-gated queue surface below.
-    pub(crate) relay: Arc<Relay>,
     remote: Arc<RwLock<RemoteControl>>,
     address: RemoteAddress,
     pub data_path_pinned: bool,
@@ -65,18 +61,11 @@ impl AppState {
         Self {
             commands,
             events,
-            relay: Arc::new(Relay::new()),
             remote: Arc::new(RwLock::new(remote)),
             address,
             data_path_pinned,
             library_pinned,
         }
-    }
-
-    /// The port the HTTP/WS listener actually bound, used to build the party
-    /// remote URL handed to phones.
-    pub fn bind_port(&self) -> u16 {
-        self.address.port
     }
 
     pub fn remote_token(&self) -> String {

@@ -16,27 +16,17 @@ pub(crate) async fn handle_upgrade(
     upgrade.on_upgrade(move |socket| run(state, socket))
 }
 
-/// One socket carries two streams to the client: the app event bus (the web
-/// stand-in for `AppHandle::emit`) and this connection's remote-control
-/// frames. Inbound text is relay traffic, which the shared `remote` crate
-/// validates and routes — the server adds no frame handling of its own.
+/// The web stand-in for `AppHandle::emit`: every app event goes out on the
+/// socket. Clients act through `/api/cmd`, so inbound frames are ignored apart
+/// from close.
 async fn run(state: AppState, socket: WebSocket) {
-    let client = state.relay.connect().await;
-    let client_id = client.id;
-    let mut outbound = client.outbound;
     let mut events = state.events.subscribe();
     let (mut sender, mut receiver) = socket.split();
 
-    tracing::debug!(%client_id, "ws connected");
+    tracing::debug!("ws connected");
 
     loop {
         tokio::select! {
-            frame = outbound.recv() => {
-                let Some(text) = frame else { break };
-                if sender.send(Message::Text(text)).await.is_err() {
-                    break;
-                }
-            }
             event = events.recv() => {
                 match event {
                     Ok(envelope) => {
@@ -50,22 +40,19 @@ async fn run(state: AppState, socket: WebSocket) {
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
                         // Slow consumer: drop the backlog and keep the socket
                         // alive rather than disconnecting.
-                        tracing::warn!(%client_id, %skipped, "ws lagged behind broadcast");
+                        tracing::warn!(%skipped, "ws lagged behind broadcast");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
             message = receiver.next() => {
-                let Some(Ok(message)) = message else { break };
                 match message {
-                    Message::Text(text) => state.relay.handle_text(client_id, &text).await,
-                    Message::Close(_) => break,
-                    _ => {}
+                    Some(Ok(Message::Close(_)) | Err(_)) | None => break,
+                    Some(Ok(_)) => {}
                 }
             }
         }
     }
 
-    state.relay.disconnect(client_id).await;
-    tracing::debug!(%client_id, "ws disconnected");
+    tracing::debug!("ws disconnected");
 }

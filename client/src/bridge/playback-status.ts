@@ -85,3 +85,11 @@ export const saveRemoteMicrophones = async (microphones: RemoteMicrophone[]): Pr
 
 export const loadRemoteMicrophones = async (): Promise<RemoteMicrophone[]> =>
   remoteMicrophonesSchema.parse(await invoke('load_remote_microphones'));
+
+/** Ask the host menu to draw a song when nothing is queued or playing. */
+export const requestRandomPlayback = async (): Promise<void> => {
+  await invoke('request_random_playback');
+};
+
+export const onRandomPlaybackRequested = async (callback: () => void): Promise<UnlistenFn> =>
+  await listen<unknown>('playback-random-requested', () => callback());

@@ -171,7 +171,6 @@ export const appConfigSchema: z.ZodType<AppConfig> = z.object({
   auto_play_next: nullableBoolean,
   // Non-nullable in the core config: an older stored config without the key
   // deserializes to `false` rather than to a missing value.
-  remote_control: z.boolean().default(false),
   party_import: z.boolean().default(false),
   party_lyric_shift: z.boolean().default(false),
   auto_continue_queue: nullableBoolean,

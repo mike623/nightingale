@@ -76,7 +76,7 @@ async fn main() -> Result<(), String> {
     };
 
     // Bind first: with `:0` the configured port is not the one phones must
-    // dial, and both remote surfaces hand out a URL built from it.
+    // dial, and the queue link hands out a URL built from it.
     let bound = match listener.local_addr() {
         Ok(addr) => addr,
         Err(e) => {
@@ -88,7 +88,7 @@ async fn main() -> Result<(), String> {
     let events = Arc::new(EventBus::new());
     let commands = app_api::CommandState::new(events.clone());
     let state = AppState::new(
-        commands.clone(),
+        commands,
         events.clone(),
         app_core::RemoteControl::load(),
         server::RemoteAddress::new(bound, args.remote_url.clone()),
@@ -112,14 +112,7 @@ async fn main() -> Result<(), String> {
         });
     }
 
-    let party = {
-        let events = events.clone();
-        remote::party::PartyState::new(commands.playback_queue(), move |entries| {
-            events.emit("playback-queue-changed", &entries);
-        })
-    };
-
-    let app = server::router(state).merge(remote::party::router(party));
+    let app = server::router(state);
 
     tracing::info!(addr = %args.bind, "Nightingale self-hosted server listening");
 

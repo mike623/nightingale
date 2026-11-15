@@ -244,20 +244,16 @@ pub struct AppConfig {
     /// library instead of returning to the menu. Default (`None`/false) keeps
     /// the exit-to-menu behaviour.
     pub auto_play_next: Option<bool>,
-    /// Opt-in for the LAN remote-control listener. Defaults to false, and the
-    /// listener still only starts when the UI asks for it.
-    #[serde(default)]
-    pub remote_control: bool,
-    /// Opt-in for letting a phone on the remote page submit a YouTube link to
-    /// import. Off by default: the party surface is unauthenticated, and this
-    /// is the one thing on it that runs a subprocess and writes to the library
-    /// folder. Anyone who can reach the address can use it.
+    /// Opt-in for letting a phone holding the queue link submit a YouTube link
+    /// to import. Off by default: it is the one remote action that runs a
+    /// subprocess and writes to the library folder, and anyone given the QR code
+    /// can use it.
     #[serde(default)]
     pub party_import: bool,
-    /// Opt-in for letting a phone on the remote page shift the playing song's
-    /// lyric timing. Off by default: the party surface is unauthenticated, and
-    /// a shift changes what everyone in the room reads. The shift is a display
-    /// offset on the running song only; nothing on disk changes.
+    /// Opt-in for letting a phone holding the queue link shift the playing
+    /// song's lyric timing. Off by default: a shift changes what everyone in the
+    /// room reads. The shift is a display offset on the running song only;
+    /// nothing on disk changes.
     #[serde(default)]
     pub party_lyric_shift: bool,
     /// When `true`, the results screen starts the next queued song by itself
@@ -339,7 +335,6 @@ impl Default for AppConfig {
             analysis_workers: None,
             pitch_tolerance_semitones: None,
             auto_play_next: None,
-            remote_control: false,
             party_import: false,
             party_lyric_shift: false,
             auto_continue_queue: None,

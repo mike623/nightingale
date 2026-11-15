@@ -87,7 +87,7 @@ const RemoteChecks = ({ diagnostics }: { diagnostics: RemoteDiagnostics }) => (
     <Check
       detail={
         diagnostics.status.port === null
-          ? 'Turn Remote control on in Settings → Playback to start it.'
+          ? 'The queue link is not listening. Another app may be using its port; restart Nightingale after closing it.'
           : `Listening on port ${diagnostics.status.port}.`
       }
       label="Listener"
@@ -103,9 +103,7 @@ const RemoteChecks = ({ diagnostics }: { diagnostics: RemoteDiagnostics }) => (
       <LocalBlockHint />
     )}
     <li className="text-xs text-muted-foreground">
-      {diagnostics.status.lan_url === null
-        ? 'No address to hand a phone: this machine is not on a local network.'
-        : `Phones open ${diagnostics.status.lan_url}`}
+      Phones join by scanning the QR code in the sidebar header.
     </li>
   </ul>
 );

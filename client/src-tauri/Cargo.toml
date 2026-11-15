@@ -22,7 +22,6 @@ tauri-build = { version = "2", features = [] }
 # App Core
 app-api = { path = "../../app-api" }
 app-core = { path = "../../app-core" }
-remote = { path = "../src-remote", features = ["listener"] }
 server = { path = "../src-server" }
 
 # Dependencies

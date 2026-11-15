@@ -16,7 +16,7 @@ import { Sidebar } from '@/features/menu/components/sidebar/sidebar';
 import { useDialog, type DialogMode } from '@/features/menu/hooks/use-dialog';
 import { useMenuNav } from '@/features/menu/hooks/use-menu-nav';
 import { QueuePlaybackListener } from '@/features/playback-queue/components/queue-playback-listener';
-import { useRemoteIdleHost } from '@/features/playback/hooks/use-remote-idle-host';
+import { useRandomPlaybackRequests } from '@/features/playback/hooks/use-random-playback-requests';
 import { CreateProfileDialog } from '@/features/profiles/components/create';
 import { LeaderboardsDialog } from '@/features/profiles/components/leaderboards';
 import { SelectProfileDialog } from '@/features/profiles/components/select';
@@ -28,7 +28,6 @@ import { PlexConnectDialog } from '@/features/sources/components/plex-connect';
 import { FolderSourceConfirmDialog } from '@/features/sources/components/source-change-warning';
 import { UpdateDialog } from '@/features/updates/components';
 import { SidebarInset } from '@/shared/components/ui/sidebar';
-import { useConfig } from '@/shared/config/use-config';
 
 const SourceDialogs = ({ mode }: { mode: DialogMode }) => (
   <>
@@ -43,15 +42,14 @@ export const MenuLayout = () => {
   const { mode, setMode } = useDialog();
   const { shouldRunSetup } = useShouldRunSetup();
   const location = useLocation();
-  const { data: config } = useConfig();
 
   // Mounted at the layout so an import keeps streaming progress (and lands its
   // toast) after the user navigates away from the Import page.
   useImportNotifications();
 
   // Every page under this layout is a screen with nothing playing, so this is
-  // where the relay's host seat is held for a phone that wants to start a song.
-  useRemoteIdleHost(config ?? null);
+  // where a phone's request to start a drawn song is answered.
+  useRandomPlaybackRequests();
 
   const isContentPage = location.pathname !== '/';
   const overlayOpen = isContentPage || mode !== null || shouldRunSetup;

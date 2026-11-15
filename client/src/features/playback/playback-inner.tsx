@@ -8,7 +8,7 @@
 
 import { useCallback } from 'react';
 
-import type { PlaybackOptions, PlaybackProgress } from '@/bridge/playback-remote';
+import type { PlaybackControl, PlaybackOptions, PlaybackProgress } from '@/bridge/playback-remote';
 import type { PlaybackPlayer } from '@/bridge/playback-session';
 import type { PlaybackCommand, PlaybackStatus } from '@/bridge/playback-status';
 import { isTauri } from '@/bridge/runtime';
@@ -29,6 +29,8 @@ import {
   themeName,
 } from '@/features/playback/components/theme';
 import { usePlaybackInput, usePlaybackNext, usePlaybackResult } from '@/features/playback/hooks';
+import { useLyricsHidden } from '@/features/playback/hooks/use-lyrics-hidden';
+import { usePlaybackCommandDeps } from '@/features/playback/hooks/use-playback-command-deps';
 import { usePlaybackConfigPersist } from '@/features/playback/hooks/use-playback-config-persist';
 import { usePlaybackHistory } from '@/features/playback/hooks/use-playback-history';
 import { usePlaybackRemote } from '@/features/playback/hooks/use-playback-remote';
@@ -36,8 +38,8 @@ import {
   usePlaybackRemoteControls,
   usePlaybackRemotePublisher,
 } from '@/features/playback/hooks/use-playback-remote-controls';
-import { useRemoteHost } from '@/features/playback/hooks/use-remote-host';
 import { playbackActions, playbackExitLabelKey } from '@/features/playback/lib/playback-actions';
+import { dispatchPlaybackCommand } from '@/features/playback/lib/playback-commands';
 import { FLAVORS, videoFlavorLabel } from '@/features/playback/lib/video-flavor';
 import {
   PlaybackProviders,
@@ -65,6 +67,20 @@ export type PlaybackInnerProps = {
 };
 
 type PlaybackLayoutProps = PlaybackInnerProps;
+
+// Controls that change one host preference each, handled apart from the
+// transport so neither switch grows past what reads at a glance.
+const SETTING_CONTROLS = [
+  'toggle-mic',
+  'select-mic',
+  'toggle-monitoring',
+  'select-theme',
+  'select-flavor',
+] as const;
+type SettingControl = Extract<PlaybackControl, { type: (typeof SETTING_CONTROLS)[number] }>;
+
+const isSettingControl = (control: PlaybackControl): control is SettingControl =>
+  SETTING_CONTROLS.some((type) => type === control.type);
 
 const EMPTY_PLAYERS: readonly PlaybackPlayer[] = [];
 
@@ -136,7 +152,8 @@ function PlaybackLayout({
   });
   usePlaybackInput(config, playNext, !result.open);
   usePlaybackHistory(song.file_hash);
-  useRemoteHost(song, config, playNext);
+  const commandDeps = usePlaybackCommandDeps(config, playNext);
+  const [lyricsHidden] = useLyricsHidden();
 
   // One state object feeds the host modals and the phone remote, so both offer
   // exactly the same actions.
@@ -193,6 +210,7 @@ function PlaybackLayout({
       durationMs: Math.round(duration * 1000),
       skipIntro: position < transcript.firstSegmentStart - transcript.introSkipLeadSec,
       skipOutro: !result.open && position > transcript.lastSegmentEnd + 1,
+      fileHash: song.file_hash,
       previousLineMs: line > 0 ? Math.round(segments[line - 1].start * 1000) : null,
       nextLineMs:
         line >= 0 && line < segments.length - 1
@@ -220,11 +238,37 @@ function PlaybackLayout({
     flavors: FLAVORS.map((flavor) => ({ key: flavor, label: videoFlavorLabel(flavor) })),
     flavorKey: videoFlavor,
     flavorAvailable: isPixabayTheme(theme),
+    lyricsHidden,
+    lyricOffsetMs: Math.round(transcript.lyricOffsetSec * 1000),
+    lyricShiftAllowed: config?.party_lyric_shift === true,
   };
 
   usePlaybackRemotePublisher(readProgress, remoteOptions, subscribe);
 
+  const runSettingControl = (control: SettingControl): void => {
+    switch (control.type) {
+      case 'toggle-mic':
+        micActions.handleToggleMic();
+        return;
+      case 'select-mic':
+        micActions.selectMic(control.deviceId);
+        return;
+      case 'toggle-monitoring':
+        micActions.handleToggleMicMonitor();
+        return;
+      case 'select-theme':
+        themeActions.selectTheme(control.key);
+        return;
+      case 'select-flavor':
+        themeActions.selectFlavor(control.key);
+    }
+  };
+
   usePlaybackRemoteControls((control) => {
+    if (isSettingControl(control)) {
+      runSettingControl(control);
+      return;
+    }
     switch (control.type) {
       case 'seek':
         seek(Math.max(0, Math.min(duration, control.positionMs / 1000)));
@@ -241,21 +285,11 @@ function PlaybackLayout({
         persistConfig({ guide_volume: volume });
         return;
       }
-      case 'toggle-mic':
-        micActions.handleToggleMic();
+      case 'toggle-lyrics':
+        dispatchPlaybackCommand({ action: 'toggle_lyrics' }, commandDeps);
         return;
-      case 'select-mic':
-        micActions.selectMic(control.deviceId);
-        return;
-      case 'toggle-monitoring':
-        micActions.handleToggleMicMonitor();
-        return;
-      case 'select-theme':
-        themeActions.selectTheme(control.key);
-        return;
-      case 'select-flavor':
-        themeActions.selectFlavor(control.key);
-        return;
+      case 'shift-lyrics':
+        dispatchPlaybackCommand({ action: 'shift_lyrics', delta_ms: control.deltaMs }, commandDeps);
     }
   });
 

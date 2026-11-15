@@ -79,7 +79,7 @@ impl CommandState {
     fn playback_progress(&self) -> PlaybackProgress {
         self.playback_progress
             .lock()
-            .map(|progress| *progress)
+            .map(|progress| progress.clone())
             .unwrap_or_default()
     }
 
@@ -88,7 +88,7 @@ impl CommandState {
             return PlaybackProgress::default();
         };
         *progress = next;
-        *progress
+        progress.clone()
     }
 
     fn playback_options(&self) -> PlaybackOptions {
@@ -150,7 +150,7 @@ pub struct RemoteMicrophone {
 /// What the playback surface publishes continuously so a remote can mirror the
 /// host's transport without owning a second clock. The host interpolates its
 /// own timeline; remotes only read what it last published.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackProgress {
     pub active: bool,
@@ -164,6 +164,9 @@ pub struct PlaybackProgress {
     pub duration_ms: u64,
     pub skip_intro: bool,
     pub skip_outro: bool,
+    /// Song the host is playing, so a remote can ask for its lyrics. Opaque id.
+    #[serde(default)]
+    pub file_hash: Option<String>,
     /// Absolute targets so remotes never guess a lyric boundary themselves.
     pub previous_line_ms: Option<u64>,
     pub next_line_ms: Option<u64>,
@@ -196,6 +199,14 @@ pub struct PlaybackOptions {
     pub flavors: Vec<RemoteOption>,
     pub flavor_key: String,
     pub flavor_available: bool,
+    #[serde(default)]
+    pub lyrics_hidden: bool,
+    /// Display-only lyric offset on the running song; positive shows lines later.
+    #[serde(default)]
+    pub lyric_offset_ms: i64,
+    /// Host setting `party_lyric_shift`: whether remotes may move the offset.
+    #[serde(default)]
+    pub lyric_shift_allowed: bool,
 }
 
 /// Fine-grained transport and settings actions a remote can request. Values are
@@ -216,6 +227,8 @@ pub enum PlaybackControl {
     ToggleMonitoring,
     SelectTheme { key: String },
     SelectFlavor { key: String },
+    ToggleLyrics,
+    ShiftLyrics { delta_ms: i64 },
 }
 
 /// Actions a remote can ask the playback surface to perform.
@@ -228,6 +241,9 @@ pub enum PlaybackCommand {
     Next,
     Exit,
 }
+
+/// Largest single lyric shift a remote may request; the editor's biggest step is 1s.
+const MAX_LYRIC_SHIFT_STEP_MS: i64 = 5_000;
 
 fn sanitize_control(
     control: PlaybackControl,
@@ -268,6 +284,12 @@ fn sanitize_control(
                 && options.flavors.iter().any(|flavor| flavor.key == key) =>
         {
             Some(PlaybackControl::SelectFlavor { key })
+        }
+        PlaybackControl::ToggleLyrics => Some(PlaybackControl::ToggleLyrics),
+        PlaybackControl::ShiftLyrics { delta_ms } if options.lyric_shift_allowed => {
+            Some(PlaybackControl::ShiftLyrics {
+                delta_ms: delta_ms.clamp(-MAX_LYRIC_SHIFT_STEP_MS, MAX_LYRIC_SHIFT_STEP_MS),
+            })
         }
         _ => None,
     }
@@ -509,6 +531,40 @@ pub async fn dispatch(state: CommandState, name: &str, payload: Value) -> CmdRes
             // The phone may name the singers; the host resolves microphones.
             events.emit_value("playback-queue-play-requested", payload);
             Ok(Value::Null)
+        }
+        // The phone may start a song when nothing is queued; the menu draws one.
+        "request_random_playback" => {
+            events.emit_value("playback-random-requested", Value::Null);
+            Ok(Value::Null)
+        }
+        // Lyrics of the song the host is playing, and nothing else: a remote
+        // cannot name a song, so it cannot read the rest of the library's words.
+        "load_remote_lyrics" => {
+            let Some(file_hash) = state.playback_progress().file_hash else {
+                return serde_json::to_value(RemoteLyrics::default()).map_err(serde_err);
+            };
+            let lines = tokio::task::spawn_blocking(move || app_core::lyric_lines(&file_hash))
+                .await
+                .map_err(blocking_task_err)?;
+            Ok(serde_json::to_value(RemoteLyrics { lines }).map_err(serde_err)?)
+        }
+        "load_remote_imports" => {
+            require_remote_import()?;
+            let rows: Vec<RemoteImport> = app_core::import_queue()
+                .iter()
+                .map(RemoteImport::from)
+                .collect();
+            Ok(serde_json::to_value(rows).map_err(serde_err)?)
+        }
+        "submit_remote_import" => {
+            require_remote_import()?;
+            #[derive(Deserialize)]
+            struct Args {
+                url: String,
+            }
+            let args: Args = deserialize(payload)?;
+            let row = submit_remote_import(args.url).await?;
+            Ok(serde_json::to_value(row).map_err(serde_err)?)
         }
         "load_playback_progress" => {
             Ok(serde_json::to_value(state.playback_progress()).map_err(serde_err)?)
@@ -968,6 +1024,117 @@ pub async fn dispatch(state: CommandState, name: &str, payload: Value) -> CmdRes
             message: format!("unknown command {name}"),
         }),
     }
+}
+
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteLyrics {
+    lines: Vec<String>,
+}
+
+/// Longest link a remote may submit; the body limit bounds the request, this
+/// bounds the one field inside it before it is parsed.
+const MAX_IMPORT_LINK_CHARS: usize = 2048;
+
+/// Why an import failed, as much as a guest is told. The host's own reason is
+/// yt-dlp's stderr, which quotes local paths, so it never leaves the host.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum RemoteImportProblem {
+    Unavailable,
+    Network,
+    Failed,
+}
+
+fn coarse_import_problem(reason: &str) -> RemoteImportProblem {
+    let lower = reason.to_ascii_lowercase();
+    if ["private", "unavailable", "removed", "age"]
+        .iter()
+        .any(|word| lower.contains(word))
+    {
+        return RemoteImportProblem::Unavailable;
+    }
+    if ["network", "timed out", "resolve"]
+        .iter()
+        .any(|word| lower.contains(word))
+    {
+        return RemoteImportProblem::Network;
+    }
+    RemoteImportProblem::Failed
+}
+
+/// One import as a remote sees it: no job id, submitter, or host failure text.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteImport {
+    id: String,
+    title: String,
+    artist: String,
+    duration_secs: f64,
+    status: app_core::ImportEntryStatus,
+    pct: f64,
+    problem: Option<RemoteImportProblem>,
+}
+
+impl From<&app_core::ImportQueueRow> for RemoteImport {
+    fn from(row: &app_core::ImportQueueRow) -> Self {
+        Self {
+            id: row.id.clone(),
+            title: row.title.clone(),
+            artist: row.artist.clone(),
+            duration_secs: row.duration_secs,
+            status: row.status,
+            pct: row.pct,
+            problem: row.reason.as_deref().map(coarse_import_problem),
+        }
+    }
+}
+
+/// Read per request so turning the setting off takes effect immediately.
+fn require_remote_import() -> Result<(), ApiError> {
+    if AppConfig::load().party_import {
+        Ok(())
+    } else {
+        Err(CommandError {
+            status: 403,
+            message: "importing from a phone is turned off".to_string(),
+        })
+    }
+}
+
+/// Queues one YouTube video. Only the video id survives from the request: the
+/// link is parsed, its host checked against the allowlist, and the URL that
+/// reaches yt-dlp is rebuilt from the id. Playlists are refused.
+async fn submit_remote_import(url: String) -> Result<RemoteImport, ApiError> {
+    if url.len() > MAX_IMPORT_LINK_CHARS {
+        return Err(ApiError::bad_request("that link is too long"));
+    }
+    let video_id =
+        app_core::video_id_of(&url).map_err(|error| ApiError::bad_request(error.message()))?;
+
+    let row = tokio::task::spawn_blocking(move || {
+        let (title, artist) =
+            app_core::oembed_title(&video_id).unwrap_or_else(|| (video_id.clone(), String::new()));
+        let preview = app_core::ImportPreview {
+            is_playlist: false,
+            playlist_id: None,
+            playlist_title: None,
+            entries: vec![app_core::ImportEntry {
+                id: video_id,
+                title,
+                artist,
+                duration_secs: 0.0,
+            }],
+        };
+        app_core::submit_import(&preview, app_core::ImportSubmitter::Phone)
+    })
+    .await
+    .map_err(blocking_task_err)?
+    .map_err(ApiError::bad_request)?;
+
+    row.first()
+        .map(RemoteImport::from)
+        .ok_or_else(|| ApiError::bad_request("nothing was queued"))
 }
 
 fn serde_err(e: serde_json::Error) -> ApiError {

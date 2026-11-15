@@ -33,3 +33,28 @@ export const loadRemoteInfo = async (): Promise<RemoteInfo> => {
 
   return parse(await response.json());
 };
+
+const remoteLyricsSchema = z.object({ lines: z.array(z.string()) });
+
+/** Words of the song the host is playing; empty while nothing plays. */
+export const loadRemoteLyrics = async (): Promise<string[]> =>
+  remoteLyricsSchema.parse(await invoke('load_remote_lyrics')).lines;
+
+const remoteImportSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  artist: z.string(),
+  durationSecs: z.number(),
+  status: z.enum(['Draft', 'Queued', 'Downloading', 'Imported', 'Skipped', 'Failed']),
+  pct: z.number(),
+  problem: z.enum(['unavailable', 'network', 'failed']).nullable(),
+});
+
+export type RemoteImport = z.infer<typeof remoteImportSchema>;
+
+/** The host's import queue as a phone may see it. Rejects when imports are off. */
+export const loadRemoteImports = async (): Promise<RemoteImport[]> =>
+  z.array(remoteImportSchema).parse(await invoke('load_remote_imports'));
+
+export const submitRemoteImport = async (url: string): Promise<RemoteImport> =>
+  remoteImportSchema.parse(await invoke('submit_remote_import', { url }));

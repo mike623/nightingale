@@ -1,15 +1,15 @@
 import { ListPlusIcon, SearchIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import type { PartySong } from '@/bridge/party';
+import { useAddPlaybackQueueEntry } from '@/features/playback-queue/use-playback-queue';
 import { useVirtualRows } from '@/features/remote/hooks/use-virtual-rows';
 import { errorMessage } from '@/features/remote/lib/error-message';
 import { TOUCH_FIELD, TOUCH_TARGET } from '@/features/remote/lib/touch-target';
 import {
-  useAddToPartyQueue,
-  usePartyLibrarySize,
-  usePartyLibraryWindow,
-} from '@/features/remote/queries/use-party';
+  useRemoteLibrarySize,
+  useRemoteLibraryWindow,
+} from '@/features/remote/queries/use-remote-library';
+import { t } from '@/i18n';
 import { Button } from '@/shared/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/components/ui/empty';
 import { Input } from '@/shared/components/ui/input';
@@ -17,21 +17,16 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Spinner } from '@/shared/components/ui/spinner';
 import { cn } from '@/shared/utils/cn';
 import { formatSeconds } from '@/shared/utils/format-duration';
+import type { Song } from '@/types/Song';
 
-/**
- * Every row is the same height: a line of title over a line of detail beside a
- * fingertip-sized button. Stated in `rem` so the list follows the reader's text
- * size, and matched by the `h-16` the rows carry.
- */
+/** Matches the `h-16` rows carry, in `rem` so the list follows text size. */
 const ROW_HEIGHT_REM = 4;
-
 const OVERSCAN_ROWS = 8;
-
 const ROW_LAYOUT = 'flex h-full min-w-0 items-center justify-between gap-3 px-3';
 
 type SongRowProps = {
-  song: PartySong;
-  onAdd: (song: PartySong) => void;
+  song: Song;
+  onAdd: (song: Song) => void;
   adding: boolean;
 };
 
@@ -41,12 +36,10 @@ const SongRow = ({ song, onAdd, adding }: SongRowProps) => (
       <p className="truncate text-sm font-medium">{song.title}</p>
       <p className="truncate text-xs text-muted-foreground">
         {song.artist} · {formatSeconds(song.duration_secs)}
-        {!song.is_analyzed && ' · not analyzed yet'}
       </p>
     </div>
-
     <Button
-      aria-label={`Add ${song.title} to the queue`}
+      aria-label={t('remote.queue.addLabel', { value1: song.title })}
       className={cn(TOUCH_TARGET, 'shrink-0 px-3')}
       disabled={adding}
       onClick={() => onAdd(song)}
@@ -54,31 +47,28 @@ const SongRow = ({ song, onAdd, adding }: SongRowProps) => (
       variant="outline"
     >
       <ListPlusIcon />
-      <span className="sr-only sm:not-sr-only">Add</span>
+      <span className="sr-only sm:not-sr-only">{t('remote.library.add')}</span>
     </Button>
   </div>
 );
 
-/**
- * A row the host has not sent yet. The library states its own length, so a row
- * can be scrolled to before the page holding it has arrived.
- */
+/** A row the host has not sent yet; the list knows its length up front. */
 const PendingRow = () => (
   <div className={ROW_LAYOUT}>
     <div className="min-w-0 flex-1 space-y-2">
       <Skeleton className="h-3.5 w-2/5" />
       <Skeleton className="h-3 w-3/5" />
-      <span className="sr-only">Loading</span>
+      <span className="sr-only">{t('common.loading')}</span>
     </div>
   </div>
 );
 
 type LibraryRowProps = {
-  song: PartySong | undefined;
+  song: Song | undefined;
   index: number;
   total: number;
   offset: string;
-  onAdd: (song: PartySong) => void;
+  onAdd: (song: Song) => void;
   adding: boolean;
 };
 
@@ -96,30 +86,29 @@ const LibraryRow = ({ song, index, total, offset, onAdd, adding }: LibraryRowPro
 const NoResults = ({ searching }: { searching: boolean }) => (
   <Empty>
     <EmptyHeader>
-      <EmptyTitle>No songs found</EmptyTitle>
+      <EmptyTitle>{t('remote.queue.noResults')}</EmptyTitle>
       <EmptyDescription>
-        {searching ? 'Try a different search.' : 'The host has no songs in its library yet.'}
+        {searching ? t('remote.library.tryAnotherSearch') : t('remote.library.emptyLibrary')}
       </EmptyDescription>
     </EmptyHeader>
   </Empty>
 );
 
 /**
- * The whole library as one scroll, however long it is. The host says how many
- * songs match, the list reserves that much room, and only the rows a thumb can
- * reach are in the document or fetched from the host.
+ * The whole analyzed library as one scroll. The host says how many songs
+ * match, the list reserves that much room, and only reachable rows are fetched.
  */
 const SongResults = ({ search }: { search: string }) => {
-  const { total, isLoading, error } = usePartyLibrarySize(search);
-  const { mutate: add, isLoading: adding } = useAddToPartyQueue();
-
+  const { total, isLoading, error } = useRemoteLibrarySize(search);
+  const { mutate: add, isLoading: adding } = useAddPlaybackQueueEntry();
   const { scrollRef, start, end, listHeight, rowOffset } = useVirtualRows({
     count: total,
     rowHeightRem: ROW_HEIGHT_REM,
     overscan: OVERSCAN_ROWS,
   });
-
-  const songAt = usePartyLibraryWindow(search, start, end);
+  const songAt = useRemoteLibraryWindow(search, start, end);
+  const addSong = (song: Song) =>
+    add({ song, tempo: song.tempo, keyOffset: song.key_offset, position: 'bottom' });
 
   if (isLoading) {
     return (
@@ -132,7 +121,7 @@ const SongResults = ({ search }: { search: string }) => {
   if (error !== null) {
     return (
       <p aria-live="polite" className="text-sm text-destructive">
-        The library could not be read: {errorMessage(error)}
+        {t('remote.library.loadError', { error: errorMessage(error) })}
       </p>
     );
   }
@@ -142,8 +131,7 @@ const SongResults = ({ search }: { search: string }) => {
   }
 
   return (
-    // A new search is a different list, and the offset a reader left in the old
-    // one points at an unrelated song in it, so the scroller starts again.
+    // A new search is a different list, so the scroller starts again.
     <div
       className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border"
       key={search}
@@ -156,7 +144,7 @@ const SongResults = ({ search }: { search: string }) => {
             index={start + offset}
             key={start + offset}
             offset={rowOffset(start + offset)}
-            onAdd={add}
+            onAdd={addSong}
             song={songAt(start + offset)}
             total={total}
           />
@@ -166,29 +154,27 @@ const SongResults = ({ search }: { search: string }) => {
   );
 };
 
-/**
- * The library as a phone sees it: a search box, the whole list under it, and
- * one action. Adding is the only thing a guest may do to the library — nothing
- * here renames, deletes, or plays a song directly.
- */
+/** Browse the host's analyzed library and add songs to the queue. */
 export const LibrarySection = () => {
   const [search, setSearch] = useState('');
 
   return (
-    <section aria-label="Library" className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+    <section
+      aria-label={t('remote.tabs.library')}
+      className="flex h-full min-h-0 min-w-0 flex-col gap-3"
+    >
       <div className="relative shrink-0">
         <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          aria-label="Search the library"
+          aria-label={t('remote.queue.searchPlaceholder')}
           className={cn(TOUCH_FIELD, 'pl-9')}
           enterKeyHint="search"
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search songs"
+          placeholder={t('remote.queue.searchPlaceholder')}
           type="search"
           value={search}
         />
       </div>
-
       <SongResults search={search.trim()} />
     </section>
   );

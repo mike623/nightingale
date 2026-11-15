@@ -3,7 +3,7 @@ mod import;
 mod logging;
 mod logs;
 mod microphones;
-mod remote_control;
+mod remote_diagnostics;
 
 use std::{
     collections::HashMap,
@@ -23,7 +23,6 @@ use logs::read_log;
 use microphones::{
     list_microphones, set_mic_monitoring, set_monitor_gain, start_mic_capture, stop_mic_capture,
 };
-use remote_control::{remote_diagnostics, remote_start, remote_status, remote_stop, RemoteControl};
 use serde_json::Value;
 use server::{AppState as RemoteAppState, EventBus};
 use tauri::{
@@ -77,6 +76,14 @@ impl RemoteServer {
             .lock()
             .unwrap_or_else(|error| error.into_inner());
         control.info()
+    }
+
+    /// Bound and serving. A failed bind leaves no handle, so this is false then.
+    fn is_listening(&self) -> bool {
+        self.listener
+            .lock()
+            .map(|listener| listener.is_some())
+            .unwrap_or(false)
     }
 
     async fn start(&self) -> Result<(), String> {
@@ -272,6 +279,13 @@ fn remote_control_info(remote: tauri::State<'_, RemoteServer>) -> app_core::Remo
 }
 
 #[tauri::command]
+async fn remote_diagnostics(
+    remote: tauri::State<'_, RemoteServer>,
+) -> Result<remote_diagnostics::RemoteDiagnostics, String> {
+    Ok(remote_diagnostics::diagnose(remote.is_listening()).await)
+}
+
+#[tauri::command]
 fn frontend_ready(window: tauri::Window) -> Result<(), String> {
     window.show().map_err(|error| error.to_string())
 }
@@ -333,7 +347,6 @@ pub fn run() {
     logging::init();
 
     tauri::Builder::default()
-        .manage(RemoteControl::default())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -363,10 +376,6 @@ pub fn run() {
             start_mic_capture,
             set_mic_monitoring,
             stop_mic_capture,
-            // Party remote (fork)
-            remote_start,
-            remote_stop,
-            remote_status,
         ])
         .setup(|app| {
             let _ = dotenvy::dotenv();

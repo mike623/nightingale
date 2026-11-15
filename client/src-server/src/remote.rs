@@ -30,6 +30,10 @@ pub(crate) const REMOTE_COMMANDS: &[&str] = &[
     "request_playback_command",
     "request_playback_control",
     "request_queue_playback",
+    "request_random_playback",
+    "load_remote_lyrics",
+    "load_remote_imports",
+    "submit_remote_import",
 ];
 
 /// Branding the browser fetches on its own, often before the pairing cookie
