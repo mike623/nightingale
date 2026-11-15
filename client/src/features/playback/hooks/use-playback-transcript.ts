@@ -23,16 +23,22 @@ export type PlaybackTranscript = {
 
 type LoadedTranscript = Pick<PlaybackTranscript, 'segments' | 'transcriptSource'>;
 
+const NO_SEGMENTS: Segment[] = [];
+
 /**
  * Module-level so the query cache can memoize the result: playback consumers
  * re-render per frame and must not see a new `segments` array each time.
  */
-const toPlaybackTranscript = (transcript: Transcript): LoadedTranscript => ({
-  segments: splitLongSegments(transcript.segments),
-  transcriptSource: transcript.source ?? 'generated',
-});
-
-const NO_SEGMENTS: Segment[] = [];
+const toPlaybackTranscript = (transcript: Transcript | null | undefined): LoadedTranscript => {
+  // The host returns whatever JSON the cache holds. A transcript without a
+  // segment list has no timed words to show, which is a lyric-less song rather
+  // than a failed load, so it plays with an empty lyrics track.
+  const segments: unknown = transcript?.segments;
+  return {
+    segments: Array.isArray(segments) ? splitLongSegments(transcript?.segments ?? []) : NO_SEGMENTS,
+    transcriptSource: transcript?.source ?? 'generated',
+  };
+};
 
 const loadErrorMessage = (reason: unknown): string =>
   t('playback.lyrics.loadError', {
